@@ -31,8 +31,15 @@ std::queue<MObject> newLights;
 
 ComLib comLib("sharedBuff", 100, PRODUCER);
 
-// =========================================================
+struct MsgHeader {
+	int type; 
+	int nrOf; 
+};
 
+//add struct to msg at the beginning. Add some sort of devider and then
+//add msg (vtx, normals etc)
+
+// =========================================================
 bool sendMsg(std::string &msgString, int sizeOfArr) {
 
 	bool sent = false; 
@@ -40,10 +47,6 @@ bool sendMsg(std::string &msgString, int sizeOfArr) {
 	//get array size
 	int arraySize = strlen(msgString.c_str());
 
-	//for (int i = 0; i < arraySize; i++) {
-	//	MStreamUtils::stdOutStream() << "array: " << i << " " << msgString[i] << std::endl;
-	//}
-
 	char* charMsgArray = NULL;
 	charMsgArray = new char[arraySize]();
 
@@ -52,46 +55,11 @@ bool sendMsg(std::string &msgString, int sizeOfArr) {
 
 	sent = comLib.send(charMsgArray, arraySize);
 
-
-	/* 
-	int tempSizeElement = 0;
-
-	for (int x = 0; x < sizeOfArr; x++) {
-		tempSizeElement = strlen(msgString[x].c_str());
-		arraySize = arraySize + tempSizeElement;
-	}
-	
-
-	char* charMsgArray = NULL;
-	charMsgArray = new char[arraySize]();
-
-	 
-	while (z != sizeOfArr) {
-
-		for (int y = 0; y < msgString[z].length(); y++) {
-			charMsgArray[charArrElement] = msgString[z][y];
-			charArrElement++;
-		}
-
-		z++;
-	}
-	
-
-	msgString.copy(charMsgArray, arraySize);
-
-	charMsgArray[arraySize - 1] = '\0';
-
-	sent = comLib.send(charMsgArray, arraySize);
-	if (sent) {
-		msgToSend = false;
-	}
-	*/
 	// =========================== 
 	delete[] charMsgArray;
 	return sent;
 
 }
-
 
 // ============== LIGHTS ==============
 void nodeLightAttributeChanged(MNodeMessage::AttributeMessage msg, MPlug &plug, MPlug &otherPlug, void* x)

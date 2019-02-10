@@ -56,7 +56,11 @@ int main() {
 	Model cube;
 	int modelIndex = 0;
 	int nrOfObj	   = 0;
-	size_t tempArraySize = 0; 
+	size_t tempArraySize = 0;
+	
+	int sometingToRead		= false;
+	bool checkIfModelLoaded = false;
+	bool isNextMsgSometing  = false;
 	// =============================================
 
     // Initialization
@@ -90,12 +94,6 @@ int main() {
 	Mesh mesh1	 = LoadMesh("resources/models/watermill.obj");
     Model model1 = LoadModelFromMesh(mesh1);                   
     model1.material = material1;                     // Set shader effect to 3d model
-
-
-	int sometingToRead		= false;
-	bool checkIfModelLoaded = false;
-	bool isNextMsgSometing  = false;
-
 
 	// triangle by hand
 	float vtx[3*3]{ 
