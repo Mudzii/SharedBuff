@@ -1,0 +1,68 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <Filter Include="resources">
+      <UniqueIdentifier>{fb201395-7dee-4ecf-ace5-0529ad019ac5}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="resources\shaders">
+      <UniqueIdentifier>{ed566acf-314d-445d-bc7c-7fdcd031adad}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <Image Include="resources\angle_gauge.png">
+      <Filter>resources</Filter>
+    </Image>
+    <Image Include="resources\background.png">
+      <Filter>resources</Filter>
+    </Image>
+    <Image Include="resources\billboard.png">
+      <Filter>resources</Filter>
+    </Image>
+    <Image Include="resources\cubicmap.png">
+      <Filter>resources</Filter>
+    </Image>
+    <Image Include="resources\cubicmap_atlas.png">
+      <Filter>resources</Filter>
+    </Image>
+    <Image Include="resources\fudesumi.png">
+      <Filter>resources</Filter>
+    </Image>
+    <Image Include="resources\heightmap.png">
+      <Filter>resources</Filter>
+    </Image>
+    <Image Include="resources\pitch.png">
+      <Filter>resources</Filter>
+    </Image>
+    <Image Include="resources\plane.png">
+      <Filter>resources</Filter>
+    </Image>
+    <Image Include="resources\plane_diffuse.png">
+      <Filter>resources</Filter>
+    </Image>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="resources\dresden_square.hdr">
+      <Filter>resources</Filter>
+    </None>
+    <None Include="resources\shaders\glsl330\phong.fs">
+      <Filter>resources\shaders</Filter>
+    </None>
+    <None Include="resources\shaders\glsl330\phong.vs">
+      <Filter>resources\shaders</Filter>
+    </None>
+    <None Include="resources\shaders\glsl330\base.fs">
+      <Filter>resources\shaders</Filter>
+    </None>
+    <None Include="resources\shaders\glsl330\base.vs">
+      <Filter>resources\shaders</Filter>
+    </None>
+  </ItemGroup>
+  <ItemGroup>
+    <Object Include="resources\plane.obj">
+      <Filter>resources</Filter>
+    </Object>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="core_basic_window.cpp" />
+  </ItemGroup>
+</Project>
