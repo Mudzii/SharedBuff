@@ -20,7 +20,7 @@ MObject m_node;
 MStatus status = MS::kSuccess;
 bool initBool = false;
 
-enum NODE_TYPE { TRANSFORM, MESH };
+enum NODE_TYPE { TRANSFORM, MESH }; 
 
 MTimer gTimer;
 float globalTime = 0;
