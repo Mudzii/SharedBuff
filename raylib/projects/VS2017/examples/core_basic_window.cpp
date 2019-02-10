@@ -4,8 +4,8 @@
 #include <raymath.h>
 #include <rlgl.h>
 
-#include <sstream>
 #include <map>
+#include <sstream>
 #include <functional>
 
 #include <Windows.h>
@@ -31,10 +31,10 @@ struct modelPos {
 
 // ===========================================
 
-void addModel(std::vector<modelFromMaya>& objNameArray, char* buffer, int bufferSize, Shader shader, int* nrObjs, int* index);
+void addModel	(std::vector<modelFromMaya>& objNameArray, char* buffer, int bufferSize, Shader shader, int* nrObjs, int* index);
 void updateModel(std::vector<modelFromMaya>& objNameArray, char* buffer, int bufferSize, Shader shader, int* nrObjs, int* index);
 
-typedef void(FnPtr)(std::vector<modelFromMaya>&, char*, int, Shader, int*, int*);
+typedef void(*FnPtr)(std::vector<modelFromMaya>&, char*, int, Shader, int*, int*);
 // ===========================================
 std::string recvFromMaya(char* buffer);
 
@@ -50,8 +50,8 @@ int main() {
 	std::vector<modelFromMaya> modelsFromMaya;
 
 	std::map<std::string, FnPtr> funcMap;
-	//funcMap["addModel"]	   = addModel;
-	//funcMap["updateModel"] = updateModel;
+	funcMap["addModel"]	   = addModel;
+	funcMap["updateModel"] = updateModel;
 
 	Model cube;
 	int modelIndex = 0;
@@ -188,7 +188,7 @@ int main() {
 					MatrixTranslate(pos.x,pos.y,pos.z));
 
 				Model copy = model1;
-				flatScene.push_back({copy, modelmatrix});
+				//flatScene.push_back({copy, modelmatrix});
 				i++;
 			}
 
@@ -203,7 +203,7 @@ int main() {
 			funcToCall = recvFromMaya(tempArray);
 
 			if (funcToCall != "") {
-				//funcMap[funcToCall](modelsFromMaya, tempArray, tempArraySize, shader1, &nrOfObj, &modelIndex);
+				funcMap[funcToCall](modelsFromMaya, tempArray, tempArraySize, shader1, &nrOfObj, &modelIndex);
 			}
 
 			int i = 0;
@@ -295,7 +295,7 @@ int main() {
 	UnloadModel(model1);
 	UnloadModel(tri);
 
-	UnloadModel(cube);
+	//UnloadModel(cube);
 
     CloseWindowRL();              // Close window and OpenGL context
     //--------------------------------------------------------------------------------------
