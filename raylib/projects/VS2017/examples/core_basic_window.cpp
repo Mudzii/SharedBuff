@@ -56,7 +56,7 @@ std::string recvFromMaya(char* buffer);
 MSGTYPE recvFromMaya2(char* buffer);
 
 // ===========================================
-ComLib comLib("sharedBuff", 100, CONSUMER);
+ComLib comLib("sharedBuff2", 100, CONSUMER);
 
 // ===========================================
 int main() {
@@ -67,8 +67,8 @@ int main() {
 	std::vector<modelFromMaya> modelsFromMaya;
 
 	std::map<MSGTYPE, FnPtr> funcMap;
-	funcMap[MSGTYPE::NEW_NODE] = addModel2;
-	funcMap[MSGTYPE::VTX] = updateModel2;
+	funcMap[NEW_NODE] = addModel2;
+	funcMap[VTX] = updateModel2;
 
 	/*std::map<std::string, FnPtr> funcMap;
 	funcMap["addModel"]	   = addModel;
@@ -216,7 +216,6 @@ int main() {
 		///////////////////////// TEST FOR DRAW MODEL UNDER RUNTIME
 		tempArraySize = comLib.nextSize();
 		char* tempArray = new char[tempArraySize];
-
 
 		MSGTYPE type = MSGTYPE::DEFAULT;
 		type = recvFromMaya2(tempArray);
@@ -547,29 +546,19 @@ MSGTYPE recvFromMaya2(char* buffer) {
 	bool test = comLib.recv(buff, nr);
 	if (test == true) {
 
-		/*std::string reference;
-		std::string testString(buff, nr);
-		std::stringstream stringStream;
-		stringStream << testString;
-
-		std::string temp;
-		stringStream >> temp;
-		if (std::stringstream(temp) >> reference) {
-			lineOut = temp;
-			std::cout << lineOut << std::endl;
-		}*/
-
 		int typeInt = 0;
 
 		std::string msgString(buff, nr);
 		std::stringstream ss(msgString);
 		ss >> typeInt;
 
-		//std::cout << "TYPE INT: " << typeInt << std::endl;
-
 		if (MSGTYPE::VTX == typeInt) {
 			type = MSGTYPE::VTX;
 
+		}
+
+		else if (MSGTYPE::NEW_NODE == typeInt) {
+			type = MSGTYPE::NEW_NODE;
 		}
 
 	}
@@ -583,80 +572,68 @@ MSGTYPE recvFromMaya2(char* buffer) {
 void addModel2(std::vector<modelFromMaya>& objNameArray, char* buffer, int bufferSize, Shader shader1, int* nrObjs, int* index) {
 
 	MsgHeader header;
+
+	std::cout << "==================================" << std::endl;
 	std::cout << "IN ADD MODEL" << std::endl;
-
-	int typeInt;
-	int nrOfElements;
-
-	float exampleInt;	//use to find int type in string array
-	char examplechar;
-	float* arrayVtx = new float[bufferSize];
-	int lengthVtxArray = 0;
-	std::string tempName = "";
 
 	int check = -1;
 
-	std::string msgString(buffer, bufferSize);
-	std::stringstream ss(msgString);
+	int typeInt = 0;
+	int nrOfElements = 0;
 
-	std::string div = "";
-	std::string elements = "";
+	float* arrayVtx = new float[bufferSize];
+	int lengthVtxArray = 0;
+
+	std::string msgString(buffer, bufferSize);
+	std::istringstream ss(msgString);
+
+	std::string objName = "";
+	std::string temp;
+
+	
+	//get header elements
+	if (check == -1) {
+		ss >> typeInt >> header.nrOf >> objName;
+
+		if (typeInt == MSGTYPE::NEW_NODE)
+			header.type = MSGTYPE::NEW_NODE;
+
+		std::cout << "TYPE: "	 << header.type << std::endl;
+		std::cout << "NR OF: "	 << header.nrOf << std::endl;
+		std::cout << "objName: " << objName << std::endl;
+
+		check = 0;
+	}
+
+
+	int element		= 0; 
+	float tempFloat = 0.0f;
+	nrOfElements	= header.nrOf * 3; //for each vtx * [x,y,z]
 
 	while (!ss.eof()) {
 
-		if (check == -1) {
-			ss >> typeInt >> nrOfElements >> div >> elements;
-			if (div == "|")
-				check = 0;
+		ss >> temp;
+		std::cout << "TEMP: " << temp << std::endl;
+
+		if(element >= nrOfElements){
+			check = 2; 
+			std::cout << "Last element fount " << std::endl;
+			break; 
+
 		}
 
-		if (check == 0) {
-			std::cout << "HEADER FILLED";
+		if (std::stringstream(temp) >> tempFloat && check == 0) {
+			arrayVtx[element] = (float)std::stof(temp);
+			
+			lengthVtxArray++;
+			element++;
 		}
 
 	}
 
 
 	/*
-	std::string reference;
-	std::string temp;
-
-	stringStream >> temp;
-	if (std::stringstream(temp) >> reference) {
-		//is command, discard
-	}
-
-	int i = 0;
-	while (!stringStream.eof()) {
-
-		stringStream >> temp;
-		if (std::stringstream(temp) >> exampleInt) {
-			if (check == 0) {
-				arrayVtx[i] = (float)std::stof(temp);
-				lengthVtxArray++;
-			}
-
-			if (check == -1) {
-				tempName.append(temp);
-			}
-
-			i++;
-			temp = "";
-		}
-
-		if (std::stringstream(temp) >> examplechar) {
-
-			if (examplechar == '|') {
-				check = 0;
-				i = 0;
-			}
-
-			if (check == -1) {
-				tempName.append(temp);
-			}
-		}
-	}
-
+	
 	bool exists = false;
 	for (int i = 0; i < *nrObjs; i++) {
 		if (objNameArray[i].name == tempName) {
@@ -685,6 +662,9 @@ void addModel2(std::vector<modelFromMaya>& objNameArray, char* buffer, int buffe
 
 void updateModel2(std::vector<modelFromMaya>& objNameArray, char* buffer, int bufferSize, Shader shader1, int* nrObjs, int* index)
 {
+
+	std::cout << "IN UPDATE MODEL" << std::endl;
+
 	float exampleInt;	//use to find int type in string array
 	char examplechar;
 	float* arrayVtx = new float[bufferSize];
@@ -693,10 +673,11 @@ void updateModel2(std::vector<modelFromMaya>& objNameArray, char* buffer, int bu
 
 	int check = -1;
 
-	std::string testString(buffer, bufferSize);
-	std::stringstream stringStream;
-	stringStream << testString;
+	std::string msgString(buffer, bufferSize);
+	std::stringstream ss(msgString);
 
+
+	/*
 	std::string reference;
 	std::string temp;
 
@@ -759,6 +740,7 @@ void updateModel2(std::vector<modelFromMaya>& objNameArray, char* buffer, int bu
 			objNameArray.insert(objNameArray.begin() + i, { tempModelToAdd, tempIndex, tempName, MatrixTranslate(2,0,2) });
 		}
 	}
+	*/
 }
 
 /*

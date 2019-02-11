@@ -36,7 +36,7 @@ float globalTime = 0;
 std::queue<MObject> newMeshes;
 std::queue<MObject> newLights;
 
-ComLib comLib("sharedBuff", 100, PRODUCER);
+ComLib comLib("sharedBuff2", 100, PRODUCER);
 
 struct MsgHeader {
 	int type; 
@@ -44,24 +44,22 @@ struct MsgHeader {
 };
 
 // =========================================================
-bool sendMsg(std::string &msgString, MSGTYPE msgType, int nrOfElements) {
+bool sendMsg(std::string &msgString, MSGTYPE msgType, int nrOfElements, std::string objName) {
 
+	//MGlobal::displayInfo(MString("nrOfElements: ") + nrOfElements + "\n");
 	bool sent = false;
 
 	MsgHeader header;
 	header.type = msgType;
-	header.nrOf = nrOfElements * 3;
+	header.nrOf = nrOfElements;
 
 	std::string headerString = "";
 	headerString += std::to_string(header.type) + " ";
-	headerString += std::to_string(header.nrOf);
-	headerString += "|";
+	headerString += std::to_string(header.nrOf) + " ";
+	headerString += objName + " ";
 
 	//get array size
-	//int headerSize = strlen(headerString.c_str());
 	//int arraySize = strlen(msgString.c_str());
-
-	//MGlobal::displayInfo(MString("nrOfElements: ") + nrOfElements + "\n");
 	std::string finalMsgString;
 	finalMsgString.append(headerString);
 	finalMsgString.append(msgString);
@@ -401,6 +399,7 @@ void nodeAttributeChanged(MNodeMessage::AttributeMessage msg, MPlug &plug, MPlug
 	}
 
 	//add command + name to string
+	std::string objName = mesh.name().asChar();
 	//std::string objName = "updateModel ";
 	//objName += mesh.name().asChar();
 	//objName += " | ";
@@ -424,7 +423,7 @@ void nodeAttributeChanged(MNodeMessage::AttributeMessage msg, MPlug &plug, MPlug
 		msgToSend = true;
 
 	if (msgToSend) {
-		sendMsg(vtxArrayString, MSGTYPE::VTX, nrElements);
+		sendMsg(vtxArrayString, MSGTYPE::VTX, nrElements, objName);
 	}
 
 	/////////////===============================
@@ -536,8 +535,7 @@ void nodeAttributeChanged(MNodeMessage::AttributeMessage msg, MPlug &plug, MPlug
 	MIntArray shaderGroupsIndecies;
 	mesh.getConnectedShaders(0, shaderGroups, shaderGroupsIndecies);
 
-	if (shaderGroups.length() > 1)
-	{
+	if (shaderGroups.length() > 1) {
 		MFnDependencyNode shaderNode(shaderGroups[0]);
 		MPlug surfaceShader = shaderNode.findPlug("surfaceShader");
 
@@ -610,6 +608,8 @@ void vtxPlugConnected(MPlug & srcPlug, MPlug & destPlug, bool made, void* client
 			}
 
 			//add command + name to string
+			std::string objName = mesh.name().asChar();
+
 			//std::string objName = "addModel ";
 			//objName += mesh.name().asChar();
 			//objName += " | ";
@@ -635,7 +635,7 @@ void vtxPlugConnected(MPlug & srcPlug, MPlug & destPlug, bool made, void* client
 				msgToSend = true;
 
 			if (msgToSend) {
-				sendMsg(vtxArrayString, MSGTYPE::NEW_NODE, nrElements);
+				sendMsg(vtxArrayString, MSGTYPE::NEW_NODE, nrElements, objName);
 			}
 
 		}
