@@ -9,6 +9,7 @@
 enum MSG_TYPE { NORMAL = 0, DUMMY = 1 };
 enum TYPE { PRODUCER, CONSUMER };
 
+
 // ===== HEADER STRUCT =====
 struct Header {
 	MSG_TYPE type;

@@ -36,9 +36,6 @@ struct MsgHeader {
 	int nrOf; 
 };
 
-//add struct to msg at the beginning. Add some sort of devider and then
-//add msg (vtx, normals etc)
-
 // =========================================================
 bool sendMsg(std::string &msgString, int sizeOfArr) {
 
@@ -54,6 +51,8 @@ bool sendMsg(std::string &msgString, int sizeOfArr) {
 	charMsgArray[arraySize - 1] = '\0';
 
 	sent = comLib.send(charMsgArray, arraySize);
+
+	MStreamUtils::stdOutStream() << "SENT " << endl;
 
 	// =========================== 
 	delete[] charMsgArray;

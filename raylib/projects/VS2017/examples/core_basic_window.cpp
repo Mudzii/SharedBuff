@@ -16,30 +16,47 @@
 #pragma comment(lib, "Project1.lib")
 
 // ===========================================
-struct modelFromMaya
-{
+struct modelFromMaya {
 	Model model;
 	int index;
 	std::string name;
 	Matrix modelMatrix;
 };
 
-struct modelPos { 
-	Model model; 
-	Matrix modelMatrix; 
+struct modelPos {
+	Model model;
+	Matrix modelMatrix;
+};
+
+enum MSGTYPE {
+	DEFAULT = 1000,
+	NEW_NODE = 1001,
+	VTX = 1002
+
+};
+
+struct MsgHeader {
+	MSGTYPE type;
+	int nrOf;
 };
 
 // ===========================================
 
-void addModel	(std::vector<modelFromMaya>& objNameArray, char* buffer, int bufferSize, Shader shader, int* nrObjs, int* index);
+void addModel(std::vector<modelFromMaya>& objNameArray, char* buffer, int bufferSize, Shader shader, int* nrObjs, int* index);
 void updateModel(std::vector<modelFromMaya>& objNameArray, char* buffer, int bufferSize, Shader shader, int* nrObjs, int* index);
+
+
+void addModel2(std::vector<modelFromMaya>& objNameArray, char* buffer, int bufferSize, Shader shader, int* nrObjs, int* index);
+void updateModel2(std::vector<modelFromMaya>& objNameArray, char* buffer, int bufferSize, Shader shader, int* nrObjs, int* index);
 
 typedef void(*FnPtr)(std::vector<modelFromMaya>&, char*, int, Shader, int*, int*);
 // ===========================================
 std::string recvFromMaya(char* buffer);
 
+MSGTYPE recvFromMaya2(char* buffer);
+
 // ===========================================
-ComLib comLib("sharedBuff", 100, CONSUMER); 
+ComLib comLib("sharedBuff", 100, CONSUMER);
 
 // ===========================================
 int main() {
@@ -49,104 +66,108 @@ int main() {
 	// OUR STUFF ====================================
 	std::vector<modelFromMaya> modelsFromMaya;
 
-	std::map<std::string, FnPtr> funcMap;
+	std::map<MSGTYPE, FnPtr> funcMap;
+	funcMap[MSGTYPE::NEW_NODE] = addModel2;
+	funcMap[MSGTYPE::VTX] = updateModel2;
+
+	/*std::map<std::string, FnPtr> funcMap;
 	funcMap["addModel"]	   = addModel;
-	funcMap["updateModel"] = updateModel;
+	funcMap["updateModel"] = updateModel;*/
 
 	Model cube;
 	int modelIndex = 0;
-	int nrOfObj	   = 0;
+	int nrOfObj = 0;
 	size_t tempArraySize = 0;
-	
-	int sometingToRead		= false;
+
+	int sometingToRead = false;
 	bool checkIfModelLoaded = false;
-	bool isNextMsgSometing  = false;
+	bool isNextMsgSometing = false;
 	// =============================================
 
-    // Initialization
-    //--------------------------------------------------------------------------------------
-    int screenWidth  = 1200;
-    int screenHeight = 800;
-    
-    SetConfigFlags(FLAG_MSAA_4X_HINT);      // Enable Multi Sampling Anti Aliasing 4x (if available)
-	SetConfigFlags(FLAG_VSYNC_HINT);
-    InitWindow(screenWidth, screenHeight, "demo");
+	// Initialization
+	//--------------------------------------------------------------------------------------
+	int screenWidth = 1200;
+	int screenHeight = 800;
 
-    // Define the camera to look into our 3d world
-    Camera camera   = { 0 };
-    camera.position = { 4.0f, 4.0f, 4.0f };
-    camera.target   = { 0.0f, 1.0f, -1.0f };
-    camera.up   = { 0.0f, 1.0f, 0.0f };
-    camera.fovy = 45.0f;
-    camera.type = CAMERA_PERSPECTIVE;
+	SetConfigFlags(FLAG_MSAA_4X_HINT);      // Enable Multi Sampling Anti Aliasing 4x (if available)
+	SetConfigFlags(FLAG_VSYNC_HINT);
+	InitWindow(screenWidth, screenHeight, "demo");
+
+	// Define the camera to look into our 3d world
+	Camera camera = { 0 };
+	camera.position = { 4.0f, 4.0f, 4.0f };
+	camera.target = { 0.0f, 1.0f, -1.0f };
+	camera.up = { 0.0f, 1.0f, 0.0f };
+	camera.fovy = 45.0f;
+	camera.type = CAMERA_PERSPECTIVE;
 
 	// real models rendered each frame
 	std::vector<modelPos> flatScene;
 
 	Material material1 = LoadMaterialDefault();
-    Texture2D texture1 = LoadTexture("resources/models/watermill_diffuse.png");   
+	Texture2D texture1 = LoadTexture("resources/models/watermill_diffuse.png");
 	material1.maps[MAP_DIFFUSE].texture = texture1;
 
-    Shader shader1 = LoadShader("resources/shaders/glsl330/phong.vs", 
-                               "resources/shaders/glsl330/phong.fs");   // Load model shader
+	Shader shader1 = LoadShader("resources/shaders/glsl330/phong.vs",
+		"resources/shaders/glsl330/phong.fs");   // Load model shader
 	material1.shader = shader1;
 
-	Mesh mesh1	 = LoadMesh("resources/models/watermill.obj");
-    Model model1 = LoadModelFromMesh(mesh1);                   
-    model1.material = material1;                     // Set shader effect to 3d model
+	Mesh mesh1 = LoadMesh("resources/models/watermill.obj");
+	Model model1 = LoadModelFromMesh(mesh1);
+	model1.material = material1;                     // Set shader effect to 3d model
 
 	// triangle by hand
-	float vtx[3*3]{ 
+	float vtx[3 * 3]{
 		1, 0, 1,
 		1, 0, 0,
-		0, 0, 1 
+		0, 0, 1
 	};
 
-	float norm[9] { 0, 1, 0, 0, 1, 0, 0, 1, 0};
+	float norm[9]{ 0, 1, 0, 0, 1, 0, 0, 1, 0 };
 	unsigned short indices[3] = { 0, 1, 2 }; // remove to use vertices only
-	unsigned char colors[12]  = { 255, 0, 0, 255, 0, 255, 0, 255, 0, 0, 255, 255 };
+	unsigned char colors[12] = { 255, 0, 0, 255, 0, 255, 0, 255, 0, 0, 255, 255 };
 
 	std::cout << "-----------------" << std::endl;
 
-    Vector3 position = { 0.0f, 0.0f, 0.0f };    // Set model position
-    SetCameraMode(camera, CAMERA_FREE);         // Set an orbital camera mode
-    SetTargetFPS(60);                           // Set our game to run at 60 frames-per-second
+	Vector3 position = { 0.0f, 0.0f, 0.0f };    // Set model position
+	SetCameraMode(camera, CAMERA_FREE);         // Set an orbital camera mode
+	SetTargetFPS(60);                           // Set our game to run at 60 frames-per-second
 
 	int modelLoc = GetShaderLocation(shader1, "model");
-	int viewLoc  = GetShaderLocation(shader1, "view");
-	int projLoc  = GetShaderLocation(shader1, "projection");
+	int viewLoc = GetShaderLocation(shader1, "view");
+	int projLoc = GetShaderLocation(shader1, "projection");
 
 	int lightLoc = GetShaderLocation(shader1, "lightPos");
-	Vector3 lightPos = {4,1,4};
+	Vector3 lightPos = { 4,1,4 };
 
 
 	Mesh mesh2 = {};
-	mesh2.vertexCount   = 3;
+	mesh2.vertexCount = 3;
 	mesh2.triangleCount = 1;
-	mesh2.vertices = new float[9]; 
-	mesh2.normals  = new float[9];
-	mesh2.indices  = new unsigned short[3]; // remove to use vertices only
-	mesh2.colors   = new unsigned char[12];
+	mesh2.vertices = new float[9];
+	mesh2.normals = new float[9];
+	mesh2.indices = new unsigned short[3]; // remove to use vertices only
+	mesh2.colors = new unsigned char[12];
 
-	memcpy(mesh2.vertices, vtx, sizeof(float)*9);
-	memcpy(mesh2.normals, norm, sizeof(float)*9);
-	memcpy(mesh2.indices, indices, sizeof(unsigned short)*3); // remove to use vertices only
-	memcpy(mesh2.colors, colors, sizeof(unsigned char)*12); // remove to use vertices only
+	memcpy(mesh2.vertices, vtx, sizeof(float) * 9);
+	memcpy(mesh2.normals, norm, sizeof(float) * 9);
+	memcpy(mesh2.indices, indices, sizeof(unsigned short) * 3); // remove to use vertices only
+	memcpy(mesh2.colors, colors, sizeof(unsigned char) * 12); // remove to use vertices only
 
 	rlLoadMesh(&mesh2, false);
 
 	Model tri = LoadModelFromMesh(mesh2);
 	tri.material.shader = shader1;
-	flatScene.push_back({tri, MatrixTranslate(2,0,2)});
+	flatScene.push_back({ tri, MatrixTranslate(2,0,2) });
 
-    
+
 
 	// TEST CUBE ===========================
 
 	/*int nr = comLib.nextSize();
 	float* arrayVtx = new float[nr]();
 	int lengthVtxArray = 0;
-	float* arrayVtx2; 
+	float* arrayVtx2;
 
 	recvFromMaya(arrayVtx, nr, &lengthVtxArray);*/
 
@@ -157,149 +178,162 @@ int main() {
 	}*/
 
 
-    // Main game loop
-    while (!WindowShouldClose())                // Detect window close button or ESC key
-    {
-        // Update
-        //----------------------------------------------------------------------------------
-        UpdateCamera(&camera);                  // Update camera
-        //----------------------------------------------------------------------------------
-        // Draw
-        //----------------------------------------------------------------------------------
-        BeginDrawing();
+	// Main game loop
+	while (!WindowShouldClose()) {               // Detect window close button or ESC key
 
-			SetShaderValueMatrix(shader1, viewLoc, GetCameraMatrix(camera));
-			SetShaderValue(shader1, lightLoc, Vector3ToFloat(lightPos), 3);
+		// Update
+		//----------------------------------------------------------------------------------
+		UpdateCamera(&camera);                  // Update camera
+		//----------------------------------------------------------------------------------
+		// Draw
+		//----------------------------------------------------------------------------------
+		BeginDrawing();
 
-            ClearBackground(RAYWHITE);
+		SetShaderValueMatrix(shader1, viewLoc, GetCameraMatrix(camera));
+		SetShaderValue(shader1, lightLoc, Vector3ToFloat(lightPos), 3);
 
-			if (IsKeyPressed(KEY_D))
-			{
-				Vector3 pos = { (rand() / (float)RAND_MAX) * 10.0f, 0.0f, (rand() / (float)RAND_MAX) * 10.0f };
+		ClearBackground(RAYWHITE);
 
-				static int i = 0;
+		if (IsKeyPressed(KEY_D)) {
+			Vector3 pos = { (rand() / (float)RAND_MAX) * 10.0f, 0.0f, (rand() / (float)RAND_MAX) * 10.0f };
 
-				// matrices are transposed later, so order here would be [Translate*Scale*vector]
-				Matrix modelmatrix = MatrixMultiply( MatrixMultiply( 
-					MatrixRotate({0,1,0}, i / (float)5), 
-					MatrixScale(0.1,0.1,0.1)),
-					MatrixTranslate(pos.x,pos.y,pos.z));
+			static int i = 0;
 
-				Model copy = model1;
-				//flatScene.push_back({copy, modelmatrix});
-				i++;
-			}
+			// matrices are transposed later, so order here would be [Translate*Scale*vector]
+			Matrix modelmatrix = MatrixMultiply(MatrixMultiply(
+				MatrixRotate({ 0,1,0 }, i / (float)5),
+				MatrixScale(0.1, 0.1, 0.1)),
+				MatrixTranslate(pos.x, pos.y, pos.z));
 
-            BeginMode3D(camera);
-			// ===================================
-
-			///////////////////////// TEST FOR DRAW MODEL UNDER RUNTIME
-			tempArraySize   = comLib.nextSize();
-			char* tempArray = new char[tempArraySize];
-
-			std::string funcToCall = "";
-			funcToCall = recvFromMaya(tempArray);
-
-			if (funcToCall != "") {
-				funcMap[funcToCall](modelsFromMaya, tempArray, tempArraySize, shader1, &nrOfObj, &modelIndex);
-			}
-
-			int i = 0;
+			Model copy = model1;
+			//flatScene.push_back({copy, modelmatrix});
 			i++;
-			//////////////////////////////
+		}
 
-			for (int i = 0; i < modelsFromMaya.size(); i++) {
-				auto m = modelsFromMaya[i];
-				auto l = GetShaderLocation(m.model.material.shader, "model");
-				SetShaderValueMatrix(m.model.material.shader, modelLoc, m.modelMatrix);
-				DrawModel(m.model, {}, 1.0, RED);
+		BeginMode3D(camera);
+		// ===================================
+
+		///////////////////////// TEST FOR DRAW MODEL UNDER RUNTIME
+		tempArraySize = comLib.nextSize();
+		char* tempArray = new char[tempArraySize];
+
+
+		MSGTYPE type = MSGTYPE::DEFAULT;
+		type = recvFromMaya2(tempArray);
+		//std::cout << "TYPE 2: " << type << std::endl;
+
+
+		if (type != MSGTYPE::DEFAULT) {
+
+			std::cout << "TYPE: " << type << std::endl;
+			funcMap[type](modelsFromMaya, tempArray, tempArraySize, shader1, &nrOfObj, &modelIndex);
+		}
+
+		/*
+		std::string funcToCall = "";
+		funcToCall = recvFromMaya(tempArray);
+
+		if (funcToCall != "") {
+			funcMap[funcToCall](modelsFromMaya, tempArray, tempArraySize, shader1, &nrOfObj, &modelIndex);
+		}
+		*/
+
+		int i = 0;
+		i++;
+		//////////////////////////////
+
+		for (int i = 0; i < modelsFromMaya.size(); i++) {
+			auto m = modelsFromMaya[i];
+			auto l = GetShaderLocation(m.model.material.shader, "model");
+			SetShaderValueMatrix(m.model.material.shader, modelLoc, m.modelMatrix);
+			DrawModel(m.model, {}, 1.0, RED);
+		}
+
+
+		/*	nr = comLib.nextSize();
+		arrayVtx = new float[nr];
+		lengthVtxArray = 0;
+		recvFromMaya(arrayVtx, nr, &lengthVtxArray);*/
+
+		/*
+		int nr2 = comLib.nextSize();
+		arrayVtx2 = new float[nr2]();
+		int lengthVtxArray2 = 0;
+
+
+		sometingToRead = recvFromMaya(arrayVtx2, nr2, &lengthVtxArray2);
+		if (sometingToRead == true) {
+
+			if (checkIfModelLoaded == true)	{
+				checkIfModelLoaded = false;
+				cubeExists = false;
+				flatScene.pop_back();
+
 			}
 
+			if(checkIfModelLoaded == false) {
 
-			/*	nr = comLib.nextSize();
-			arrayVtx = new float[nr];
-			lengthVtxArray = 0;
-			recvFromMaya(arrayVtx, nr, &lengthVtxArray);*/
+			Mesh cubeTest2 = {};
+			cubeTest2.vertexCount = lengthVtxArray2;
+			cubeTest2.vertices = new float[lengthVtxArray2];
+			memcpy(cubeTest2.vertices, arrayVtx2, sizeof(float) * cubeTest2.vertexCount);
+			rlLoadMesh(&cubeTest2, false);
 
-			/*
-			int nr2 = comLib.nextSize();
-			arrayVtx2 = new float[nr2]();
-			int lengthVtxArray2 = 0;
+			cube = LoadModelFromMesh(cubeTest2);
+			cube.material.shader = shader1;
+			flatScene.push_back({ cube, MatrixTranslate(1,0,1) });
+			checkIfModelLoaded = true;
+			cubeExists = true;
 
+			/*for (int i = 0; i < cubeTest2.vertexCount; i++) {
 
-			sometingToRead = recvFromMaya(arrayVtx2, nr2, &lengthVtxArray2);
-			if (sometingToRead == true) {
-
-				if (checkIfModelLoaded == true)	{
-					checkIfModelLoaded = false;
-					cubeExists = false; 
-					flatScene.pop_back();
-			
-				}
-
-				if(checkIfModelLoaded == false) {
-
-				Mesh cubeTest2 = {};
-				cubeTest2.vertexCount = lengthVtxArray2;
-				cubeTest2.vertices = new float[lengthVtxArray2];
-				memcpy(cubeTest2.vertices, arrayVtx2, sizeof(float) * cubeTest2.vertexCount);
-				rlLoadMesh(&cubeTest2, false);
-
-				cube = LoadModelFromMesh(cubeTest2);
-				cube.material.shader = shader1;
-				flatScene.push_back({ cube, MatrixTranslate(1,0,1) });
-				checkIfModelLoaded = true;
-				cubeExists = true; 
-
-				/*for (int i = 0; i < cubeTest2.vertexCount; i++) {
-
-					std::cout << "VTX: " << cubeTest2.vertices[i]  << std::endl;
-				}
-				std::cout << "==================================" << std::endl;
-
-				}
+				std::cout << "VTX: " << cubeTest2.vertices[i]  << std::endl;
 			}
-			*/
+			std::cout << "==================================" << std::endl;
 
-			// ===================================
-			/* 
-			for (int i = 0; i < flatScene.size(); i++)
-			{
-				auto m = flatScene[i];
-				auto l = GetShaderLocation(m.model.material.shader, "model");
-				SetShaderValueMatrix( m.model.material.shader, modelLoc, m.modelMatrix);
-				DrawModel(m.model,{}, 1.0, RED);
 			}
-			*/
-            DrawGrid(10, 1.0f);     // Draw a grid
+		}
+		*/
 
-			DrawSphere(lightPos, 0.1,RED);
+		// ===================================
+		/*
+		for (int i = 0; i < flatScene.size(); i++)
+		{
+			auto m = flatScene[i];
+			auto l = GetShaderLocation(m.model.material.shader, "model");
+			SetShaderValueMatrix( m.model.material.shader, modelLoc, m.modelMatrix);
+			DrawModel(m.model,{}, 1.0, RED);
+		}
+		*/
+		DrawGrid(10, 1.0f);     // Draw a grid
 
-            EndMode3D();
+		DrawSphere(lightPos, 0.1, RED);
 
-            DrawTextRL("(c) Watermill 3D model by Alberto Cano", screenWidth - 210, screenHeight - 20, 10, GRAY);
-            DrawTextRL(FormatText("Camera position: (%.2f, %.2f, %.2f)", camera.position.x, camera.position.y, camera.position.z), 600, 20, 10, BLACK);
-            DrawTextRL(FormatText("Camera target: (%.2f, %.2f, %.2f)", camera.target.x, camera.target.y, camera.target.z), 600, 40, 10, GRAY);
-            DrawFPS(10, 10);
+		EndMode3D();
 
-        EndDrawing();
-		delete[] tempArray; 
-        //----------------------------------------------------------------------------------
-    }
+		DrawTextRL("(c) Watermill 3D model by Alberto Cano", screenWidth - 210, screenHeight - 20, 10, GRAY);
+		DrawTextRL(FormatText("Camera position: (%.2f, %.2f, %.2f)", camera.position.x, camera.position.y, camera.position.z), 600, 20, 10, BLACK);
+		DrawTextRL(FormatText("Camera target: (%.2f, %.2f, %.2f)", camera.target.x, camera.target.y, camera.target.z), 600, 40, 10, GRAY);
+		DrawFPS(10, 10);
 
-    // De-Initialization
-    UnloadShader(shader1);       // Unload shader
-    UnloadTexture(texture1);     // Unload texture
+		EndDrawing();
+		delete[] tempArray;
+		//----------------------------------------------------------------------------------
+	}
+
+	// De-Initialization
+	UnloadShader(shader1);       // Unload shader
+	UnloadTexture(texture1);     // Unload texture
 	UnloadModel(model1);
 	UnloadModel(tri);
 
 	//UnloadModel(cube);
 
-    CloseWindowRL();              // Close window and OpenGL context
-    //--------------------------------------------------------------------------------------
-	
+	CloseWindowRL();              // Close window and OpenGL context
+	//--------------------------------------------------------------------------------------
 
-    return 0;
+
+	return 0;
 }
 
 std::string recvFromMaya(char* buffer) {
@@ -365,7 +399,7 @@ void addModel(std::vector<modelFromMaya>& objNameArray, char* buffer, int buffer
 
 		stringStream >> temp;
 		if (std::stringstream(temp) >> exampleInt) {
-			if (check == 0)	{
+			if (check == 0) {
 				arrayVtx[i] = (float)std::stof(temp);
 				lengthVtxArray++;
 			}
@@ -378,7 +412,7 @@ void addModel(std::vector<modelFromMaya>& objNameArray, char* buffer, int buffer
 			temp = "";
 		}
 
-		if (std::stringstream(temp) >> examplechar)	{
+		if (std::stringstream(temp) >> examplechar) {
 
 			if (examplechar == '|') {
 				check = 0;
@@ -492,9 +526,244 @@ void updateModel(std::vector<modelFromMaya>& objNameArray, char* buffer, int buf
 	}
 }
 
-/* 
+
+// TEST===========================================
+MSGTYPE recvFromMaya2(char* buffer) {
+
+	std::string lineOut = "";
+	MSGTYPE type = MSGTYPE::DEFAULT;
+
+	size_t nr = comLib.nextSize();
+	size_t oldBuffSize = nr;
+
+	char* buff = (char*)malloc(oldBuffSize);
+
+	if (nr > oldBuffSize) {
+		free(buff);
+		buff = (char*)malloc(nr);
+		oldBuffSize = nr;
+	}
+
+	bool test = comLib.recv(buff, nr);
+	if (test == true) {
+
+		/*std::string reference;
+		std::string testString(buff, nr);
+		std::stringstream stringStream;
+		stringStream << testString;
+
+		std::string temp;
+		stringStream >> temp;
+		if (std::stringstream(temp) >> reference) {
+			lineOut = temp;
+			std::cout << lineOut << std::endl;
+		}*/
+
+		int typeInt = 0;
+
+		std::string msgString(buff, nr);
+		std::stringstream ss(msgString);
+		ss >> typeInt;
+
+		//std::cout << "TYPE INT: " << typeInt << std::endl;
+
+		if (MSGTYPE::VTX == typeInt) {
+			type = MSGTYPE::VTX;
+
+		}
+
+	}
+
+	memcpy(buffer, buff, nr);
+	free(buff);
+
+	return type;
+}
+
+void addModel2(std::vector<modelFromMaya>& objNameArray, char* buffer, int bufferSize, Shader shader1, int* nrObjs, int* index) {
+
+	MsgHeader header;
+	std::cout << "IN ADD MODEL" << std::endl;
+
+	int typeInt;
+	int nrOfElements;
+
+	float exampleInt;	//use to find int type in string array
+	char examplechar;
+	float* arrayVtx = new float[bufferSize];
+	int lengthVtxArray = 0;
+	std::string tempName = "";
+
+	int check = -1;
+
+	std::string msgString(buffer, bufferSize);
+	std::stringstream ss(msgString);
+
+	std::string div = "";
+	std::string elements = "";
+
+	while (!ss.eof()) {
+
+		if (check == -1) {
+			ss >> typeInt >> nrOfElements >> div >> elements;
+			if (div == "|")
+				check = 0;
+		}
+
+		if (check == 0) {
+			std::cout << "HEADER FILLED";
+		}
+
+	}
+
+
+	/*
+	std::string reference;
+	std::string temp;
+
+	stringStream >> temp;
+	if (std::stringstream(temp) >> reference) {
+		//is command, discard
+	}
+
+	int i = 0;
+	while (!stringStream.eof()) {
+
+		stringStream >> temp;
+		if (std::stringstream(temp) >> exampleInt) {
+			if (check == 0) {
+				arrayVtx[i] = (float)std::stof(temp);
+				lengthVtxArray++;
+			}
+
+			if (check == -1) {
+				tempName.append(temp);
+			}
+
+			i++;
+			temp = "";
+		}
+
+		if (std::stringstream(temp) >> examplechar) {
+
+			if (examplechar == '|') {
+				check = 0;
+				i = 0;
+			}
+
+			if (check == -1) {
+				tempName.append(temp);
+			}
+		}
+	}
+
+	bool exists = false;
+	for (int i = 0; i < *nrObjs; i++) {
+		if (objNameArray[i].name == tempName) {
+			exists = true;
+		}
+	}
+
+	if (exists == false) {
+		Mesh tempMeshToAdd = {};
+		tempMeshToAdd.vertexCount = lengthVtxArray;
+		tempMeshToAdd.vertices = new float[lengthVtxArray];
+		memcpy(tempMeshToAdd.vertices, arrayVtx, sizeof(float) * tempMeshToAdd.vertexCount);
+		rlLoadMesh(&tempMeshToAdd, false);
+
+		Model tempModelToAdd = LoadModelFromMesh(tempMeshToAdd);
+		tempModelToAdd.material.shader = shader1;
+
+		objNameArray.push_back({ tempModelToAdd, *index, tempName, MatrixTranslate(2,0,2) });
+		*index = *index + 1;
+		*nrObjs = *nrObjs + 1;
+	}
+
+	*/
+
+}
+
+void updateModel2(std::vector<modelFromMaya>& objNameArray, char* buffer, int bufferSize, Shader shader1, int* nrObjs, int* index)
+{
+	float exampleInt;	//use to find int type in string array
+	char examplechar;
+	float* arrayVtx = new float[bufferSize];
+	int lengthVtxArray = 0;
+	std::string tempName = "";
+
+	int check = -1;
+
+	std::string testString(buffer, bufferSize);
+	std::stringstream stringStream;
+	stringStream << testString;
+
+	std::string reference;
+	std::string temp;
+
+	stringStream >> temp;
+	if (std::stringstream(temp) >> reference)
+	{
+		//is command, discard
+	}
+
+	int i = 0;
+	while (!stringStream.eof())
+	{
+		stringStream >> temp;
+		if (std::stringstream(temp) >> exampleInt)
+		{
+			if (check == 0)
+			{
+				arrayVtx[i] = (float)std::stof(temp);
+				lengthVtxArray++;
+			}
+
+			if (check == -1)
+			{
+				tempName.append(temp);
+			}
+			i++;
+			temp = "";
+		}
+		if (std::stringstream(temp) >> examplechar)
+		{
+			if (examplechar == '|')
+			{
+				check = 0;
+				i = 0;
+			}
+
+			if (check == -1)
+			{
+				tempName.append(temp);
+			}
+		}
+	}
+
+	for (int i = 0; i < *nrObjs; i++)
+	{
+		if (objNameArray[i].name == tempName)
+		{
+			int tempIndex = objNameArray[i].index;
+
+			Mesh tempMeshToAdd = {};
+			tempMeshToAdd.vertexCount = lengthVtxArray;
+			tempMeshToAdd.vertices = new float[lengthVtxArray];
+			memcpy(tempMeshToAdd.vertices, arrayVtx, sizeof(float) * tempMeshToAdd.vertexCount);
+			rlLoadMesh(&tempMeshToAdd, false);
+
+			Model tempModelToAdd = LoadModelFromMesh(tempMeshToAdd);
+			tempModelToAdd.material.shader = shader1;
+
+			objNameArray.erase(objNameArray.begin() + i);
+			objNameArray.insert(objNameArray.begin() + i, { tempModelToAdd, tempIndex, tempName, MatrixTranslate(2,0,2) });
+		}
+	}
+}
+
+/*
 bool recvFromMaya(float* arrayFloat, int sizeOfArray, int* nrOut) {
-	
+
 	bool result = false;
 
 	size_t nr = comLib.nextSize();
@@ -515,7 +784,7 @@ bool recvFromMaya(float* arrayFloat, int sizeOfArray, int* nrOut) {
 			std::cout << std::string((char*)buff, nr) << std::endl;
 		}
 
-		else { 
+		else {
 			buff = "notWorking";
 		}
 
@@ -598,7 +867,7 @@ bool recvFromMaya(float* arrayFloat, int sizeOfArray, int* nrOut) {
 
 		*nrOut = lengthVtxArray;
 		 result = true;
-		delete[] arrayVtx; 
+		delete[] arrayVtx;
 	}
 
 	free(buff);
