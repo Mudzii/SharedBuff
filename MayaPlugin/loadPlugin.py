@@ -19,7 +19,7 @@ answer = s.recv(1024)
 
 # load plugin
 #s.send('loadPlugin("C:/Users/BTH/Desktop/MayaPlugin/x64/Debug/MayaAPI.mll")\n')
-s.send('loadPlugin("C:/Users/Mudzi/Desktop/API3/MayaPlugin/x64/Debug/MayaAPI.mll")\n')
+s.send('loadPlugin("C:/Users/Mudzi/source/repos/SharedBuff/MayaPlugin/x64/Debug/MayaAPI.mll")\n')
 answer = s.recv(1024)
 
 # create a polycube

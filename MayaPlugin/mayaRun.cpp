@@ -11,7 +11,7 @@
 
 #pragma comment(lib, "Project1.lib")
 
-using namespace std;
+//using namespace std;
 
 MCallbackIdArray callbackIdArray;
 MCallbackId		 callbackId;
@@ -21,6 +21,13 @@ MStatus status = MS::kSuccess;
 bool initBool = false;
 
 enum NODE_TYPE { TRANSFORM, MESH }; 
+
+enum MSGTYPE {
+	DEFAULT = 1000,
+	NEW_NODE = 1001,
+	VTX = 1002
+
+};
 
 MTimer gTimer;
 float globalTime = 0;
@@ -37,22 +44,37 @@ struct MsgHeader {
 };
 
 // =========================================================
-bool sendMsg(std::string &msgString, int sizeOfArr) {
+bool sendMsg(std::string &msgString, MSGTYPE msgType, int nrOfElements) {
 
-	bool sent = false; 
+	bool sent = false;
+
+	MsgHeader header;
+	header.type = msgType;
+	header.nrOf = nrOfElements * 3;
+
+	std::string headerString = "";
+	headerString += std::to_string(header.type) + " ";
+	headerString += std::to_string(header.nrOf);
+	headerString += "|";
 
 	//get array size
-	int arraySize = strlen(msgString.c_str());
+	//int headerSize = strlen(headerString.c_str());
+	//int arraySize = strlen(msgString.c_str());
+
+	//MGlobal::displayInfo(MString("nrOfElements: ") + nrOfElements + "\n");
+	std::string finalMsgString;
+	finalMsgString.append(headerString);
+	finalMsgString.append(msgString);
+
+	int arraySizeFinal = strlen(finalMsgString.c_str());
 
 	char* charMsgArray = NULL;
-	charMsgArray = new char[arraySize]();
+	charMsgArray = new char[arraySizeFinal]();
 
-	msgString.copy(charMsgArray, arraySize);
-	charMsgArray[arraySize - 1] = '\0';
+	finalMsgString.copy(charMsgArray, arraySizeFinal);
+	charMsgArray[arraySizeFinal - 1] = '\0';
 
-	sent = comLib.send(charMsgArray, arraySize);
-
-	MStreamUtils::stdOutStream() << "SENT " << endl;
+	sent = comLib.send(charMsgArray, arraySizeFinal);
 
 	// =========================== 
 	delete[] charMsgArray;
@@ -379,19 +401,19 @@ void nodeAttributeChanged(MNodeMessage::AttributeMessage msg, MPlug &plug, MPlug
 	}
 
 	//add command + name to string
-	std::string objName = "updateModel ";
-	objName += mesh.name().asChar();
-	objName += " | ";
-	size_t lengthName = objName.length();
+	//std::string objName = "updateModel ";
+	//objName += mesh.name().asChar();
+	//objName += " | ";
+	//size_t lengthName = objName.length();
 
 	//MVector to string
 	std::string vtxArrayString;
-	vtxArrayString.append(objName);
+	//vtxArrayString.append(objName);
 	size_t vtxArrElements = 0;
 
 	for (int u = 0; u < trueVtxForm.length(); u++) {
 		for (int v = 0; v < 3; v++) {
-			vtxArrayString.append(to_string(trueVtxForm[u][v]) + " ");
+			vtxArrayString.append(std::to_string(trueVtxForm[u][v]) + " ");
 			vtxArrElements++;
 		}
 	}
@@ -402,13 +424,10 @@ void nodeAttributeChanged(MNodeMessage::AttributeMessage msg, MPlug &plug, MPlug
 		msgToSend = true;
 
 	if (msgToSend) {
-		sendMsg(vtxArrayString, vtxArrElements);
+		sendMsg(vtxArrayString, MSGTYPE::VTX, nrElements);
 	}
 
 	/////////////===============================
-
-
-
 	/* 
 	// get vertices ==================
 	MPlug vtxArray = mesh.findPlug("controlPoints");
@@ -511,6 +530,7 @@ void nodeAttributeChanged(MNodeMessage::AttributeMessage msg, MPlug &plug, MPlug
 	charMsgArray[arraySize - 1] = '\0'; 
 	msgToSend = true;
 	*/
+
 	// MATERIAL ================================================
 	MObjectArray shaderGroups;
 	MIntArray shaderGroupsIndecies;
@@ -527,8 +547,9 @@ void nodeAttributeChanged(MNodeMessage::AttributeMessage msg, MPlug &plug, MPlug
 
 }
 
-void vtxPlugConnected(MPlug & srcPlug, MPlug & destPlug, bool made, void* clientData)
-{
+void vtxPlugConnected(MPlug & srcPlug, MPlug & destPlug, bool made, void* clientData) {
+
+
 	MStreamUtils::stdOutStream() << "srcPlug.partialName()" << srcPlug.partialName() << endl;
 	MStreamUtils::stdOutStream() << "destPlug.partialName()" << destPlug.partialName() << endl;
 	MStreamUtils::stdOutStream() << "destPlug.name()" << destPlug.name() << endl;
@@ -562,8 +583,8 @@ void vtxPlugConnected(MPlug & srcPlug, MPlug & destPlug, bool made, void* client
 				float y = 0;
 				float z = 0;
 
-				if (currentVtx.isCompound())
-				{
+				if (currentVtx.isCompound()) {
+
 					//we have control points [0] but in Maya the values are one hierarchy down so we acces them by getting the child
 					MPlug plugX = currentVtx.child(0);
 					MPlug plugY = currentVtx.child(1);
@@ -584,26 +605,26 @@ void vtxPlugConnected(MPlug & srcPlug, MPlug & destPlug, bool made, void* client
 			MIntArray triVertsIndex;
 			mesh.getTriangles(triCount, triVertsIndex);
 			MVectorArray trueVtxForm;
-			for (int i = 0; i < triVertsIndex.length(); i++)
-			{
+			for (int i = 0; i < triVertsIndex.length(); i++) {
 				trueVtxForm.append(vtxArrayMessy[triVertsIndex[i]]);
 			}
 
 			//add command + name to string
-			std::string objName = "addModel ";
-			objName += mesh.name().asChar();
-			objName += " | ";
-			size_t lengthName = objName.length();
+			//std::string objName = "addModel ";
+			//objName += mesh.name().asChar();
+			//objName += " | ";
+			//size_t lengthName = objName.length();
 
 			//MVector to string
 			std::string vtxArrayString;
-			vtxArrayString.append(objName);
+			//vtxArrayString.append(objName);
 			size_t vtxArrElements = 0;
+
 			for (int u = 0; u < trueVtxForm.length(); u++)
 			{
 				for (int v = 0; v < 3; v++)
 				{
-					vtxArrayString.append(to_string(trueVtxForm[u][v]) + " ");
+					vtxArrayString.append(std::to_string(trueVtxForm[u][v]) + " ");
 					vtxArrElements++;
 				}
 			}
@@ -614,7 +635,7 @@ void vtxPlugConnected(MPlug & srcPlug, MPlug & destPlug, bool made, void* client
 				msgToSend = true;
 
 			if (msgToSend) {
-				sendMsg(vtxArrayString, vtxArrElements);
+				sendMsg(vtxArrayString, MSGTYPE::NEW_NODE, nrElements);
 			}
 
 		}
@@ -751,12 +772,6 @@ void nodeAdded(MObject &node, void* clientData) {
 	MCallbackId newCallbackID;
 	MStatus Result = MS::kSuccess;
 
-
-	/*if (node.hasFn(MFn::kTransform)) {
-		MGlobal::displayInfo(MString("Transform has been added: ") + MFnDagNode(node).name() + "\n");
-	}*/
-
-
 	if (node.hasFn(MFn::kLight)) {
 
 		MGlobal::displayInfo(MString("Light has been added: ") + MFnDagNode(node).name() + "\n");
@@ -767,10 +782,12 @@ void nodeAdded(MObject &node, void* clientData) {
 
 	if (node.hasFn(MFn::kMesh)) {
 
-		MGlobal::displayInfo(MString("Mesh has been added: ") + MFnDagNode(node).name() + "\n");
+		MGlobal::displayInfo(MString("New Mesh has been added: ") + MFnDagNode(node).name() + "\n");
 		newMeshes.push(node);
 
 		MCallbackId tempID = MDGMessage::addConnectionCallback(vtxPlugConnected, NULL, &status);
+	
+	
 		if (Result == MS::kSuccess) {
 			callbackIdArray.append(tempID);
 		}
@@ -802,9 +819,8 @@ void timerCallback(float elapsedTime, float lastTime, void* clientData) {
 
 		if (currenNode.hasFn(MFn::kMesh)) {
 
-
 			MFnMesh currentMesh = currenNode;
-			MGlobal::displayInfo("MESH " + currentMesh.name());
+			MGlobal::displayInfo("MESH: " + currentMesh.name());
 
 			MDagPath path;
 			MFnDagNode(currenNode).getPath(path);
@@ -844,10 +860,7 @@ void timerCallback(float elapsedTime, float lastTime, void* clientData) {
 				callbackIdArray.append(newCallbackID);
 			}
 
-
 			newMeshes.pop();
-
-
 		}
 
 	}
@@ -925,7 +938,7 @@ EXPORT MStatus initializePlugin(MObject obj) {
 		callbackIdArray.append(callbackID);
 	}
 
-	callbackID = MTimerMessage::addTimerCallback(5.0, timerCallback, NULL, &status);
+	callbackID = MTimerMessage::addTimerCallback(2.0, timerCallback, NULL, &status);
 	if (status == MS::kSuccess) {
 		callbackIdArray.append(callbackID);
 	}
