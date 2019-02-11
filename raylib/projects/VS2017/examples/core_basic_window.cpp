@@ -6,6 +6,7 @@
 
 #include <map>
 #include <sstream>
+#include <iostream>
 #include <functional>
 
 #include <Windows.h>
@@ -68,7 +69,7 @@ int main() {
 
 	std::map<MSGTYPE, FnPtr> funcMap;
 	funcMap[NEW_NODE] = addModel2;
-	funcMap[VTX] = updateModel2;
+	funcMap[VTX]	  = updateModel2;
 
 	/*std::map<std::string, FnPtr> funcMap;
 	funcMap["addModel"]	   = addModel;
@@ -219,8 +220,6 @@ int main() {
 
 		MSGTYPE type = MSGTYPE::DEFAULT;
 		type = recvFromMaya2(tempArray);
-		//std::cout << "TYPE 2: " << type << std::endl;
-
 
 		if (type != MSGTYPE::DEFAULT) {
 
@@ -240,6 +239,8 @@ int main() {
 		int i = 0;
 		i++;
 		//////////////////////////////
+
+		std::cout << "modelsFromMaya.size(): " << modelsFromMaya.size() << std::endl;
 
 		for (int i = 0; i < modelsFromMaya.size(); i++) {
 			auto m = modelsFromMaya[i];
@@ -605,7 +606,6 @@ void addModel2(std::vector<modelFromMaya>& objNameArray, char* buffer, int buffe
 		check = 0;
 	}
 
-
 	int element		= 0; 
 	float tempFloat = 0.0f;
 	nrOfElements	= header.nrOf * 3; //for each vtx * [x,y,z]
@@ -631,105 +631,100 @@ void addModel2(std::vector<modelFromMaya>& objNameArray, char* buffer, int buffe
 
 	}
 
-
-	/*
-	
 	bool exists = false;
 	for (int i = 0; i < *nrObjs; i++) {
-		if (objNameArray[i].name == tempName) {
+		if (objNameArray[i].name == objName) {
 			exists = true;
 		}
 	}
 
 	if (exists == false) {
+
 		Mesh tempMeshToAdd = {};
 		tempMeshToAdd.vertexCount = lengthVtxArray;
-		tempMeshToAdd.vertices = new float[lengthVtxArray];
+		tempMeshToAdd.vertices	  = new float[lengthVtxArray];
 		memcpy(tempMeshToAdd.vertices, arrayVtx, sizeof(float) * tempMeshToAdd.vertexCount);
 		rlLoadMesh(&tempMeshToAdd, false);
 
 		Model tempModelToAdd = LoadModelFromMesh(tempMeshToAdd);
 		tempModelToAdd.material.shader = shader1;
 
-		objNameArray.push_back({ tempModelToAdd, *index, tempName, MatrixTranslate(2,0,2) });
+		objNameArray.push_back({ tempModelToAdd, *index, objName, MatrixTranslate(2,0,2) });
 		*index = *index + 1;
 		*nrObjs = *nrObjs + 1;
 	}
-
-	*/
-
+	
 }
 
-void updateModel2(std::vector<modelFromMaya>& objNameArray, char* buffer, int bufferSize, Shader shader1, int* nrObjs, int* index)
-{
+void updateModel2(std::vector<modelFromMaya>& objNameArray, char* buffer, int bufferSize, Shader shader1, int* nrObjs, int* index) {
 
-	std::cout << "IN UPDATE MODEL" << std::endl;
+	MsgHeader header;
 
-	float exampleInt;	//use to find int type in string array
-	char examplechar;
-	float* arrayVtx = new float[bufferSize];
-	int lengthVtxArray = 0;
-	std::string tempName = "";
+	//std::cout << "==================================" << std::endl;
+	//std::cout << "IN UPDATE MODEL" << std::endl;
 
 	int check = -1;
 
+	int typeInt = 0;
+	int nrOfElements = 0;
+
+	float* arrayVtx = new float[bufferSize];
+	int lengthVtxArray = 0;
+
 	std::string msgString(buffer, bufferSize);
-	std::stringstream ss(msgString);
+	std::istringstream ss(msgString);
 
-
-	/*
-	std::string reference;
+	std::string objName = "";
 	std::string temp;
 
-	stringStream >> temp;
-	if (std::stringstream(temp) >> reference)
-	{
-		//is command, discard
+	//get header elements
+	if (check == -1) {
+		ss >> typeInt >> header.nrOf >> objName;
+
+		if (typeInt == MSGTYPE::VTX)
+			header.type = MSGTYPE::VTX;
+
+		//std::cout << "TYPE: "	 << header.type << std::endl;
+		//std::cout << "NR OF: "	 << header.nrOf << std::endl;
+		//std::cout << "objName: " << objName << std::endl;
+
+		check = 0;
 	}
 
-	int i = 0;
-	while (!stringStream.eof())
-	{
-		stringStream >> temp;
-		if (std::stringstream(temp) >> exampleInt)
-		{
-			if (check == 0)
-			{
-				arrayVtx[i] = (float)std::stof(temp);
-				lengthVtxArray++;
-			}
+	int element = 0;
+	float tempFloat = 0.0f;
+	nrOfElements = header.nrOf * 3; //for each vtx * [x,y,z]
 
-			if (check == -1)
-			{
-				tempName.append(temp);
-			}
-			i++;
-			temp = "";
-		}
-		if (std::stringstream(temp) >> examplechar)
-		{
-			if (examplechar == '|')
-			{
-				check = 0;
-				i = 0;
-			}
+	while (!ss.eof()) {
 
-			if (check == -1)
-			{
-				tempName.append(temp);
-			}
+		ss >> temp;
+		//std::cout << "TEMP: " << temp << std::endl;
+
+		if (element >= nrOfElements) {
+			check = 2;
+			//std::cout << "Last element fount " << std::endl;
+			break;
+
 		}
+
+		if (std::stringstream(temp) >> tempFloat && check == 0) {
+			arrayVtx[element] = (float)std::stof(temp);
+
+			lengthVtxArray++;
+			element++;
+		}
+
 	}
 
-	for (int i = 0; i < *nrObjs; i++)
-	{
-		if (objNameArray[i].name == tempName)
-		{
+	for (int i = 0; i < *nrObjs; i++) {
+
+		if (objNameArray[i].name == objName) {
+
 			int tempIndex = objNameArray[i].index;
 
 			Mesh tempMeshToAdd = {};
 			tempMeshToAdd.vertexCount = lengthVtxArray;
-			tempMeshToAdd.vertices = new float[lengthVtxArray];
+			tempMeshToAdd.vertices	  = new float[lengthVtxArray];
 			memcpy(tempMeshToAdd.vertices, arrayVtx, sizeof(float) * tempMeshToAdd.vertexCount);
 			rlLoadMesh(&tempMeshToAdd, false);
 
@@ -737,10 +732,10 @@ void updateModel2(std::vector<modelFromMaya>& objNameArray, char* buffer, int bu
 			tempModelToAdd.material.shader = shader1;
 
 			objNameArray.erase(objNameArray.begin() + i);
-			objNameArray.insert(objNameArray.begin() + i, { tempModelToAdd, tempIndex, tempName, MatrixTranslate(2,0,2) });
+			objNameArray.insert(objNameArray.begin() + i, { tempModelToAdd, tempIndex, objName, MatrixTranslate(2,0,2) });
 		}
 	}
-	*/
+	
 }
 
 /*
