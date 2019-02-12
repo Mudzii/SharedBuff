@@ -17,6 +17,13 @@
 #pragma comment(lib, "Project1.lib")
 
 // ===========================================
+enum CMDTYPE {
+	DEFAULT = 1000,
+	NEW_NODE = 1001,
+	VTX = 1002
+
+};
+
 struct modelFromMaya {
 	Model model;
 	int index;
@@ -29,16 +36,11 @@ struct modelPos {
 	Matrix modelMatrix;
 };
 
-enum MSGTYPE {
-	DEFAULT = 1000,
-	NEW_NODE = 1001,
-	VTX = 1002
-
-};
-
 struct MsgHeader {
-	MSGTYPE type;
+	CMDTYPE type;
 	int nrOf;
+	int nameLen;
+	char objName[64];
 };
 
 // ===========================================
@@ -54,7 +56,7 @@ typedef void(*FnPtr)(std::vector<modelFromMaya>&, char*, int, Shader, int*, int*
 // ===========================================
 std::string recvFromMaya(char* buffer);
 
-MSGTYPE recvFromMaya2(char* buffer);
+CMDTYPE recvFromMaya2(char* buffer);
 
 // ===========================================
 ComLib comLib("sharedBuff2", 100, CONSUMER);
@@ -67,7 +69,7 @@ int main() {
 	// OUR STUFF ====================================
 	std::vector<modelFromMaya> modelsFromMaya;
 
-	std::map<MSGTYPE, FnPtr> funcMap;
+	std::map<CMDTYPE, FnPtr> funcMap;
 	funcMap[NEW_NODE] = addModel2;
 	funcMap[VTX]	  = updateModel2;
 
@@ -218,10 +220,10 @@ int main() {
 		tempArraySize = comLib.nextSize();
 		char* tempArray = new char[tempArraySize];
 
-		MSGTYPE type = MSGTYPE::DEFAULT;
+		CMDTYPE type = CMDTYPE::DEFAULT;
 		type = recvFromMaya2(tempArray);
 
-		if (type != MSGTYPE::DEFAULT) {
+		if (type != CMDTYPE::DEFAULT) {
 
 			std::cout << "TYPE: " << type << std::endl;
 			funcMap[type](modelsFromMaya, tempArray, tempArraySize, shader1, &nrOfObj, &modelIndex);
@@ -528,15 +530,20 @@ void updateModel(std::vector<modelFromMaya>& objNameArray, char* buffer, int buf
 
 
 // TEST===========================================
-MSGTYPE recvFromMaya2(char* buffer) {
+CMDTYPE recvFromMaya2(char* buffer) {
 
 	std::string lineOut = "";
-	MSGTYPE type = MSGTYPE::DEFAULT;
+	CMDTYPE type = CMDTYPE::DEFAULT;
+
+	MsgHeader header = {};
 
 	size_t nr = comLib.nextSize();
 	size_t oldBuffSize = nr;
 
 	char* buff = (char*)malloc(oldBuffSize);
+
+
+	std::string objectName = "";
 
 	if (nr > oldBuffSize) {
 		free(buff);
@@ -546,6 +553,25 @@ MSGTYPE recvFromMaya2(char* buffer) {
 
 	bool test = comLib.recv(buff, nr);
 	if (test == true) {
+
+		memcpy(buffer, buff, nr);
+		memcpy((char*)&header, buff, sizeof(MsgHeader));
+
+		//char* testMsg = new char[172]; 
+		//memcpy((char*)&testMsg, buff, 171);
+
+		std::cout << "header type: " << header.type << std::endl;
+		std::cout << "header nrOf: " << header.nrOf << std::endl;
+		std::cout << "header objName: " << header.objName << std::endl;
+		std::cout << "header nameLen: " << header.nameLen << std::endl;
+
+		objectName = header.objName;
+		objectName = objectName.substr(0, header.nameLen);
+		std::cout << "objectName: " << objectName << std::endl;
+
+		//std::cout << "testMsg: " << testMsg << std::endl;
+
+		/*
 
 		int typeInt = 0;
 
@@ -561,10 +587,11 @@ MSGTYPE recvFromMaya2(char* buffer) {
 		else if (MSGTYPE::NEW_NODE == typeInt) {
 			type = MSGTYPE::NEW_NODE;
 		}
+		*/
 
+		//free(testMsg); 
 	}
 
-	memcpy(buffer, buff, nr);
 	free(buff);
 
 	return type;
@@ -591,45 +618,53 @@ void addModel2(std::vector<modelFromMaya>& objNameArray, char* buffer, int buffe
 	std::string objName = "";
 	std::string temp;
 
-	
+
 	//get header elements
 	if (check == -1) {
-		ss >> typeInt >> header.nrOf >> objName;
+		ss >> typeInt >> header.nrOf >> header.nameLen >> header.objName;
 
-		if (typeInt == MSGTYPE::NEW_NODE)
-			header.type = MSGTYPE::NEW_NODE;
+		if (typeInt == CMDTYPE::NEW_NODE)
+			header.type = CMDTYPE::NEW_NODE;
 
-		std::cout << "TYPE: "	 << header.type << std::endl;
-		std::cout << "NR OF: "	 << header.nrOf << std::endl;
+		std::cout << "TYPE: " << header.type << std::endl;
+		std::cout << "NR OF: " << header.nrOf << std::endl;
+		std::cout << "objName: " << header.objName << std::endl;
+		std::cout << "nameLen: " << header.nameLen << std::endl;
+
+		objName = header.objName;
+		objName = objName.substr(0, header.nameLen);
 		std::cout << "objName: " << objName << std::endl;
+
 
 		check = 0;
 	}
 
-	int element		= 0; 
+	int element = 0;
 	float tempFloat = 0.0f;
-	nrOfElements	= header.nrOf * 3; //for each vtx * [x,y,z]
+	nrOfElements = header.nrOf * 3 * 2; //for each vtx * [x,y,z]
 
 	while (!ss.eof()) {
 
+		// get x y z ?? 
 		ss >> temp;
-		std::cout << "TEMP: " << temp << std::endl;
 
-		if(element >= nrOfElements){
-			check = 2; 
+		if (element >= nrOfElements) {
+			check = 1;
 			std::cout << "Last element fount " << std::endl;
-			break; 
+			break;
 
 		}
 
-		if (std::stringstream(temp) >> tempFloat && check == 0) {
+		if (std::stringstream(temp) >> tempFloat) {
+			std::cout << "TEMP: " << temp << std::endl;
 			arrayVtx[element] = (float)std::stof(temp);
-			
+
 			lengthVtxArray++;
 			element++;
 		}
 
 	}
+
 
 	bool exists = false;
 	for (int i = 0; i < *nrObjs; i++) {
@@ -642,7 +677,7 @@ void addModel2(std::vector<modelFromMaya>& objNameArray, char* buffer, int buffe
 
 		Mesh tempMeshToAdd = {};
 		tempMeshToAdd.vertexCount = lengthVtxArray;
-		tempMeshToAdd.vertices	  = new float[lengthVtxArray];
+		tempMeshToAdd.vertices = new float[lengthVtxArray];
 		memcpy(tempMeshToAdd.vertices, arrayVtx, sizeof(float) * tempMeshToAdd.vertexCount);
 		rlLoadMesh(&tempMeshToAdd, false);
 
@@ -653,7 +688,7 @@ void addModel2(std::vector<modelFromMaya>& objNameArray, char* buffer, int buffe
 		*index = *index + 1;
 		*nrObjs = *nrObjs + 1;
 	}
-	
+
 }
 
 void updateModel2(std::vector<modelFromMaya>& objNameArray, char* buffer, int bufferSize, Shader shader1, int* nrObjs, int* index) {
@@ -677,23 +712,33 @@ void updateModel2(std::vector<modelFromMaya>& objNameArray, char* buffer, int bu
 	std::string objName = "";
 	std::string temp;
 
+	memcpy((char*)&header, buffer, sizeof(MsgHeader));
+
+	std::cout << "header type: " << header.type << std::endl;
+
 	//get header elements
 	if (check == -1) {
-		ss >> typeInt >> header.nrOf >> objName;
+		ss >> typeInt >> header.nrOf >> header.nameLen >> header.objName;
 
-		if (typeInt == MSGTYPE::VTX)
-			header.type = MSGTYPE::VTX;
 
-		//std::cout << "TYPE: "	 << header.type << std::endl;
-		//std::cout << "NR OF: "	 << header.nrOf << std::endl;
-		//std::cout << "objName: " << objName << std::endl;
+		if (typeInt == CMDTYPE::VTX)
+			header.type = CMDTYPE::VTX;
+
+		std::cout << "TYPE: " << header.type << std::endl;
+		std::cout << "NR OF: " << header.nrOf << std::endl;
+		std::cout << "objName: " << header.objName << std::endl;
+		std::cout << "nameLen: " << header.nameLen << std::endl;
+
+		objName = header.objName;
+		objName = objName.substr(0, header.nameLen);
+		std::cout << "objName: " << objName << std::endl;
 
 		check = 0;
 	}
 
 	int element = 0;
 	float tempFloat = 0.0f;
-	nrOfElements = header.nrOf * 3; //for each vtx * [x,y,z]
+	nrOfElements = header.nrOf * 3 * 2; //for each vtx * [x,y,z]
 
 	while (!ss.eof()) {
 
@@ -701,13 +746,13 @@ void updateModel2(std::vector<modelFromMaya>& objNameArray, char* buffer, int bu
 		//std::cout << "TEMP: " << temp << std::endl;
 
 		if (element >= nrOfElements) {
-			check = 2;
+			check = 1;
 			//std::cout << "Last element fount " << std::endl;
 			break;
 
 		}
 
-		if (std::stringstream(temp) >> tempFloat && check == 0) {
+		if (std::stringstream(temp) >> tempFloat) {
 			arrayVtx[element] = (float)std::stof(temp);
 
 			lengthVtxArray++;
@@ -715,6 +760,7 @@ void updateModel2(std::vector<modelFromMaya>& objNameArray, char* buffer, int bu
 		}
 
 	}
+
 
 	for (int i = 0; i < *nrObjs; i++) {
 
@@ -724,7 +770,7 @@ void updateModel2(std::vector<modelFromMaya>& objNameArray, char* buffer, int bu
 
 			Mesh tempMeshToAdd = {};
 			tempMeshToAdd.vertexCount = lengthVtxArray;
-			tempMeshToAdd.vertices	  = new float[lengthVtxArray];
+			tempMeshToAdd.vertices = new float[lengthVtxArray];
 			memcpy(tempMeshToAdd.vertices, arrayVtx, sizeof(float) * tempMeshToAdd.vertexCount);
 			rlLoadMesh(&tempMeshToAdd, false);
 
@@ -735,8 +781,9 @@ void updateModel2(std::vector<modelFromMaya>& objNameArray, char* buffer, int bu
 			objNameArray.insert(objNameArray.begin() + i, { tempModelToAdd, tempIndex, objName, MatrixTranslate(2,0,2) });
 		}
 	}
-	
+
 }
+
 
 /*
 bool recvFromMaya(float* arrayFloat, int sizeOfArray, int* nrOut) {

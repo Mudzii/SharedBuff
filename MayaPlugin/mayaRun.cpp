@@ -22,7 +22,7 @@ bool initBool = false;
 
 enum NODE_TYPE { TRANSFORM, MESH }; 
 
-enum MSGTYPE {
+enum CMDTYPE {
 	DEFAULT = 1000,
 	NEW_NODE = 1001,
 	VTX = 1002
@@ -39,12 +39,14 @@ std::queue<MObject> newLights;
 ComLib comLib("sharedBuff2", 100, PRODUCER);
 
 struct MsgHeader {
-	int type; 
-	int nrOf; 
+	CMDTYPE type;
+	int nrOf;
+	int nameLen;
+	char objName[64];
 };
 
 // =========================================================
-bool sendMsg(std::string &msgString, MSGTYPE msgType, int nrOfElements, std::string objName) {
+bool sendMsg(std::string &msgString, CMDTYPE msgType, int nrOfElements, std::string objName) {
 
 	//MGlobal::displayInfo(MString("nrOfElements: ") + nrOfElements + "\n");
 	bool sent = false;
@@ -52,14 +54,20 @@ bool sendMsg(std::string &msgString, MSGTYPE msgType, int nrOfElements, std::str
 	MsgHeader header;
 	header.type = msgType;
 	header.nrOf = nrOfElements;
+	memcpy(header.objName, objName.c_str(), objName.length());
+	header.nameLen = objName.length();
 
+	/*
 	std::string headerString = "";
 	headerString += std::to_string(header.type) + " ";
 	headerString += std::to_string(header.nrOf) + " ";
-	headerString += objName + " ";
+	headerString += std::to_string(header.nameLen) + " ";
+	headerString += std::string(header.objName) + " ";
+
+	//fix bit copying like in exporter!!
 
 	//get array size
-	//int arraySize = strlen(msgString.c_str());
+	////int arraySize = strlen(msgString.c_str());
 	std::string finalMsgString;
 	finalMsgString.append(headerString);
 	finalMsgString.append(msgString);
@@ -70,12 +78,25 @@ bool sendMsg(std::string &msgString, MSGTYPE msgType, int nrOfElements, std::str
 	charMsgArray = new char[arraySizeFinal]();
 
 	finalMsgString.copy(charMsgArray, arraySizeFinal);
-	charMsgArray[arraySizeFinal - 1] = '\0';
+	//charMsgArray[arraySizeFinal - 1] = '\0';
+	*/
 
-	sent = comLib.send(charMsgArray, arraySizeFinal);
+	size_t msgSize = (sizeof(MsgHeader));
+	char* msg = new char[msgSize];
+
+	memcpy((char*)msg, &header, sizeof(MsgHeader));
+	//memcpy((char*)msg, msgString.c_str(), strlen(msgString.c_str())); 
+	//int strLen = strlen(msgString.c_str()); 
+
+	//MGlobal::displayInfo(MString("strLen: ") + strLen + "\n");
+
+	sent = comLib.send(msg, msgSize);
+
+	//sent = comLib.send(charMsgArray, arraySizeFinal);
 
 	// =========================== 
-	delete[] charMsgArray;
+	//delete[] charMsgArray;
+	delete[]msg;
 	return sent;
 
 }
@@ -423,7 +444,7 @@ void nodeAttributeChanged(MNodeMessage::AttributeMessage msg, MPlug &plug, MPlug
 		msgToSend = true;
 
 	if (msgToSend) {
-		sendMsg(vtxArrayString, MSGTYPE::VTX, nrElements, objName);
+		sendMsg(vtxArrayString, CMDTYPE::VTX, nrElements, objName);
 	}
 
 	/////////////===============================
@@ -635,7 +656,7 @@ void vtxPlugConnected(MPlug & srcPlug, MPlug & destPlug, bool made, void* client
 				msgToSend = true;
 
 			if (msgToSend) {
-				sendMsg(vtxArrayString, MSGTYPE::NEW_NODE, nrElements, objName);
+				sendMsg(vtxArrayString, CMDTYPE::NEW_NODE, nrElements, objName);
 			}
 
 		}
