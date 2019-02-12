@@ -40,6 +40,7 @@ struct MsgHeader {
 	CMDTYPE type;
 	int nrOf;
 	int nameLen;
+	int msgSize;
 	char objName[64];
 };
 
@@ -225,7 +226,7 @@ int main() {
 
 		if (type != CMDTYPE::DEFAULT) {
 
-			std::cout << "TYPE: " << type << std::endl;
+			//std::cout << "TYPE: " << type << std::endl;
 			funcMap[type](modelsFromMaya, tempArray, tempArraySize, shader1, &nrOfObj, &modelIndex);
 		}
 
@@ -242,7 +243,7 @@ int main() {
 		i++;
 		//////////////////////////////
 
-		std::cout << "modelsFromMaya.size(): " << modelsFromMaya.size() << std::endl;
+		//std::cout << "modelsFromMaya.size(): " << modelsFromMaya.size() << std::endl;
 
 		for (int i = 0; i < modelsFromMaya.size(); i++) {
 			auto m = modelsFromMaya[i];
@@ -535,7 +536,7 @@ CMDTYPE recvFromMaya2(char* buffer) {
 	std::string lineOut = "";
 	CMDTYPE type = CMDTYPE::DEFAULT;
 
-	MsgHeader header = {};
+	MsgHeader msgHeader = {};
 
 	size_t nr = comLib.nextSize();
 	size_t oldBuffSize = nr;
@@ -553,21 +554,26 @@ CMDTYPE recvFromMaya2(char* buffer) {
 
 	bool test = comLib.recv(buff, nr);
 	if (test == true) {
-
 		memcpy(buffer, buff, nr);
-		memcpy((char*)&header, buff, sizeof(MsgHeader));
+		memcpy((char*)&msgHeader, buff, sizeof(MsgHeader));
+
+
+		char* msg = new char[msgHeader.msgSize];
+		memcpy((char*)msg, buff + sizeof(MsgHeader), msgHeader.msgSize);
 
 		//char* testMsg = new char[172]; 
 		//memcpy((char*)&testMsg, buff, 171);
 
-		std::cout << "header type: " << header.type << std::endl;
-		std::cout << "header nrOf: " << header.nrOf << std::endl;
-		std::cout << "header objName: " << header.objName << std::endl;
-		std::cout << "header nameLen: " << header.nameLen << std::endl;
+		std::cout << "header type: " << msgHeader.type << std::endl;
+		std::cout << "header nrOf: " << msgHeader.nrOf << std::endl;
+		std::cout << "header objName: " << msgHeader.objName << std::endl;
+		std::cout << "header nameLen: " << msgHeader.nameLen << std::endl;
+		std::cout << "header nameLen: " << msgHeader.msgSize << std::endl;
 
-		objectName = header.objName;
-		objectName = objectName.substr(0, header.nameLen);
+		objectName = msgHeader.objName;
+		objectName = objectName.substr(0, msgHeader.nameLen);
 		std::cout << "objectName: " << objectName << std::endl;
+		std::cout << "MSG: " << msg << std::endl;
 
 		//std::cout << "testMsg: " << testMsg << std::endl;
 

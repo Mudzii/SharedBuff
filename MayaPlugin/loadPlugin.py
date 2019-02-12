@@ -25,7 +25,7 @@ answer = s.recv(1024)
 # create a polycube
 s.send('polyPlane -sy 1 -sx 1\n')
 #s.send('polyCube')
-s.send('polyTriangulate')
+#s.send('polyTriangulate')
 answer = s.recv(1024)
 
 # close socket with Maya

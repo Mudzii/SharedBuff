@@ -20,6 +20,9 @@ MObject m_node;
 MStatus status = MS::kSuccess;
 bool initBool = false;
 
+MTimer gTimer;
+float globalTime = 0;
+
 enum NODE_TYPE { TRANSFORM, MESH }; 
 
 enum CMDTYPE {
@@ -29,8 +32,15 @@ enum CMDTYPE {
 
 };
 
-MTimer gTimer;
-float globalTime = 0;
+struct MsgHeader {
+	CMDTYPE type;
+	int nrOf;
+	int nameLen;
+	int msgSize; 
+	char objName[64];
+};
+
+
 
 // keep track of created objects to maintain them
 std::queue<MObject> newMeshes;
@@ -38,24 +48,22 @@ std::queue<MObject> newLights;
 
 ComLib comLib("sharedBuff2", 100, PRODUCER);
 
-struct MsgHeader {
-	CMDTYPE type;
-	int nrOf;
-	int nameLen;
-	char objName[64];
-};
-
 // =========================================================
 bool sendMsg(std::string &msgString, CMDTYPE msgType, int nrOfElements, std::string objName) {
 
 	//MGlobal::displayInfo(MString("nrOfElements: ") + nrOfElements + "\n");
 	bool sent = false;
 
-	MsgHeader header;
-	header.type = msgType;
-	header.nrOf = nrOfElements;
-	memcpy(header.objName, objName.c_str(), objName.length());
-	header.nameLen = objName.length();
+	MsgHeader msgHeader;
+	msgHeader.type = msgType;
+	msgHeader.nrOf = nrOfElements;
+	msgHeader.msgSize = msgString.size() + 1;
+	msgHeader.nameLen = objName.length();
+	memcpy(msgHeader.objName, objName.c_str(), objName.length());
+
+	MGlobal::displayInfo(MString("msgStringSize: ") + msgHeader.msgSize + "\n");
+
+
 
 	/*
 	std::string headerString = "";
@@ -81,10 +89,15 @@ bool sendMsg(std::string &msgString, CMDTYPE msgType, int nrOfElements, std::str
 	//charMsgArray[arraySizeFinal - 1] = '\0';
 	*/
 
-	size_t msgSize = (sizeof(MsgHeader));
+	size_t msgSize = (sizeof(MsgHeader) + msgHeader.msgSize);
 	char* msg = new char[msgSize];
 
-	memcpy((char*)msg, &header, sizeof(MsgHeader));
+	memcpy((char*)msg, &msgHeader, sizeof(MsgHeader));
+	memcpy((char*)msg + sizeof(MsgHeader), msgString.c_str(), msgHeader.msgSize);
+
+
+	MGlobal::displayInfo(MString("msg: ") + msg + "\n");
+
 	//memcpy((char*)msg, msgString.c_str(), strlen(msgString.c_str())); 
 	//int strLen = strlen(msgString.c_str()); 
 
