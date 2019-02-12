@@ -40,7 +40,13 @@ struct MsgHeader {
 	char objName[64];
 };
 
-
+/*
+ * how Maya calls this method when a node is added.
+ * new POLY mesh: kPolyXXX, kTransform, kMesh
+ * new MATERIAL : kBlinn, kShadingEngine, kMaterialInfo
+ * new LIGHT    : kTransform, [kPointLight, kDirLight, kAmbientLight]
+ * new JOINT    : kJoint
+ */
 
 // keep track of created objects to maintain them
 std::queue<MObject> newMeshes;
@@ -54,6 +60,7 @@ bool sendMsg(std::string &msgString, CMDTYPE msgType, int nrOfElements, std::str
 	//MGlobal::displayInfo(MString("nrOfElements: ") + nrOfElements + "\n");
 	bool sent = false;
 
+	// Fill header ================= 
 	MsgHeader msgHeader;
 	msgHeader.type = msgType;
 	msgHeader.nrOf = nrOfElements;
@@ -61,54 +68,16 @@ bool sendMsg(std::string &msgString, CMDTYPE msgType, int nrOfElements, std::str
 	msgHeader.nameLen = objName.length();
 	memcpy(msgHeader.objName, objName.c_str(), objName.length());
 
-	MGlobal::displayInfo(MString("msgStringSize: ") + msgHeader.msgSize + "\n");
 
-
-
-	/*
-	std::string headerString = "";
-	headerString += std::to_string(header.type) + " ";
-	headerString += std::to_string(header.nrOf) + " ";
-	headerString += std::to_string(header.nameLen) + " ";
-	headerString += std::string(header.objName) + " ";
-
-	//fix bit copying like in exporter!!
-
-	//get array size
-	////int arraySize = strlen(msgString.c_str());
-	std::string finalMsgString;
-	finalMsgString.append(headerString);
-	finalMsgString.append(msgString);
-
-	int arraySizeFinal = strlen(finalMsgString.c_str());
-
-	char* charMsgArray = NULL;
-	charMsgArray = new char[arraySizeFinal]();
-
-	finalMsgString.copy(charMsgArray, arraySizeFinal);
-	//charMsgArray[arraySizeFinal - 1] = '\0';
-	*/
-
-	size_t msgSize = (sizeof(MsgHeader) + msgHeader.msgSize); 
-	char* msg = new char[msgSize];
+	// Copy MSG ================== 
+	size_t totalMsgSize = (sizeof(MsgHeader) + msgHeader.msgSize); 
+	char* msg = new char[totalMsgSize];
 
 	memcpy((char*)msg, &msgHeader, sizeof(MsgHeader));
 	memcpy((char*)msg + sizeof(MsgHeader), msgString.c_str(), msgHeader.msgSize);
 
-
-	MGlobal::displayInfo(MString("msg: ") + msg + "\n");
-	 
-	//memcpy((char*)msg, msgString.c_str(), strlen(msgString.c_str())); 
-	//int strLen = strlen(msgString.c_str()); 
-
-	//MGlobal::displayInfo(MString("strLen: ") + strLen + "\n");
-
-	sent = comLib.send(msg, msgSize);
-
-	//sent = comLib.send(charMsgArray, arraySizeFinal);
-
+	sent = comLib.send(msg, totalMsgSize);
 	// =========================== 
-	//delete[] charMsgArray;
 	delete[]msg;
 	return sent;
 
@@ -792,13 +761,7 @@ void nodeConnectionChange(MPlug &srcPlug, MPlug &destPlug, bool made, void *clie
 	MGlobal::displayInfo("=======================================");
 }
 
-/*
- * how Maya calls this method when a node is added.
- * new POLY mesh: kPolyXXX, kTransform, kMesh
- * new MATERIAL : kBlinn, kShadingEngine, kMaterialInfo
- * new LIGHT    : kTransform, [kPointLight, kDirLight, kAmbientLight]
- * new JOINT    : kJoint
- */
+
 
 void nodeAdded(MObject &node, void* clientData) {
 

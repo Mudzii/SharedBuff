@@ -57,7 +57,7 @@ typedef void(*FnPtr)(std::vector<modelFromMaya>&, char*, int, Shader, int*, int*
 // ===========================================
 std::string recvFromMaya(char* buffer);
 
-CMDTYPE recvFromMaya2(char* buffer);
+CMDTYPE recvMsgFromMaya(char* buffer);
 
 // ===========================================
 ComLib comLib("sharedBuff2", 100, CONSUMER);
@@ -67,7 +67,7 @@ int main() {
 
 	SetTraceLog(LOG_WARNING);
 
-	// OUR STUFF ====================================
+	// MAYA STUFF ====================================
 	std::vector<modelFromMaya> modelsFromMaya;
 
 	std::map<CMDTYPE, FnPtr> funcMap;
@@ -164,24 +164,6 @@ int main() {
 	tri.material.shader = shader1;
 	flatScene.push_back({ tri, MatrixTranslate(2,0,2) });
 
-
-
-	// TEST CUBE ===========================
-
-	/*int nr = comLib.nextSize();
-	float* arrayVtx = new float[nr]();
-	int lengthVtxArray = 0;
-	float* arrayVtx2;
-
-	recvFromMaya(arrayVtx, nr, &lengthVtxArray);*/
-
-	//std::cout << "lengthVtxArray: " << lengthVtxArray << std::endl;
-
-	/*for (int i = 0; i < lengthVtxArray; i++) {
-		std::cout << "array[i]: " << arrayVtx[i] << std::endl;
-	}*/
-
-
 	// Main game loop
 	while (!WindowShouldClose()) {               // Detect window close button or ESC key
 
@@ -222,22 +204,12 @@ int main() {
 		char* tempArray = new char[tempArraySize];
 
 		CMDTYPE type = CMDTYPE::DEFAULT;
-		type = recvFromMaya2(tempArray);
+		type = recvMsgFromMaya(tempArray);
 
 		if (type != CMDTYPE::DEFAULT) {
-
-			//std::cout << "TYPE: " << type << std::endl;
 			funcMap[type](modelsFromMaya, tempArray, tempArraySize, shader1, &nrOfObj, &modelIndex);
 		}
 
-		/*
-		std::string funcToCall = "";
-		funcToCall = recvFromMaya(tempArray);
-
-		if (funcToCall != "") {
-			funcMap[funcToCall](modelsFromMaya, tempArray, tempArraySize, shader1, &nrOfObj, &modelIndex);
-		}
-		*/
 
 		int i = 0;
 		i++;
@@ -252,52 +224,6 @@ int main() {
 			DrawModel(m.model, {}, 1.0, RED);
 		}
 
-
-		/*	nr = comLib.nextSize();
-		arrayVtx = new float[nr];
-		lengthVtxArray = 0;
-		recvFromMaya(arrayVtx, nr, &lengthVtxArray);*/
-
-		/*
-		int nr2 = comLib.nextSize();
-		arrayVtx2 = new float[nr2]();
-		int lengthVtxArray2 = 0;
-
-
-		sometingToRead = recvFromMaya(arrayVtx2, nr2, &lengthVtxArray2);
-		if (sometingToRead == true) {
-
-			if (checkIfModelLoaded == true)	{
-				checkIfModelLoaded = false;
-				cubeExists = false;
-				flatScene.pop_back();
-
-			}
-
-			if(checkIfModelLoaded == false) {
-
-			Mesh cubeTest2 = {};
-			cubeTest2.vertexCount = lengthVtxArray2;
-			cubeTest2.vertices = new float[lengthVtxArray2];
-			memcpy(cubeTest2.vertices, arrayVtx2, sizeof(float) * cubeTest2.vertexCount);
-			rlLoadMesh(&cubeTest2, false);
-
-			cube = LoadModelFromMesh(cubeTest2);
-			cube.material.shader = shader1;
-			flatScene.push_back({ cube, MatrixTranslate(1,0,1) });
-			checkIfModelLoaded = true;
-			cubeExists = true;
-
-			/*for (int i = 0; i < cubeTest2.vertexCount; i++) {
-
-				std::cout << "VTX: " << cubeTest2.vertices[i]  << std::endl;
-			}
-			std::cout << "==================================" << std::endl;
-
-			}
-		}
-		*/
-
 		// ===================================
 		/*
 		for (int i = 0; i < flatScene.size(); i++)
@@ -308,6 +234,7 @@ int main() {
 			DrawModel(m.model,{}, 1.0, RED);
 		}
 		*/
+
 		DrawGrid(10, 1.0f);     // Draw a grid
 
 		DrawSphere(lightPos, 0.1, RED);
@@ -530,40 +457,34 @@ void updateModel(std::vector<modelFromMaya>& objNameArray, char* buffer, int buf
 }
 
 
-// TEST===========================================
-CMDTYPE recvFromMaya2(char* buffer) {
-
-	std::string lineOut = "";
-	CMDTYPE type = CMDTYPE::DEFAULT;
+// TEST ===========================================
+CMDTYPE recvMsgFromMaya(char* buffer) {
 
 	MsgHeader msgHeader = {};
+	msgHeader.type = CMDTYPE::DEFAULT;
+
+	std::string objectName = "";
 
 	size_t nr = comLib.nextSize();
 	size_t oldBuffSize = nr;
 
-	char* buff = (char*)malloc(oldBuffSize);
-
-
-	std::string objectName = "";
+	char* buff = new char[oldBuffSize];
 
 	if (nr > oldBuffSize) {
-		free(buff);
-		buff = (char*)malloc(nr);
+		delete[] buff;
+		buff = new char[nr];
 		oldBuffSize = nr;
 	}
 
-	bool test = comLib.recv(buff, nr); 
-	if (test == true) {
+	bool receive = comLib.recv(buff, nr);
+	if (receive == true) {
+
 		memcpy(buffer, buff, nr);
 		memcpy((char*)&msgHeader, buff, sizeof(MsgHeader));
-
 
 		char* msg = new char[msgHeader.msgSize];
 		memcpy((char*)msg, buff + sizeof(MsgHeader), msgHeader.msgSize);
 		 
-		//char* testMsg = new char[172]; 
-		//memcpy((char*)&testMsg, buff, 171);
-
 		std::cout << "header type: " << msgHeader.type << std::endl;
 		std::cout << "header nrOf: " << msgHeader.nrOf << std::endl;
 		std::cout << "header objName: " << msgHeader.objName << std::endl;
@@ -575,32 +496,11 @@ CMDTYPE recvFromMaya2(char* buffer) {
 		std::cout << "objectName: " << objectName << std::endl;
 		std::cout << "MSG: " << msg << std::endl;
 
-		//std::cout << "testMsg: " << testMsg << std::endl;
-
-		/*
-
-		int typeInt = 0;
-
-		std::string msgString(buff, nr);
-		std::stringstream ss(msgString);
-		ss >> typeInt;
-
-		if (MSGTYPE::VTX == typeInt) {
-			type = MSGTYPE::VTX;
-
-		}
-
-		else if (MSGTYPE::NEW_NODE == typeInt) {
-			type = MSGTYPE::NEW_NODE;
-		}
-		*/
-
-		//free(testMsg); 
+		delete[] msg; 
 	}
 
-	free(buff);
-
-	return type;
+	delete[] buff;
+	return msgHeader.type;
 }
 
 void addModel2(std::vector<modelFromMaya>& objNameArray, char* buffer, int bufferSize, Shader shader1, int* nrObjs, int* index) {
@@ -789,118 +689,3 @@ void updateModel2(std::vector<modelFromMaya>& objNameArray, char* buffer, int bu
 	}
 
 }
-
-
-/*
-bool recvFromMaya(float* arrayFloat, int sizeOfArray, int* nrOut) {
-
-	bool result = false;
-
-	size_t nr = comLib.nextSize();
-
-	size_t oldBuffSize = nr;
-	char* buff = (char*)malloc(oldBuffSize);
-
-	if (nr > oldBuffSize){
-		free(buff);
-		buff = (char*)malloc(nr);
-		oldBuffSize = nr;
-	}
-
-	bool test = comLib.recv(buff, nr);
-	if (test == true){
-
-		if (test == true) {
-			std::cout << std::string((char*)buff, nr) << std::endl;
-		}
-
-		else {
-			buff = "notWorking";
-		}
-
-		float exampleFloat;	//use to find int type in string array
-		char examplechar;
-
-		float* arrayVtx = new float[nr]();
-		int lengthVtxArray = 0;
-
-		//int* arrayIndex = new int[nr]();
-		//int lengthIndexArray = 0;
-
-		//int check = -1;
-
-		//std::cout << "nr: " << nr << std::endl;
-
-		std::string testString(buff, nr);
-		std::stringstream stringStream;
-		stringStream << testString;
-		//std::cout << "testStrubg: " << testString << std::endl;
-
-		int i = 0;
-		std::string temp;
-
-		while (!stringStream.eof())
-		{
-			stringStream >> temp;
-			if (std::stringstream(temp) >> exampleFloat)
-			{
-				//std::cout << i << std::endl;
-				arrayVtx[i] = (float)std::stof(temp);
-				//std::cout << "arrayVtx: " << arrayVtx[i] << std::endl;
-				lengthVtxArray++;
-
-				//if (check == 0)
-				//{
-				//	arrayIndex[i] = (int)std::stoi(temp);
-				//	//std::cout << "arrayIndex: " << arrayIndex[i] << std::endl;
-				//	lengthIndexArray++;
-				//}
-
-				i++;
-				temp = "";
-
-			}
-			//if (std::stringstream(temp) >> examplechar)
-			//{
-			//	if (examplechar == 'a')
-			//	{
-			//		check = 0;
-			//		//std::cout << "found a!!" << std::endl;
-			//		i = 0;
-			//	}
-			//}
-		}
-
-		float* arrayVtx2 = new float[lengthVtxArray];
-		int* arrayIndex2 = new int[lengthIndexArray];
-
-		for (int i = 0; i < lengthVtxArray; i++)
-		{
-			arrayVtx2[i] = arrayVtx[i];
-			std::cout << "arrayvtx: " << arrayVtx2[i] << std::endl;
-		}
-		delete[] arrayVtx;
-
-		for (int i = 0; i < lengthIndexArray; i++)
-		{
-			arrayIndex2[i] = arrayIndex[i];
-			std::cout << "arrayIndex: " << arrayIndex2[i] << std::endl;
-		}
-		delete[] arrayIndex;
-
-		std::cout << "arrayVtxLength: " << lengthVtxArray << std::endl;
-		//std::cout << "lengthVtxArray: " << lengthVtxArray << std::endl;
-
-		for (int i = 0; i < lengthVtxArray; i++) {
-			arrayFloat[i] = arrayVtx[i];
-		}
-
-		*nrOut = lengthVtxArray;
-		 result = true;
-		delete[] arrayVtx;
-	}
-
-	free(buff);
-	return result;
-}
-*/
