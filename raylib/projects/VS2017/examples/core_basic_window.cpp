@@ -560,7 +560,7 @@ CMDTYPE recvFromMaya2(char* buffer) {
 
 		char* msg = new char[msgHeader.msgSize];
 		memcpy((char*)msg, buff + sizeof(MsgHeader), msgHeader.msgSize);
-
+		 
 		//char* testMsg = new char[172]; 
 		//memcpy((char*)&testMsg, buff, 171);
 
