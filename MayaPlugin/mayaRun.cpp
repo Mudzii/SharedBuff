@@ -62,7 +62,7 @@ bool sendMsg(std::string &msgString, CMDTYPE msgType, int nrOfElements, std::str
 
 	// Fill header ================= 
 	MsgHeader msgHeader;
-	msgHeader.type = msgType;
+	msgHeader.type = msgType; 
 	msgHeader.nrOf = nrOfElements;
 	msgHeader.msgSize = msgString.size() + 1;
 	msgHeader.nameLen = objName.length();
