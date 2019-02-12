@@ -26,9 +26,9 @@ float globalTime = 0;
 enum NODE_TYPE { TRANSFORM, MESH }; 
 
 enum CMDTYPE {
-	DEFAULT = 1000,
-	NEW_NODE = 1001,
-	VTX = 1002
+	DEFAULT		= 1000,
+	NEW_NODE	= 1001,
+	UPDATE_NODE = 1002
 
 };
 
@@ -401,16 +401,10 @@ void nodeAttributeChanged(MNodeMessage::AttributeMessage msg, MPlug &plug, MPlug
 		trueVtxForm.append(vtxArrayMessy[triVertsIndex[i]]);
 	}
 
-	//add command + name to string
 	std::string objName = mesh.name().asChar();
-	//std::string objName = "updateModel ";
-	//objName += mesh.name().asChar();
-	//objName += " | ";
-	//size_t lengthName = objName.length();
-
+	
 	//MVector to string
 	std::string vtxArrayString;
-	//vtxArrayString.append(objName);
 	size_t vtxArrElements = 0;
 
 	for (int u = 0; u < trueVtxForm.length(); u++) {
@@ -426,112 +420,8 @@ void nodeAttributeChanged(MNodeMessage::AttributeMessage msg, MPlug &plug, MPlug
 		msgToSend = true;
 
 	if (msgToSend) {
-		sendMsg(vtxArrayString, CMDTYPE::VTX, nrElements, objName);
+		sendMsg(vtxArrayString, CMDTYPE::UPDATE_NODE, nrElements, objName);
 	}
-
-	/////////////===============================
-	/* 
-	// get vertices ==================
-	MPlug vtxArray = mesh.findPlug("controlPoints");
-	int nrElements = vtxArray.numElements();
-
-	// Get VTX Points ===============
-	MIntArray*  vtxIndecies;
-	MPointArray pointsOnMesh;
-
-	MStatus getVtxStatus = mesh.getPoints(pointsOnMesh, MSpace::kObject);
-	if (!getVtxStatus) {
-		MStreamUtils::stdOutStream() << "Can't find points!!" << endl;
-	}
-
-	// itterate over each face on mesh to get total vtx count
-	MItMeshPolygon faceIt(path);
-	int vtxCount = 0;
-
-	for (; !faceIt.isDone(); faceIt.next()) {
-		int currentFaceCount = faceIt.polygonVertexCount();
-		vtxCount += currentFaceCount;
-	}
-
-	// get vtx per face
-	MVectorArray   vtxVectorArr;
-	MItMeshPolygon faceIt2(path);
-	int nrFaces = 0;
-
-	for (; !faceIt2.isDone(); faceIt2.next()) {
-		int currentFaceCount = faceIt2.polygonVertexCount();
-		nrFaces++;
-
-		//get currnet vtx points
-		MPointArray tempVtx;
-		faceIt2.getPoints(tempVtx, MSpace::kObject);
-
-		//add current vtx to vtxVextorArr
-		for (int u = 0; u < currentFaceCount; u++) {
-			MVector tempVtxPoint = { tempVtx[u][0], tempVtx[u][1], tempVtx[u][2] };
-			vtxVectorArr.append(tempVtxPoint);
-		}
-
-	}
-
-	std::string* vtxArrayString = new std::string[vtxVectorArr.length() * 3]();
-	int vtxArrElements = 0;
-
-	std::string vtxArrayS; 
-
-	// fill string with vtx
-	for (int i = 0; i < vtxVectorArr.length(); i++) {
-
-		for (int j = 0; j < 3; j++) {
-			vtxArrayString[vtxArrElements] = to_string(vtxVectorArr[i][j]) + " ";
-			vtxArrayS.append(to_string(vtxVectorArr[i][j]) + " ");
-
-			vtxArrElements++;
-		}
-	}
-
-	
-	if (vtxArrElements > 0)
-		msgToSend = true; 
-
-	if(msgToSend){
-		sendMsg(vtxArrayS, vtxArrElements);
-	}
-	
-	//delete[] charMsgArray;
-	delete[] vtxArrayString;
-	*/
-
-	/* 
-	//get array size
-	int finalSize		= 0;
-	int tempSizeElement = 0; 
-	for (int x = 0; x < vtxArrElements; x++) {
-		tempSizeElement = strlen(vtxArrayString[x].c_str());
-		finalSize = finalSize + tempSizeElement;
-	}
-
-	int z = 0;
-	int arraySize = finalSize; 
-	int charArrElement = 0;
-
-	char* charMsgArray = NULL; 
-	charMsgArray	   = new char[arraySize]();
-	
-	//antalet vertiser
-	while (z != vtxArrElements) {	
-
-		for (int y = 0; y < vtxArrayString[z].length(); y++) {
-			charMsgArray[charArrElement] = vtxArrayString[z][y];
-			charArrElement++;
-		}
-
-		z++;
-	}
-
-	charMsgArray[arraySize - 1] = '\0'; 
-	msgToSend = true;
-	*/
 
 	// MATERIAL ================================================
 	MObjectArray shaderGroups;

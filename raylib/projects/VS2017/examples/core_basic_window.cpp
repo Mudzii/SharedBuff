@@ -20,7 +20,7 @@
 enum CMDTYPE {
 	DEFAULT = 1000,
 	NEW_NODE = 1001,
-	VTX = 1002
+	UPDATE_NODE = 1002
 
 };
 
@@ -71,12 +71,8 @@ int main() {
 	std::vector<modelFromMaya> modelsFromMaya;
 
 	std::map<CMDTYPE, FnPtr> funcMap;
-	funcMap[NEW_NODE] = addModel2;
-	funcMap[VTX]	  = updateModel2;
-
-	/*std::map<std::string, FnPtr> funcMap;
-	funcMap["addModel"]	   = addModel;
-	funcMap["updateModel"] = updateModel;*/
+	funcMap[NEW_NODE]	 = addModel2;
+	funcMap[UPDATE_NODE] = updateModel2;
 
 	Model cube;
 	int modelIndex = 0;
@@ -149,9 +145,9 @@ int main() {
 	mesh2.vertexCount = 3;
 	mesh2.triangleCount = 1;
 	mesh2.vertices = new float[9];
-	mesh2.normals = new float[9];
-	mesh2.indices = new unsigned short[3]; // remove to use vertices only
-	mesh2.colors = new unsigned char[12];
+	mesh2.normals  = new float[9];
+	mesh2.indices  = new unsigned short[3]; // remove to use vertices only
+	mesh2.colors   = new unsigned char[12];
 
 	memcpy(mesh2.vertices, vtx, sizeof(float) * 9);
 	memcpy(mesh2.normals, norm, sizeof(float) * 9);
@@ -468,113 +464,99 @@ CMDTYPE recvMsgFromMaya(char* buffer) {
 	size_t nr = comLib.nextSize();
 	size_t oldBuffSize = nr;
 
-	char* buff = new char[oldBuffSize];
+	char* msgBuff = new char[oldBuffSize];
 
 	if (nr > oldBuffSize) {
-		delete[] buff;
-		buff = new char[nr];
+		delete[] msgBuff;
+		msgBuff = new char[nr];
 		oldBuffSize = nr;
 	}
 
-	bool receive = comLib.recv(buff, nr);
+	bool receive = comLib.recv(msgBuff, nr);
+
 	if (receive == true) {
 
-		memcpy(buffer, buff, nr);
-		memcpy((char*)&msgHeader, buff, sizeof(MsgHeader));
+		memcpy((char*)&msgHeader, msgBuff, sizeof(MsgHeader));
 
+	/*
 		char* msg = new char[msgHeader.msgSize];
-		memcpy((char*)msg, buff + sizeof(MsgHeader), msgHeader.msgSize);
-		 
+		memcpy((char*)msg, msgBuff + sizeof(MsgHeader), msgHeader.msgSize);
+	
+
+		
+		std::cout << "============================" << std::endl;
 		std::cout << "header type: " << msgHeader.type << std::endl;
 		std::cout << "header nrOf: " << msgHeader.nrOf << std::endl;
 		std::cout << "header objName: " << msgHeader.objName << std::endl;
 		std::cout << "header nameLen: " << msgHeader.nameLen << std::endl;
 		std::cout << "header nameLen: " << msgHeader.msgSize << std::endl;
-		 
-		objectName = msgHeader.objName;
-		objectName = objectName.substr(0, msgHeader.nameLen);
 		std::cout << "objectName: " << objectName << std::endl;
-		std::cout << "MSG: " << msg << std::endl;
+		*/
 
-		delete[] msg; 
+		memcpy(buffer, msgBuff, sizeof(MsgHeader));
+		memcpy(buffer + sizeof(MsgHeader), msgBuff + sizeof(MsgHeader), msgHeader.msgSize);
+
+		//delete[] msg; 
 	}
 
-	delete[] buff;
+	
+	delete[] msgBuff;
 	return msgHeader.type;
 }
 
 void addModel2(std::vector<modelFromMaya>& objNameArray, char* buffer, int bufferSize, Shader shader1, int* nrObjs, int* index) {
 
-	MsgHeader header;
+	std::cout << "============================" << std::endl;
+	std::cout << "ADD MODEL: " << std::endl;
 
-	std::cout << "==================================" << std::endl;
-	std::cout << "IN ADD MODEL" << std::endl;
+	MsgHeader msgHeader	   = {};
+	std::string objectName = ""; 
 
-	int check = -1;
+	// Get elements from buffer
+	memcpy((char*)&msgHeader, buffer, sizeof(MsgHeader));
+	objectName = msgHeader.objName;
+	objectName = objectName.substr(0, msgHeader.nameLen);
 
-	int typeInt = 0;
-	int nrOfElements = 0;
+	char* msgElements = new char[msgHeader.msgSize];
+	memcpy((char*)msgElements, buffer + sizeof(MsgHeader), msgHeader.msgSize);
+	
+	// array for vtxPoints
+	float* arrayVtx  = new float[msgHeader.msgSize];
+	int lengthVtxArr = 0; 
 
-	float* arrayVtx = new float[bufferSize];
-	int lengthVtxArray = 0;
-
-	std::string msgString(buffer, bufferSize);
+	// setup stringstream
+	std::string msgString(msgElements, msgHeader.msgSize);
 	std::istringstream ss(msgString);
-
-	std::string objName = "";
-	std::string temp;
-
-
-	//get header elements
-	if (check == -1) {
-		ss >> typeInt >> header.nrOf >> header.nameLen >> header.objName;
-
-		if (typeInt == CMDTYPE::NEW_NODE)
-			header.type = CMDTYPE::NEW_NODE;
-
-		std::cout << "TYPE: " << header.type << std::endl;
-		std::cout << "NR OF: " << header.nrOf << std::endl;
-		std::cout << "objName: " << header.objName << std::endl;
-		std::cout << "nameLen: " << header.nameLen << std::endl;
-
-		objName = header.objName;
-		objName = objName.substr(0, header.nameLen);
-		std::cout << "objName: " << objName << std::endl;
-
-
-		check = 0;
-	}
-
-	int element = 0;
-	float tempFloat = 0.0f;
-	nrOfElements = header.nrOf * 3 * 2; //for each vtx * [x,y,z]
-
+	
+	std::string tempX, tempY, tempZ = ""; 
+	int element		 = 0;
+	float tempFloat  = 0.0f;
+	int nrOfElements = msgHeader.nrOf * 3 * 2; //for each vtx * [x,y,z]
+	
 	while (!ss.eof()) {
 
-		// get x y z ?? 
-		ss >> temp;
+		ss >> tempX >> tempY >> tempZ;
 
 		if (element >= nrOfElements) {
-			check = 1;
 			std::cout << "Last element fount " << std::endl;
 			break;
-
 		}
 
-		if (std::stringstream(temp) >> tempFloat) {
-			std::cout << "TEMP: " << temp << std::endl;
-			arrayVtx[element] = (float)std::stof(temp);
+		if (std::stringstream(tempX) >> tempFloat && std::stringstream(tempY) >> tempFloat && std::stringstream(tempZ) >> tempFloat) {
+			std::cout << "TEMP: " << tempX << " : " << tempY << " : " << tempX << std::endl;
+			
+			arrayVtx[element]	  = (float)std::stof(tempX);
+			arrayVtx[element + 1] = (float)std::stof(tempY);
+			arrayVtx[element + 2] = (float)std::stof(tempZ);
 
-			lengthVtxArray++;
-			element++;
+			lengthVtxArr = lengthVtxArr + 3;
+			element = element + 3;
 		}
-
 	}
-
 
 	bool exists = false;
 	for (int i = 0; i < *nrObjs; i++) {
-		if (objNameArray[i].name == objName) {
+		if (objNameArray[i].name == objectName) {
 			exists = true;
 		}
 	}
@@ -582,19 +564,21 @@ void addModel2(std::vector<modelFromMaya>& objNameArray, char* buffer, int buffe
 	if (exists == false) {
 
 		Mesh tempMeshToAdd = {};
-		tempMeshToAdd.vertexCount = lengthVtxArray;
-		tempMeshToAdd.vertices = new float[lengthVtxArray];
+		tempMeshToAdd.vertexCount = lengthVtxArr;
+		tempMeshToAdd.vertices = new float[lengthVtxArr];
 		memcpy(tempMeshToAdd.vertices, arrayVtx, sizeof(float) * tempMeshToAdd.vertexCount);
 		rlLoadMesh(&tempMeshToAdd, false);
 
 		Model tempModelToAdd = LoadModelFromMesh(tempMeshToAdd);
 		tempModelToAdd.material.shader = shader1;
 
-		objNameArray.push_back({ tempModelToAdd, *index, objName, MatrixTranslate(2,0,2) });
+		objNameArray.push_back({ tempModelToAdd, *index, objectName, MatrixTranslate(2,0,2) });
 		*index = *index + 1;
 		*nrObjs = *nrObjs + 1;
 	}
 
+	delete[]msgElements; 
+	delete[] arrayVtx; 
 }
 
 void updateModel2(std::vector<modelFromMaya>& objNameArray, char* buffer, int bufferSize, Shader shader1, int* nrObjs, int* index) {
@@ -627,8 +611,8 @@ void updateModel2(std::vector<modelFromMaya>& objNameArray, char* buffer, int bu
 		ss >> typeInt >> header.nrOf >> header.nameLen >> header.objName;
 
 
-		if (typeInt == CMDTYPE::VTX)
-			header.type = CMDTYPE::VTX;
+		if (typeInt == CMDTYPE::UPDATE_NODE)
+			header.type = CMDTYPE::UPDATE_NODE;
 
 		std::cout << "TYPE: " << header.type << std::endl;
 		std::cout << "NR OF: " << header.nrOf << std::endl;
