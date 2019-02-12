@@ -552,7 +552,7 @@ CMDTYPE recvFromMaya2(char* buffer) {
 		oldBuffSize = nr;
 	}
 
-	bool test = comLib.recv(buff, nr);
+	bool test = comLib.recv(buff, nr); 
 	if (test == true) {
 		memcpy(buffer, buff, nr);
 		memcpy((char*)&msgHeader, buff, sizeof(MsgHeader));
