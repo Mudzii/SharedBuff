@@ -97,7 +97,7 @@ bool sendMsg(std::string &msgString, CMDTYPE msgType, int nrOfElements, std::str
 
 
 	MGlobal::displayInfo(MString("msg: ") + msg + "\n");
-
+	 
 	//memcpy((char*)msg, msgString.c_str(), strlen(msgString.c_str())); 
 	//int strLen = strlen(msgString.c_str()); 
 
