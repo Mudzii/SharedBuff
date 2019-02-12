@@ -490,7 +490,7 @@ CMDTYPE recvMsgFromMaya(char* buffer) {
 		std::cout << "header objName: " << msgHeader.objName << std::endl;
 		std::cout << "header nameLen: " << msgHeader.nameLen << std::endl;
 		std::cout << "header nameLen: " << msgHeader.msgSize << std::endl;
-
+		 
 		objectName = msgHeader.objName;
 		objectName = objectName.substr(0, msgHeader.nameLen);
 		std::cout << "objectName: " << objectName << std::endl;
