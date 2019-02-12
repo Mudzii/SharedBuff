@@ -34,7 +34,7 @@ float globalTime = 0;
 
 // keep track of created objects to maintain them
 std::queue<MObject> newMeshes;
-std::queue<MObject> newLights;
+std::queue<MObject> newLights; 
 
 ComLib comLib("sharedBuff2", 100, PRODUCER);
 
