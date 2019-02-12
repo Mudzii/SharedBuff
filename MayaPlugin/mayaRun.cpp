@@ -89,7 +89,7 @@ bool sendMsg(std::string &msgString, CMDTYPE msgType, int nrOfElements, std::str
 	//charMsgArray[arraySizeFinal - 1] = '\0';
 	*/
 
-	size_t msgSize = (sizeof(MsgHeader) + msgHeader.msgSize);
+	size_t msgSize = (sizeof(MsgHeader) + msgHeader.msgSize); 
 	char* msg = new char[msgSize];
 
 	memcpy((char*)msg, &msgHeader, sizeof(MsgHeader));
