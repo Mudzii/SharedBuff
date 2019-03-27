@@ -750,11 +750,11 @@ void vtxPlugConnected(MPlug & srcPlug, MPlug & destPlug, bool made, void* client
 				MIntArray triNormIndex;
 				mesh.getNormalIds(normCount, triNormIndex);
 
-				/*
 				MFloatVectorArray normals;
 				mesh.getNormals(normals, MSpace::kWorld);
 
 				int nrOfNormals = normals.length();
+				/*
 
 				MVectorArray normalsArray;
 
