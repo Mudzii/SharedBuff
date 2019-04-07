@@ -949,7 +949,8 @@ void vtxPlugConnected(MPlug & srcPlug, MPlug & destPlug, bool made, void* client
 					normArrElements++;
 				}
 			}
-			//MStreamUtils::stdOutStream() << "NormArrayString: " << NormArrayString << "_" << endl;
+			MStreamUtils::stdOutStream() << "NormArrayString: " << NormArrayString << "_" << endl;
+
 
 
 			std::string masterTransformString;
