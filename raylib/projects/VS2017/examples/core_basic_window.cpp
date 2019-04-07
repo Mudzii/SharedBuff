@@ -105,10 +105,10 @@ int main() {
 	lightsFromMaya.push_back({ lightPos, radius, color });
 
 	std::map<CMDTYPE, FnPtr> funcMap;
-	funcMap[NEW_NODE]	 = addNode;
+	funcMap[NEW_NODE] = addNode;
 	funcMap[UPDATE_NODE] = updateNode;
 	funcMap[UPDATE_MATRIX] = updateNodeMatrix;
-	funcMap[UPDATE_NAME]   = updateNodeName;
+	funcMap[UPDATE_NAME] = updateNodeName;
 
 
 	int modelIndex = 0;
@@ -119,7 +119,7 @@ int main() {
 
 	// Initialization
 	//--------------------------------------------------------------------------------------
-	int screenWidth  = 1200;
+	int screenWidth = 1200;
 	int screenHeight = 800;
 
 	SetConfigFlags(FLAG_MSAA_4X_HINT);      // Enable Multi Sampling Anti Aliasing 4x (if available)
@@ -127,10 +127,10 @@ int main() {
 	InitWindow(screenWidth, screenHeight, "demo");
 
 	// Define the camera to look into our 3d world
-	Camera camera	= { 0 };
+	Camera camera = { 0 };
 	camera.position = { 4.0f, 4.0f, 4.0f };
-	camera.target	= { 0.0f, 1.0f, -1.0f };
-	camera.up	= { 0.0f, 1.0f, 0.0f };
+	camera.target = { 0.0f, 1.0f, -1.0f };
+	camera.up = { 0.0f, 1.0f, 0.0f };
 	camera.fovy = 45.0f;
 	camera.type = CAMERA_PERSPECTIVE;
 
@@ -195,11 +195,11 @@ int main() {
 		int i = 0;
 		i++;
 		//////////////////////////////
-		camera.target   = cameraMaya[0].forward;
+		camera.target = cameraMaya[0].forward;
 		camera.position = cameraMaya[0].pos;
 		camera.fovy = cameraMaya[0].FOVy;
 		camera.type = cameraMaya[0].type;
-		camera.up   = cameraMaya[0].up;
+		camera.up = cameraMaya[0].up;
 
 
 
@@ -263,7 +263,7 @@ int main() {
 	return 0;
 }
 
- 
+
 
 
 CMDTYPE recvFromMaya(char* buffer)
@@ -313,7 +313,7 @@ CMDTYPE recvFromMaya(char* buffer)
 
 		}
 
-		std::cout << "print msg: " << msg << "_" << std::endl;
+		//std::cout << "print msg: " << msg << "_" << std::endl;
 		delete[] msg;
 	}
 
@@ -383,11 +383,11 @@ void addNode(std::vector<modelFromMaya>& objNameArray, char* buffer, int bufferS
 
 			while (vtxCheck < nrVtx)
 			{
-				std::cout << "VERTEX" << std::endl;
+				//std::cout << "VERTEX" << std::endl;
 				ss >> tempX >> tempY >> tempZ;
 
 				if (element >= nrOfElements) {
-					std::cout << "Last element fount " << std::endl;
+					//std::cout << "Last element fount " << std::endl;
 					break;
 				}
 
@@ -410,22 +410,21 @@ void addNode(std::vector<modelFromMaya>& objNameArray, char* buffer, int bufferS
 
 			element = 0;
 
-			while (normCheck < nrNorm)
-			{
+			while (normCheck < nrNorm) {
 				std::cout << "NORMALS" << std::endl;
 				ss >> tempNormX >> tempNormY >> tempNormZ;
 
 				if (element >= nrOfElements) {
-					std::cout << "Last element fount " << std::endl;
+					//std::cout << "Last element fount " << std::endl;
 					break;
 				}
 
 				arrayNorm[element] = (float)std::stof(tempNormX);
-				std::cout << "NORM X:" << arrayNorm[element] << std::endl;
+				//std::cout << "NORM X:" << arrayNorm[element] << std::endl;
 				arrayNorm[element + 1] = (float)std::stof(tempNormY);
-				std::cout << "NORM Y:" << arrayNorm[element + 1] << std::endl;
+				//std::cout << "NORM Y:" << arrayNorm[element + 1] << std::endl;
 				arrayNorm[element + 2] = (float)std::stof(tempNormZ);
-				std::cout << "NORM Z" << arrayNorm[element + 2] << std::endl;
+				//std::cout << "NORM Z" << arrayNorm[element + 2] << std::endl;
 
 				lengthNormArr = lengthNormArr + 3;
 				element = element + 3;
@@ -490,7 +489,7 @@ void addNode(std::vector<modelFromMaya>& objNameArray, char* buffer, int bufferS
 
 		ss >> lightPos[0] >> lightPos[1] >> lightPos[2] >> lightColor[0] >> lightColor[1] >> lightColor[2] >> lightColor[3];
 
-		std::cout << "lightPos: " << lightPos[0] << " " << lightPos[1] << " " << lightPos[2] << "lightColor: " << lightColor[0] << " " << lightColor[1] << " " << lightColor[2] << " " << lightColor[3] << std::endl;
+		//std::cout << "lightPos: " << lightPos[0] << " " << lightPos[1] << " " << lightPos[2] << "lightColor: " << lightColor[0] << " " << lightColor[1] << " " << lightColor[2] << " " << lightColor[3] << std::endl;
 
 		Color tempColor = { lightColor[0] * 255, lightColor[1] * 255, lightColor[2] * 255, lightColor[3] * 255 };
 		Vector3 tempPos = { lightPos[0], lightPos[1], lightPos[2] };
@@ -510,8 +509,8 @@ void updateNode(std::vector<modelFromMaya>& objNameArray, char* buffer, int buff
 	objectName = msgHeader.objName;
 	objectName = objectName.substr(0, msgHeader.nameLen);
 
-	std::cout << "in update and printing cmdType " << msgHeader.cmdType << " " << std::endl;
-	std::cout << "in update and printing node_TYPE " << msgHeader.nodeType << " " << std::endl;
+	//std::cout << "in update and printing cmdType " << msgHeader.cmdType << " " << std::endl;
+	//std::cout << "in update and printing node_TYPE " << msgHeader.nodeType << " " << std::endl;
 
 	if (msgHeader.nodeType == NODE_TYPE::MESH)
 	{
@@ -536,7 +535,7 @@ void updateNode(std::vector<modelFromMaya>& objNameArray, char* buffer, int buff
 		int normCheck = 0;
 
 		// setup stringstream
-	
+
 		ss >> nrVtx;
 
 		float* arrayNorm;
@@ -560,7 +559,7 @@ void updateNode(std::vector<modelFromMaya>& objNameArray, char* buffer, int buff
 				ss >> tempX >> tempY >> tempZ;
 
 				if (element >= nrOfElements) {
-					std::cout << "Last element fount " << std::endl;
+					//std::cout << "Last element fount " << std::endl;
 					break;
 				}
 
@@ -589,16 +588,16 @@ void updateNode(std::vector<modelFromMaya>& objNameArray, char* buffer, int buff
 				ss >> tempNormX >> tempNormY >> tempNormZ;
 
 				if (element >= nrOfElements) {
-					std::cout << "Last element fount " << std::endl;
+					//std::cout << "Last element fount " << std::endl;
 					break;
 				}
 
 				arrayNorm[element] = (float)std::stof(tempNormX);
-				std::cout << "NORM X:" << arrayNorm[element] << std::endl;
+				//std::cout << "NORM X:" << arrayNorm[element] << std::endl;
 				arrayNorm[element + 1] = (float)std::stof(tempNormY);
-				std::cout << "NORM Y:" << arrayNorm[element + 1] << std::endl;
+				//std::cout << "NORM Y:" << arrayNorm[element + 1] << std::endl;
 				arrayNorm[element + 2] = (float)std::stof(tempNormZ);
-				std::cout << "NORM Z" << arrayNorm[element + 2] << std::endl;
+				//std::cout << "NORM Z" << arrayNorm[element + 2] << std::endl;
 
 				lengthNormArr = lengthNormArr + 3;
 				element = element + 3;
@@ -708,8 +707,8 @@ void updateNodeMatrix(std::vector<modelFromMaya>& objNameArray, char* buffer, in
 	objectName = msgHeader.objName;
 	objectName = objectName.substr(0, msgHeader.nameLen);
 
-	std::cout << "in matrix and printing cmdType " << msgHeader.cmdType << " " << std::endl;
-	std::cout << "in matrix and printing node_TYPE " << msgHeader.nodeType << " " << std::endl;
+	//std::cout << "in matrix and printing cmdType " << msgHeader.cmdType << " " << std::endl;
+	//std::cout << "in matrix and printing node_TYPE " << msgHeader.nodeType << " " << std::endl;
 
 	if (msgHeader.nodeType == NODE_TYPE::MESH)
 	{
@@ -732,8 +731,8 @@ void updateNodeMatrix(std::vector<modelFromMaya>& objNameArray, char* buffer, in
 
 		for (int i = 0; i < *nrObjs; i++)
 		{
-			std::cout << "objName: " << objNameArray[i].name << std::endl;
-			std::cout << "tempName: " << objectName << std::endl;
+			//std::cout << "objName: " << objNameArray[i].name << std::endl;
+			//std::cout << "tempName: " << objectName << std::endl;
 
 			if (objNameArray[i].name == objectName)
 			{
@@ -767,7 +766,7 @@ void updateNodeMatrix(std::vector<modelFromMaya>& objNameArray, char* buffer, in
 
 		ss >> matrixPos[0] >> matrixPos[1] >> matrixPos[2];
 
-		std::cout << matrixPos[0] << matrixPos[1] << matrixPos[2] << std::endl;
+		//std::cout << matrixPos[0] << matrixPos[1] << matrixPos[2] << std::endl;
 
 		Color tempColor = lightsFromMaya[0].color;
 		Vector3 tempPos = { matrixPos[0], matrixPos[1], matrixPos[2] };
@@ -789,7 +788,7 @@ void updateNodeName(std::vector<modelFromMaya>& objNameArray, char* buffer, int 
 	objectName = msgHeader.objName;
 	objectName = objectName.substr(0, msgHeader.nameLen);
 
-	std::cout << "oldName: " << objectName << "_" << std::endl;
+	//std::cout << "oldName: " << objectName << "_" << std::endl;
 
 	if (msgHeader.nodeType == NODE_TYPE::MESH)
 	{
@@ -811,7 +810,7 @@ void updateNodeName(std::vector<modelFromMaya>& objNameArray, char* buffer, int 
 		newName = newName.substr(0, newName.length() - 1);
 
 
-		std::cout << "newName: " << newName << "_" << std::endl;
+		//std::cout << "newName: " << newName << "_" << std::endl;
 
 		for (int i = 0; i < *nrObjs; i++)
 		{

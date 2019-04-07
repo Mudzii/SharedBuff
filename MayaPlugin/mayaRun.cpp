@@ -207,19 +207,15 @@ void activeCamera(const MString &panelName, void* cliendData) {
 		MStreamUtils::stdOutStream() << "rightDir: " << rightDir << endl;
 		MStreamUtils::stdOutStream() << "CamPos: "	 << camPos << endl;
 		MStreamUtils::stdOutStream() << "verticalFOV: " << verticalFOV << endl;
-
 	}
 	MStreamUtils::stdOutStream() << " " << endl;
 	MStreamUtils::stdOutStream() << cameraView.name() << endl;
-
 	MStreamUtils::stdOutStream() << " " << endl;
 	MStreamUtils::stdOutStream() << camName << endl;
 	MStreamUtils::stdOutStream() << " " << endl;
 	MStreamUtils::stdOutStream() << "Model view mat: " << modelViewMat << endl;
 	MStreamUtils::stdOutStream() << " " << endl;
 	MStreamUtils::stdOutStream() << "Projection mat: " <<projectionViewMat << endl;
-
-
 	MStreamUtils::stdOutStream() << "==================================================" << endl;
 	*/
 
@@ -394,20 +390,63 @@ void nodeAttributeChanged(MNodeMessage::AttributeMessage msg, MPlug &plug, MPlug
 	// NORMALS //
 	/////////////
 
+	MStreamUtils::stdOutStream() << "================================= " << endl;
+
+	MFloatVectorArray normals;
+	MFloatVectorArray initialNormals;
+	mesh.getNormals(normals, MSpace::kWorld);
+
+	MIntArray normCounts;
+	MIntArray triNormIndex;
+	//mesh.getNormalIds(normCounts, triNormIndex);
+
+	MIntArray vertexCount;
+	MIntArray vertexList;
+	mesh.getVertices(vertexCount, vertexList);
+
+	int currentIndex = 0;
+	MFloatVectorArray orderedNormals;
+	for (int faceCnt = 0; faceCnt < vertexCount.length(); ++faceCnt) {
+		for (int faceVtxCnt = 0; faceVtxCnt < vertexCount[faceCnt]; ++faceVtxCnt) {
+
+			MVector tempNorm = normals[triNormIndex[currentIndex]];
+			orderedNormals.append(tempNorm);
+			++currentIndex;
+		}
+
+
+	}
+
+	MStreamUtils::stdOutStream() << "====================== " << endl;
+	MStreamUtils::stdOutStream() << "orderedNormals.len: " << orderedNormals.length() << endl;
+
+	std::string nmlArrayString;
+	size_t nrmlArrElements = 0;
+	int nrmlCount = orderedNormals.length();
+
+	vtxArrayString.append(to_string(nrmlCount) + " ");
+	for (int u = 0; u < orderedNormals.length(); u++) {
+		for (int v = 0; v < 3; v++) {
+			nmlArrayString.append(std::to_string(orderedNormals[u][v]) + " ");
+			nrmlArrElements++;
+		}
+	}
+
+
+	//MVectorArray normalsArray;
+	//MFloatVectorArray normals;
+	//mesh.getNormals(normals, MSpace::kWorld);
+
+	/*
 	MIntArray normCount;
 	MIntArray triNormIndex;
 	mesh.getNormalIds(normCount, triNormIndex);
-
-	MVectorArray normalsArray;
-	MFloatVectorArray normals;
-	mesh.getNormals(normals, MSpace::kWorld);
 
 	int nrOfNormals = normals.length();
 
 	for (int i = 0; i < triNormIndex.length(); i++) {
 		normalsArray.append(normals[triNormIndex[i]]);
 	}
-
 	int nrNormals = triNormIndex.length();
 
 	std::string NormArrayString;
@@ -422,10 +461,11 @@ void nodeAttributeChanged(MNodeMessage::AttributeMessage msg, MPlug &plug, MPlug
 			normArrElements++;
 		}
 	}
+	*/
 
-	std::string masterTransformString;
-	masterTransformString.append(vtxArrayString + " ");
-	masterTransformString.append(NormArrayString);
+	//std::string masterTransformString;
+	//masterTransformString.append(vtxArrayString + " ");
+	//masterTransformString.append(NormArrayString);
 
 
 	//////////////////////////
@@ -463,7 +503,7 @@ void nodeAttributeChanged(MNodeMessage::AttributeMessage msg, MPlug &plug, MPlug
 		//MStreamUtils::stdOutStream() << "UV: " + texCoordString << endl;
 	}
 
-
+	/*
 	//pass to send
 	bool msgToSend = false;
 	if (vtxArrElements > 0)
@@ -472,6 +512,7 @@ void nodeAttributeChanged(MNodeMessage::AttributeMessage msg, MPlug &plug, MPlug
 	if (msgToSend) {
 		sendMsg(CMDTYPE::UPDATE_NODE, NODE_TYPE::MESH, nrElements, totalTrisCount, objName, vtxArrayString);
 	}
+	*/
 
 
 }
@@ -645,13 +686,14 @@ void meshConnectionChanged(MPlug &plug, MPlug &otherPlug, bool made, void *clien
 }
 
 //sending
-void vtxPlugConnected(MPlug & srcPlug, MPlug & destPlug, bool made, void* clientData)
-{
+void vtxPlugConnected(MPlug & srcPlug, MPlug & destPlug, bool made, void* clientData) {
 
-	if (srcPlug.partialName() == "out" && destPlug.partialName() == "i")
-	{
-		if (made == true)
-		{
+	MStatus status = MS::kSuccess;
+
+	if (srcPlug.partialName() == "out" && destPlug.partialName() == "i") {
+
+		if (made == true) {
+
 			MDagPath path;
 			MFnDagNode(destPlug.node()).getPath(path);
 			MFnTransform transform(path);
@@ -660,117 +702,229 @@ void vtxPlugConnected(MPlug & srcPlug, MPlug & destPlug, bool made, void* client
 			MPlugArray plugArray;
 			destPlug.connectedTo(plugArray, true, true);
 
-			MStreamUtils::stdOutStream() << "parent: " << plugArray[0].name() << endl;
-
 			std::string testString = "polyTriangulate";
 			std::string name = plugArray[0].name().asChar();
+			MStreamUtils::stdOutStream() << "============================================" << endl;
 
-			bool triangulated = false;
-			if (name.find(testString) == std::string::npos) {
-				MGlobal::executeCommand("polyTriangulate " + mesh.name(), true, true);
-				MStreamUtils::stdOutStream() << "TRANGULATING" << endl;
-				triangulated = true;
+			MStreamUtils::stdOutStream() << "Plug name: " << plugArray[0].name().asChar() << endl;
+
+			// Make sure mesh is triangulated =======
+
+			std::size_t found = name.find(testString);
+
+			if (found != std::string::npos) {
+				MStreamUtils::stdOutStream() << "Already triangulated..." << endl;
 			}
 
 			else {
-				triangulated = true;
+				MStreamUtils::stdOutStream() << "Triangulating..." << endl;
+				status = MGlobal::executeCommand("polyTriangulate " + mesh.name(), true, true);
 			}
+		
+			/*else {
+				status = MS::kFailure;
+				MStreamUtils::stdOutStream() << "NONE" << endl;
 
+			}*/
 
-			if (triangulated) {
+			// if triangulated, proceed =======
+			//if (status == MS::kSuccess) {
 
 				/////////////
 				// 	 VTX   //
 				/////////////
 
-				MPlug vtxArray = mesh.findPlug("controlPoints");
-				size_t nrElements = vtxArray.numElements();
+			MPlug vtxArray = mesh.findPlug("controlPoints");
+			size_t nrElements = vtxArray.numElements();
 
-				//get vtx in array
-				MVectorArray vtxArrayMessy;
-				for (int i = 0; i < nrElements; i++)
-				{
-					//get plug for i array item (gives: shape.vrts[x])
-					MPlug currentVtx = vtxArray.elementByLogicalIndex(i);
+			//get vtx in array
+			MVectorArray vtxArrayMessy;
+			for (int i = 0; i < nrElements; i++)
+			{
+				//get plug for i array item (gives: shape.vrts[x])
+				MPlug currentVtx = vtxArray.elementByLogicalIndex(i);
 
-					float x = 0;
-					float y = 0;
-					float z = 0;
+				float x = 0;
+				float y = 0;
+				float z = 0;
 
-					if (currentVtx.isCompound())
-					{
-						//we have control points [0] but in Maya the values are one hierarchy down so we acces them by getting the child
-						MPlug plugX = currentVtx.child(0);
-						MPlug plugY = currentVtx.child(1);
-						MPlug plugZ = currentVtx.child(2);
+				if (currentVtx.isCompound()) {
+					//we have control points [0] but in Maya the values are one hierarchy down so we acces them by getting the child
+					MPlug plugX = currentVtx.child(0);
+					MPlug plugY = currentVtx.child(1);
+					MPlug plugZ = currentVtx.child(2);
 
-						//get value and story them in our xyz
-						plugX.getValue(x);
-						plugY.getValue(y);
-						plugZ.getValue(z);
+					//get value and story them in our xyz
+					plugX.getValue(x);
+					plugY.getValue(y);
+					plugZ.getValue(z);
 
-						MVector tempPoint = { x, y, z };
-						vtxArrayMessy.append(tempPoint);
-					}
+					MVector tempPoint = { x, y, z };
+					vtxArrayMessy.append(tempPoint);
+				}
+			}
+
+			//sort vtx correctly
+			MIntArray triCount;
+			MIntArray triVertsIndex;
+			MVectorArray trueVtxForm;
+
+			mesh.getTriangles(triCount, triVertsIndex);
+
+			for (int i = 0; i < triVertsIndex.length(); i++) {
+				trueVtxForm.append(vtxArrayMessy[triVertsIndex[i]]);
+			}
+
+			int totalTrisCount = triCount.length() * 2;
+			std::string objName = mesh.name().asChar();
+
+			//MVector to string
+			std::string vtxArrayString;
+			size_t vtxArrElements = 0;
+
+			int vtxCount = trueVtxForm.length();
+			vtxArrayString.append(to_string(vtxCount) + " ");
+
+			for (int u = 0; u < trueVtxForm.length(); u++) {
+				for (int v = 0; v < 3; v++) {
+					vtxArrayString.append(std::to_string(trueVtxForm[u][v]) + " ");
+					vtxArrElements++;
+				}
+			}
+
+
+			///////////////
+			//// NORMALS //
+			///////////////
+			//MStreamUtils::stdOutStream() << "================================= " << endl;
+
+			MFloatVectorArray normals;
+			MFloatVectorArray initialNormals;
+			mesh.getNormals(normals, MSpace::kWorld);
+
+
+			//MIntArray vertexCount;
+			//MIntArray vertexList;
+			//mesh.getVertices(vertexCount, vertexList);
+
+			MStreamUtils::stdOutStream() << "================" << endl;
+			MStreamUtils::stdOutStream() << triCount.length() << endl;
+
+			//MIntArray normalCounts;
+			MIntArray normalIds;
+			//mesh.getNormalIds(normalCounts, normalIds);
+
+			MStreamUtils::stdOutStream() << "==========================" << endl;
+			MStreamUtils::stdOutStream() << "TRI count: " << triCount.length() << endl;
+
+			MIntArray tempNormalIds;
+			for (int faceCnt = 0; faceCnt < triCount.length(); faceCnt++) {
+
+				mesh.getFaceNormalIds(triVertsIndex[faceCnt], tempNormalIds);
+				//MStreamUtils::stdOutStream() << "tempNormalIds: " << tempNormalIds << endl;
+
+				for (int vtxPerFace = 0; vtxPerFace < 3; vtxPerFace++) {
+					normalIds.append(tempNormalIds[vtxPerFace]);
+				}
+			}
+
+			MFloatVectorArray orderedNormals; 
+
+			MStreamUtils::stdOutStream() << "normalIds: " << normalIds << endl;
+			MStreamUtils::stdOutStream() << "normal: " << normals << endl;
+			MStreamUtils::stdOutStream() << "===============" << endl;
+
+			MStreamUtils::stdOutStream() << " trueVtxForm.length(): " << trueVtxForm.length() << endl;
+
+			for (int j = 0; j < trueVtxForm.length(); j++) {
+
+				//MStreamUtils::stdOutStream() << "normals: " << normals[j] << endl;
+
+				MStreamUtils::stdOutStream() << "Normal index: " << normalIds[j] << endl;
+				MStreamUtils::stdOutStream() << "Normal at index? " << normals[normalIds[j]] << endl;
+
+				orderedNormals.append(normals[normalIds[j]]);
+			}
+
+			//MStreamUtils::stdOutStream() << "===============" << endl;
+			//MStreamUtils::stdOutStream() << "normals nr: " << normals.length() << endl;
+
+			//MStreamUtils::stdOutStream() << "orderedNormals len: " << orderedNormals.length() << endl;
+			//MStreamUtils::stdOutStream() << "orderedNormals: " << orderedNormals << endl;
+
+			//MStreamUtils::stdOutStream() << "normalIds: " << normalIds << endl;
+
+
+			/* 
+			MIntArray normCounts;
+			MIntArray triNormIndex;
+			mesh.getNormalIds(normCounts, triNormIndex);
+
+			MIntArray vertexCount;
+			MIntArray vertexList;
+			mesh.getVertices(vertexCount, vertexList);
+
+			int currentIndex = 0;
+			MFloatVectorArray orderedNormals;
+			for (int faceCnt = 0; faceCnt < vertexCount.length(); ++faceCnt) {
+				for (int faceVtxCnt = 0; faceVtxCnt < vertexCount[faceCnt]; ++faceVtxCnt) {
+
+					MVector tempNorm = MVector(0, 0, 0);// normals[triNormIndex[currentIndex]];
+					orderedNormals.append(tempNorm);
+					++currentIndex;
 				}
 
-				//sort vtx correctly
-				MIntArray triCount;
-				MIntArray triVertsIndex;
-				mesh.getTriangles(triCount, triVertsIndex);
-				MVectorArray trueVtxForm;
 
-				for (int i = 0; i < triVertsIndex.length(); i++) {
-					trueVtxForm.append(vtxArrayMessy[triVertsIndex[i]]);
+			}
+
+			MStreamUtils::stdOutStream() << "====================== " << endl;
+			MStreamUtils::stdOutStream() << "orderedNormals.len: " << orderedNormals.length() << endl;
+
+			std::string nmlArrayString;
+			size_t nrmlArrElements = 0;
+			int nrmlCount = orderedNormals.length();
+
+			vtxArrayString.append(to_string(nrmlCount) + " ");
+			for (int u = 0; u < orderedNormals.length(); u++) {
+				for (int v = 0; v < 3; v++) {
+					nmlArrayString.append(std::to_string(orderedNormals[u][v]) + " ");
+					nrmlArrElements++;
 				}
-
-				int totalTrisCount  = triCount.length() * 2;
-				std::string objName = mesh.name().asChar();
-
-				//MVector to string
-				std::string vtxArrayString;
-				size_t vtxArrElements = 0;
-
-				int vtxCount = trueVtxForm.length();
-				vtxArrayString.append(to_string(vtxCount) + " ");
-
-				for (int u = 0; u < trueVtxForm.length(); u++) {
-					for (int v = 0; v < 3; v++) {
-						vtxArrayString.append(std::to_string(trueVtxForm[u][v]) + " ");
-						vtxArrElements++;
-					}
-				}
+			}
+			*/
 
 
-				/////////////
-				// NORMALS //
-				/////////////
 
-				MIntArray normCount;
+			/*
+
+			MStreamUtils::stdOutStream() << "======================== " << endl;
+
+			MStreamUtils::stdOutStream() << "nrElements: "  << nrElements << endl;
+			MStreamUtils::stdOutStream() << "nrOfNormals: " << nrOfNormals << endl;
+
+			if (nrElements == nrOfNormals) {
+				MStreamUtils::stdOutStream() << "IN NORMAL!" << endl;
+				status = MS::kFailure;
+
+				MIntArray normCounts;
 				MIntArray triNormIndex;
-				mesh.getNormalIds(normCount, triNormIndex);
-
-				MFloatVectorArray normals;
-				mesh.getNormals(normals, MSpace::kWorld);
-
-				int nrOfNormals = normals.length();
-				/*
-
 				MVectorArray normalsArray;
 
+				mesh.getNormalIds(normCounts, triNormIndex)
 
-				for (int i = 0; i < triNormIndex.length(); i++)
-				{
+				for (int i = 0; i < triNormIndex.length(); i++) {
 					normalsArray.append(normals[triNormIndex[i]]);
 				}
+				*/
 
-				int nrNormals = triNormIndex.length();
+				/*
+					MStreamUtils::stdOutStream() << "normalsArray: " << normalsArray << endl;
 
-				//MVector to string
-				std::string NormArrayString;
-				NormArrayString.append(to_string(nrNormals) + " ");
-				size_t normArrElements = 0;
-
+					int nrNormals = triNormIndex.length();
+					MVector to string
+					std::string NormArrayString;
+					NormArrayString.append(to_string(nrOfNormals) + " ");
+					size_t normArrElements = 0;
 				for (int u = 0; u < normalsArray.length(); u++)
 				{
 					for (int v = 0; v < 3; v++)
@@ -779,30 +933,30 @@ void vtxPlugConnected(MPlug & srcPlug, MPlug & destPlug, bool made, void* client
 						normArrElements++;
 					}
 				}
-
-				//MStreamUtils::stdOutStream() << "NormArrayString: " << NormArrayString << "_" << endl;
-
-
-				std::string masterTransformString;
-				masterTransformString.append(vtxArrayString + " ");
-				masterTransformString.append(NormArrayString);
+				MStreamUtils::stdOutStream() << "NormArrayString: " << NormArrayString << "_" << endl;
+				*/
+			
 
 
-				*/ 
 
-				// SEND MESSAGE ==================================================
+			std::string masterTransformString;
+			masterTransformString.append(vtxArrayString + " ");
+			//masterTransformString.append(nmlArrayString);
 
-				//pass to send
-				bool msgToSend = false;
-				if (vtxArrElements > 0)
-					msgToSend = true;
 
-				if (msgToSend) {
-					sendMsg(CMDTYPE::NEW_NODE, NODE_TYPE::MESH, nrElements, totalTrisCount, objName, vtxArrayString);
-				}
+			// SEND MESSAGE ==================================================
+
+			//pass to send
+			bool msgToSend = false;
+			if (vtxArrElements > 0)
+				msgToSend = true;
+
+			if (msgToSend) {
+				sendMsg(CMDTYPE::NEW_NODE, NODE_TYPE::MESH, nrElements, totalTrisCount, objName, vtxArrayString);
 			}
 		}
 	}
+
 }
 
 void nodeAdded(MObject &node, void * clientData)
@@ -816,7 +970,7 @@ void nodeAdded(MObject &node, void * clientData)
 	//we check if has kMesh attribute == is a mesh
 	if (node.hasFn(MFn::kMesh))
 	{
-		MCallbackId tempID; 
+		MCallbackId tempID;
 		MStatus Result = MS::kSuccess;
 		newMeshes.push(node);
 
@@ -1023,13 +1177,11 @@ EXPORT MStatus uninitializePlugin(MObject obj) {
 /*int newSize = checkLoopFaceIndex + 1 + nrElements * 3;
 std::string* tempString = new std::string[newSize];
 int tempSTringArrayValue = 0;
-
 for (int u = 0; u < checkLoopFaceIndex + 1; u++)
 {
 	tempString[tempSTringArrayValue] = arrayVtxIndecies[u];
 	tempSTringArrayValue++;
 }
-
 for (int u = 0; u < nrElements * 3; u++)
 {
 	tempString[tempSTringArrayValue] = test1[u];
@@ -1045,7 +1197,6 @@ for (int u = 0; u < nrElements * 3; u++)
 //MStreamUtils::stdOutStream() << "msg length with space:  " << newSize * 2 << endl;
 /*MIntArray* vtxCountAsArray;
 vtxCountAsArray[0] = nrElements;
-
 status2 = mesh.getVertices(&pointsOnMesh, &vtxIndecies);
 if (status2)
 {
@@ -1056,12 +1207,10 @@ if (status2)
 MObjectArray sets;
 unsigned int instanceNr = path.instanceNumber();
 mesh.getConnectedSetsAndMembers(instanceNr, sets, components, 1);
-
 for (int u = 0; i < sets.length(); u++)
 {
 	MFnSet setFn(sets[u]);
 	MItMeshPolygon faceIt(path, components[u]);
-
 	MStreamUtils::stdOutStream() << "sets:  " << setFn.name() << endl;
 	MStreamUtils::stdOutStream() << "faceIt count:  " << faceIt.count() << endl;
 	MStreamUtils::stdOutStream() << "faceIt index:  " << faceIt.index() << endl;
