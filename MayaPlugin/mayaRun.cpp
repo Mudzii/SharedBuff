@@ -829,7 +829,6 @@ void vtxPlugConnected(MPlug & srcPlug, MPlug & destPlug, bool made, void* client
 			}
 
 			MFloatVectorArray orderedNormals; 
-
 			MStreamUtils::stdOutStream() << "normalIds: " << normalIds << endl;
 			MStreamUtils::stdOutStream() << "normal: " << normals << endl;
 			MStreamUtils::stdOutStream() << "===============" << endl;
@@ -955,6 +954,37 @@ void vtxPlugConnected(MPlug & srcPlug, MPlug & destPlug, bool made, void* client
 			std::string masterTransformString;
 			masterTransformString.append(vtxArrayString + " ");
 			masterTransformString.append(NormArrayString);
+
+
+			///////////////
+			////   UVS	 //
+			///////////////
+
+			MFloatArray uArr;
+			MFloatArray vArr;
+			 
+			mesh.getUVs(uArr, vArr, 0);
+			
+			MStreamUtils::stdOutStream() << "================" << endl;
+			MStreamUtils::stdOutStream() << uArr.length() << endl;
+
+			//MStreamUtils::stdOutStream() << "uArr: " << uArr << endl;
+			//MStreamUtils::stdOutStream() << "vArr: " << vArr << endl;
+
+			MFloatArray sortedUVs; 
+
+			for (int vtxNr = 0; vtxNr < trueVtxForm.length(); vtxNr++) {
+			
+				int vtx = triVertsIndex[vtxNr];
+				float tempU, tempV; 
+				mesh.getUV(vtx, tempU, tempV);
+
+				MStreamUtils::stdOutStream() << "UV: " << tempU << " : " << tempV << endl;
+				sortedUVs.append(tempU);
+				sortedUVs.append(tempV);
+			}
+
+			MStreamUtils::stdOutStream() << "sortedUVs " << sortedUVs << endl;
 
 
 			// SEND MESSAGE ==================================================
