@@ -245,7 +245,7 @@ int main() {
 		DrawTextRL("(c) Watermill 3D model by Alberto Cano", screenWidth - 210, screenHeight - 20, 10, GRAY);
 		DrawTextRL(FormatText("Camera position: (%.2f, %.2f, %.2f)", camera.position.x, camera.position.y, camera.position.z), 600, 20, 10, BLACK);
 		DrawTextRL(FormatText("Camera target: (%.2f, %.2f, %.2f)", camera.target.x, camera.target.y, camera.target.z), 600, 40, 10, GRAY);
-		DrawFPS(10, 10);
+		DrawFPS(20, 20);
 		EndDrawing();
 		//----------------------------------------------------------------------------------
 	}

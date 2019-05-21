@@ -23,8 +23,8 @@ s.send('loadPlugin("C:/Users/Mudzi/source/repos/SharedBuff/MayaPlugin/x64/Debug/
 answer = s.recv(1024)
 
 # create a polycube
-s.send('polyPlane -sy 1 -sx 1\n')
-#s.send('polyCube')
+#s.send('polyPlane -sy 1 -sx 1\n')
+s.send('polyCube')
 #s.send('polyTriangulate')
 answer = s.recv(1024)
 
