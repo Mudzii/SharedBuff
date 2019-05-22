@@ -68,6 +68,7 @@ struct MsgHeader {
 struct msgMesh {
 	int vtxCount;
 	int trisCount;
+	int normalCount;
 };
 
 //model
@@ -158,7 +159,7 @@ int main() {
 
 	Vector3 position = { 0.0f, 0.0f, 0.0f };    // Set model position
 	SetCameraMode(camera, CAMERA_FREE);         // Set an orbital camera mode
-	SetTargetFPS(60);                           // Set our game to run at 60 frames-per-second
+	SetTargetFPS(500);                           // Set our game to run at 60 frames-per-second
 	//initializing camera!!!!
 
 	int modelLoc = GetShaderLocation(shader1, "model");
@@ -236,7 +237,7 @@ int main() {
 			SetShaderValueMatrix(m.model.material.shader, modelLoc, m.modelMatrix);
 			DrawModel(m.model, {}, 1.0, lightsFromMaya[0].color);
 		}
-
+		  
 		DrawGrid(10, 1.0f);     // Draw a grid
 		DrawSphere(lightsFromMaya[0].lightPos, 0.1, lightsFromMaya[0].color);
 
@@ -245,7 +246,7 @@ int main() {
 		DrawTextRL("(c) Watermill 3D model by Alberto Cano", screenWidth - 210, screenHeight - 20, 10, GRAY);
 		DrawTextRL(FormatText("Camera position: (%.2f, %.2f, %.2f)", camera.position.x, camera.position.y, camera.position.z), 600, 20, 10, BLACK);
 		DrawTextRL(FormatText("Camera target: (%.2f, %.2f, %.2f)", camera.target.x, camera.target.y, camera.target.z), 600, 40, 10, GRAY);
-		DrawFPS(20, 20);
+		DrawFPS(10, 10);
 		EndDrawing();
 		//----------------------------------------------------------------------------------
 	}
@@ -262,8 +263,6 @@ int main() {
 	//--------------------------------------------------------------------------------------
 	return 0;
 }
-
-
 
 
 CMDTYPE recvFromMaya(char* buffer)
@@ -354,6 +353,7 @@ void addNode(std::vector<modelFromMaya>& objNameArray, char* buffer, int bufferS
 		//float* arrayVtx = new float[msgHeader.msgSize];
 		//int lengthVtxArr = 0;
 
+
 		// setup stringstream
 		std::string msgString(msgElements, msgHeader.msgSize);
 		std::istringstream ss(msgString);
@@ -373,6 +373,8 @@ void addNode(std::vector<modelFromMaya>& objNameArray, char* buffer, int bufferS
 		float tempFloat = 0.0f;
 
 		int nrOfElements = mesh.trisCount * 3 * 3; //for each tris, add each vtx and then [x,y,z]
+		int nrOfNormals = mesh.normalCount; 
+		//std::cout << "MSG: " << msgElements << std::endl;
 
 		ss >> nrVtx;
 
@@ -381,8 +383,7 @@ void addNode(std::vector<modelFromMaya>& objNameArray, char* buffer, int bufferS
 
 		while (!ss.eof()) {
 
-			while (vtxCheck < nrVtx)
-			{
+			while (vtxCheck < nrVtx) {
 				//std::cout << "VERTEX" << std::endl;
 				ss >> tempX >> tempY >> tempZ;
 
