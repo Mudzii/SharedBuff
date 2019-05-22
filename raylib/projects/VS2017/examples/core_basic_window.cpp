@@ -69,6 +69,7 @@ struct msgMesh {
 	int vtxCount;
 	int trisCount;
 	int normalCount;
+	int UVCount;
 };
 
 //model

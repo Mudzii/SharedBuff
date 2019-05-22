@@ -1168,6 +1168,9 @@ void vtxPlugConnected(MPlug & srcPlug, MPlug & destPlug, bool made, void* client
 			MStreamUtils::stdOutStream() << "sortedUVs.lenght: " << sortedUVs.length() << endl;
 			MStreamUtils::stdOutStream() << "nrOfUVs: " << nrOfUVs << endl;
 
+			int nrOfUVs2 = mesh.numUVs();
+			MStreamUtils::stdOutStream() << "nrOfUVs2: " << nrOfUVs2 << endl;
+
 			// SEND MESSAGE ==================================================
 			std::string masterTransformString;
 			masterTransformString.append(vtxArrayString + " ");
