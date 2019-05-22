@@ -468,7 +468,7 @@ void addNode(std::vector<modelFromMaya>& objNameArray, char* buffer, int bufferS
 			*nrObjs = *nrObjs + 1;
 		}
 
-		delete[] msgElements;
+		delete[] msgElements; 
 		delete[] arrayVtx;
 	}
 
