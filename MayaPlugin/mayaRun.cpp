@@ -10,7 +10,6 @@
 #include <C:\Users\Mudzi\source\repos\SharedBuff\shared\Project1\ComLib.h>
 
 using namespace std;
-
 #pragma comment(lib, "Project1.lib")
 
 ComLib ourComLib("buffer2", 50, PRODUCER);
@@ -656,6 +655,7 @@ void nodeAttributeChanged(MNodeMessage::AttributeMessage msg, MPlug &plug, MPlug
 	//masterTransformString.append(NormArrayString);
 
 
+	/* 
 	//////////////////////////
 	//						//
 	//			UVS			//
@@ -690,10 +690,63 @@ void nodeAttributeChanged(MNodeMessage::AttributeMessage msg, MPlug &plug, MPlug
 
 		//MStreamUtils::stdOutStream() << "UV: " + texCoordString << endl;
 	}
+	*/
 
+	///////////////
+			////   UVS	 //
+			///////////////
+	MString UVName;
+	mesh.getCurrentUVSetName(UVName, -1);
+	MFloatArray uArr;
+	MFloatArray vArr;
+
+	mesh.getUVs(uArr, vArr, &UVName);
+
+	MStreamUtils::stdOutStream() << "================" << endl;
+	//MStreamUtils::stdOutStream() << "UVName: " << UVName << endl;
+	//MStreamUtils::stdOutStream() << "U arr len: " << uArr.length() << endl;
+	//MStreamUtils::stdOutStream() << "V arr len: " << vArr.length() << endl;
+
+	//MStreamUtils::stdOutStream() << "uArr: " << uArr << endl;
+	//MStreamUtils::stdOutStream() << "vArr: " << vArr << endl;
+	//MStreamUtils::stdOutStream() << " " << endl;
+
+	MFloatArray sortedUVs;
+	int nrOfUVs = 0;
+	for (int vtxNr = 0; vtxNr < trueVtxForm.length(); vtxNr++) {
+
+		int vtx = triVertsIndex[vtxNr];
+		float tempU, tempV;
+		mesh.getUV(vtx, tempU, tempV);
+
+		//MStreamUtils::stdOutStream() << vtxNr << " UV: " << tempU << " : " << tempV << endl;
+		sortedUVs.append(tempU);
+		sortedUVs.append(tempV);
+		nrOfUVs++;
+	}
+
+	//MStreamUtils::stdOutStream() << " " << endl;
+	//MStreamUtils::stdOutStream() << "sortedUVs: " << sortedUVs << endl;
+	//StreamUtils::stdOutStream() << "sortedUVs.lenght: " << sortedUVs.length() << endl;
+	//MStreamUtils::stdOutStream() << "nrOfUVs: " << nrOfUVs << endl;
+
+	std::string UVArrayString;
+	size_t totalUVCount = nrOfUVs;
+	UVArrayString.append(to_string(totalUVCount) + " ");
+
+	for (int u = 0; u < sortedUVs.length(); u++) {
+		UVArrayString.append(to_string(sortedUVs[u]) + " ");
+	}
+
+	//MStreamUtils::stdOutStream() << "UVArrayString: " << UVArrayString << endl;
+	
+	MStreamUtils::stdOutStream() << "UV nr of nodeAttributeChanged: " << totalUVCount << endl;
+
+	// SEND MESSAGE ==================================================
 	std::string msgString = ""; 
 	msgString.append(vtxArrayString + " "); 
-	msgString.append(NormArrayString);
+	msgString.append(NormArrayString + " ");
+	msgString.append(UVArrayString);
 
 	//pass to send
 	bool msgToSend = false;
@@ -701,7 +754,7 @@ void nodeAttributeChanged(MNodeMessage::AttributeMessage msg, MPlug &plug, MPlug
 		msgToSend = true;
 
 	if (msgToSend) {
-		sendMsg(CMDTYPE::UPDATE_NODE, NODE_TYPE::MESH, nrElements, totalTrisCount, nrOfNormals, nrOfUVs, objName, msgString);
+		sendMsg(CMDTYPE::UPDATE_NODE, NODE_TYPE::MESH, nrElements, totalTrisCount, nrOfNormals, totalUVCount, objName, msgString);
 	}
 	
 
@@ -1141,13 +1194,13 @@ void vtxPlugConnected(MPlug & srcPlug, MPlug & destPlug, bool made, void* client
 			mesh.getUVs(uArr, vArr, &UVName);
 			
 			MStreamUtils::stdOutStream() << "================" << endl;
-			MStreamUtils::stdOutStream() << "UVName: " << UVName << endl;
-			MStreamUtils::stdOutStream() << "U arr len: " << uArr.length() << endl;
-			MStreamUtils::stdOutStream() << "V arr len: " << vArr.length() << endl;
+			//MStreamUtils::stdOutStream() << "UVName: " << UVName << endl;
+			//MStreamUtils::stdOutStream() << "U arr len: " << uArr.length() << endl;
+			//MStreamUtils::stdOutStream() << "V arr len: " << vArr.length() << endl;
 
-			MStreamUtils::stdOutStream() << "uArr: " << uArr << endl;
-			MStreamUtils::stdOutStream() << "vArr: " << vArr << endl;
-			MStreamUtils::stdOutStream() << " " << endl;
+			//MStreamUtils::stdOutStream() << "uArr: " << uArr << endl;
+			//MStreamUtils::stdOutStream() << "vArr: " << vArr << endl;
+			//MStreamUtils::stdOutStream() << " " << endl;
 
 			MFloatArray sortedUVs; 
 			int nrOfUVs = 0; 
@@ -1157,21 +1210,35 @@ void vtxPlugConnected(MPlug & srcPlug, MPlug & destPlug, bool made, void* client
 				float tempU, tempV; 
 				mesh.getUV(vtx, tempU, tempV);
 
-				MStreamUtils::stdOutStream() << vtxNr << " UV: " << tempU << " : " << tempV << endl;
+				//MStreamUtils::stdOutStream() << vtxNr << " UV: " << tempU << " : " << tempV << endl;
 				sortedUVs.append(tempU);
 				sortedUVs.append(tempV);
 				nrOfUVs++; 
 			}
 
-			MStreamUtils::stdOutStream() << " " << endl;
-			MStreamUtils::stdOutStream() << "sortedUVs: " << sortedUVs << endl;
-			MStreamUtils::stdOutStream() << "sortedUVs.lenght: " << sortedUVs.length() << endl;
-			MStreamUtils::stdOutStream() << "nrOfUVs: " << nrOfUVs << endl;
+			//MStreamUtils::stdOutStream() << " " << endl;
+			//MStreamUtils::stdOutStream() << "sortedUVs: " << sortedUVs << endl;
+			//StreamUtils::stdOutStream() << "sortedUVs.lenght: " << sortedUVs.length() << endl;
+			//MStreamUtils::stdOutStream() << "nrOfUVs: " << nrOfUVs << endl;
 
+			std::string UVArrayString;
+			size_t totalUVCount = nrOfUVs; 
+			UVArrayString.append(to_string(totalUVCount) + " ");
+
+			for (int u = 0; u < sortedUVs.length(); u++) {
+				UVArrayString.append(to_string(sortedUVs[u]) + " ");
+			}
+			
+			//MStreamUtils::stdOutStream() << "UVArrayString: " << UVArrayString << endl;
+			
+			MStreamUtils::stdOutStream() << "UV nr of vtxPlugConnected: " << totalUVCount << endl;
+
+			
 			// SEND MESSAGE ==================================================
 			std::string masterTransformString;
 			masterTransformString.append(vtxArrayString + " ");
-			masterTransformString.append(NormArrayString);
+			masterTransformString.append(NormArrayString + " ");
+			masterTransformString.append(UVArrayString);
 
 			//pass to send
 			bool msgToSend = false;
@@ -1179,7 +1246,7 @@ void vtxPlugConnected(MPlug & srcPlug, MPlug & destPlug, bool made, void* client
 				msgToSend = true;
 
 			if (msgToSend) {
-				sendMsg(CMDTYPE::NEW_NODE, NODE_TYPE::MESH, nrElements, totalTrisCount, nrOfNormals, nrOfUVs, objName, masterTransformString);
+				sendMsg(CMDTYPE::NEW_NODE, NODE_TYPE::MESH, nrElements, totalTrisCount, nrOfNormals, totalUVCount, objName, masterTransformString);
 			}
 		}
 	}

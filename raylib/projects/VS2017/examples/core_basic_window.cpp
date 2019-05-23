@@ -249,6 +249,8 @@ int main() {
 		DrawTextRL(FormatText("Camera target: (%.2f, %.2f, %.2f)", camera.target.x, camera.target.y, camera.target.z), 600, 40, 10, GRAY);
 		DrawFPS(10, 10);
 		EndDrawing();
+
+		delete[] tempArray; 
 		//----------------------------------------------------------------------------------
 	}
 
@@ -340,8 +342,8 @@ void addNode(std::vector<modelFromMaya>& objNameArray, char* buffer, int bufferS
 	//std::cout << "in add node and printing cmdType " << msgHeader.cmdType << " " << std::endl;
 	//::cout << "in add node and printing node_TYPE " << msgHeader.nodeType << " " << std::endl;
 
-	if (msgHeader.nodeType == NODE_TYPE::MESH)
-	{
+	if (msgHeader.nodeType == NODE_TYPE::MESH) {
+
 		std::cout << "============================" << std::endl;
 		std::cout << "ADD MODEL: " << std::endl;
 		msgMesh mesh = {};
@@ -354,38 +356,46 @@ void addNode(std::vector<modelFromMaya>& objNameArray, char* buffer, int bufferS
 		//float* arrayVtx = new float[msgHeader.msgSize];
 		//int lengthVtxArr = 0;
 
-
 		// setup stringstream
 		std::string msgString(msgElements, msgHeader.msgSize);
 		std::istringstream ss(msgString);
 
 		std::string tempX, tempY, tempZ = "";
 		std::string tempNormX, tempNormY, tempNormZ = "";
+		std::string tempU, tempV = ""; 
 
 		int nrVtx;
 		int vtxCheck = 0;
+
 		int nrNorm;
 		int normCheck = 0;
 
-		int lengthVtxArr = 0;
+		int nrUV; 
+		int UVCheck = 0; 
+
+		int lengthVtxArr  = 0;
 		int lengthNormArr = 0;
+		int lenghtUVArr   = 0; 
 
 		int element = 0;
 		float tempFloat = 0.0f;
 
 		int nrOfElements = mesh.trisCount * 3 * 3; //for each tris, add each vtx and then [x,y,z]
-		int nrOfNormals = mesh.normalCount; 
-		//std::cout << "MSG: " << msgElements << std::endl;
+		int nrOfNormals  = mesh.normalCount; 
+		int nrOfUVs		 = mesh.UVCount; 
+		
+		//std::cout << "nrOfUVs: " << nrOfUVs << std::endl;
 
 		ss >> nrVtx;
 
 		float* arrayVtx = new float[nrVtx * 3];
 		float* arrayNorm;
+		float* arrayUV; 
 
 		while (!ss.eof()) {
 
 			while (vtxCheck < nrVtx) {
-				//std::cout << "VERTEX" << std::endl;
+				std::cout << vtxCheck << " VERTEX" << std::endl;
 				ss >> tempX >> tempY >> tempZ;
 
 				if (element >= nrOfElements) {
@@ -407,13 +417,11 @@ void addNode(std::vector<modelFromMaya>& objNameArray, char* buffer, int bufferS
 			}
 
 			ss >> nrNorm;
-
 			arrayNorm = new float[nrNorm * 3];
-
 			element = 0;
 
 			while (normCheck < nrNorm) {
-				std::cout << "NORMALS" << std::endl;
+				std::cout << normCheck << " NORMALS" << std::endl;
 				ss >> tempNormX >> tempNormY >> tempNormZ;
 
 				if (element >= nrOfElements) {
@@ -430,11 +438,64 @@ void addNode(std::vector<modelFromMaya>& objNameArray, char* buffer, int bufferS
 
 				lengthNormArr = lengthNormArr + 3;
 				element = element + 3;
-
 				normCheck++;
 
 			}
 
+			ss >> nrUV;
+			arrayUV = new float[nrUV * 2]; 
+			element = 0; 
+
+			while (UVCheck < nrUV) {
+				std::cout << UVCheck << " UV's" << std::endl;
+				ss >> tempU >> tempV; 
+
+				if (element >= nrOfElements) {
+					//std::cout << "Last element fount " << std::endl;
+					break;
+				}
+
+				arrayUV[element] = (float)std::stof(tempU);
+				arrayUV[element + 1] = (float)std::stof(tempV);
+
+				std::cout << "TEMP U:" << arrayUV[element] << std::endl;
+				std::cout << "TEMP V:" << arrayUV[element + 1] << std::endl;
+				std::cout << " " << std::endl;
+
+				lenghtUVArr = lenghtUVArr + 2; 
+				element = element + 2; 
+				UVCheck++; 
+			}
+
+
+			/* 
+			ss >> nrUV;
+			arrayUV = new float[nrUV * 2];
+			element = 0;
+
+			std::cout << "nrUV: " << nrUV << std::endl;
+
+
+			while (UVCheck < nrUV) {
+				std::cout << "UVS" << std::endl;
+				ss >> tempU >> tempV; 
+
+				if (element >= nrUV) {
+					//std::cout << "Last element fount " << std::endl;
+					break;
+				}
+
+				arrayUV[element] = (float)std::stof(tempU);
+				std::cout << "UV U: " << arrayUV[element] << std::endl;
+				arrayUV[element + 1] = (float)std::stof(tempV);
+				std::cout << "UV V: " << arrayUV[element + 1] << std::endl;
+
+				lenghtUVArr = lenghtUVArr + 2; 
+				element = element + 2;
+				UVCheck++; 
+			}
+			*/
+			
 			break;
 		}
 
@@ -459,6 +520,9 @@ void addNode(std::vector<modelFromMaya>& objNameArray, char* buffer, int bufferS
 			tempMeshToAdd.normals = new float[lengthNormArr];
 			memcpy(tempMeshToAdd.normals, arrayNorm, sizeof(float) * lengthNormArr);
 
+			tempMeshToAdd.texcoords = new float[lenghtUVArr]; 
+			memcpy(tempMeshToAdd.texcoords, arrayUV, sizeof(float) * lenghtUVArr);
+
 			rlLoadMesh(&tempMeshToAdd, false);
 
 			Model tempModelToAdd = LoadModelFromMesh(tempMeshToAdd);
@@ -467,10 +531,15 @@ void addNode(std::vector<modelFromMaya>& objNameArray, char* buffer, int bufferS
 			objNameArray.push_back({ tempModelToAdd, *index, objectName, MatrixTranslate(2,0,2) });
 			*index = *index + 1;
 			*nrObjs = *nrObjs + 1;
+
+
+			
 		}
 
 		delete[] msgElements; 
 		delete[] arrayVtx;
+		delete[] arrayNorm; 
+		delete[] arrayUV; 
 	}
 
 	if (msgHeader.nodeType == NODE_TYPE::LIGHT)
