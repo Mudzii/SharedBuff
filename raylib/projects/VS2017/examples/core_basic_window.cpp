@@ -1272,6 +1272,7 @@ void updateNodeName(std::vector<modelFromMaya>& objNameArray, char* buffer, int 
 	}
 }
 
+
 ///////////////////////////
 ////					   //
 ////		LIGHT		   //
