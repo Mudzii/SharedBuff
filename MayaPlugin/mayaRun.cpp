@@ -32,8 +32,9 @@ enum CMDTYPE {
 	NEW_NODE = 1001,
 	UPDATE_NODE = 1002,
 	UPDATE_MATRIX = 1003,
-	UPDATE_NAME = 1004
-
+	UPDATE_NAME = 1004,
+	UPDATE_MATERIAL = 1005,
+	UPDATE_MATERIALNAME = 1006
 };
 
 struct MsgHeader {
@@ -58,6 +59,8 @@ float globalTime = 0;
 queue<MObject> newMeshes;
 queue<MObject> newLights;
 
+string oldContent = "";
+string oldName = "";
 
 bool sendMsg(CMDTYPE msgType, NODE_TYPE nodeT, int nrOfElements, int trisCount, int normalCount, int UVCount, std::string objName, std::string &msgString) {
 
@@ -108,25 +111,28 @@ bool sendMsg(CMDTYPE msgType, NODE_TYPE nodeT, int nrOfElements, int trisCount, 
 		delete[]msg;
 	}
 
+	oldName	   = objName;
+	oldContent = msgString;
+
 	return sent;
 }
 
 //sending 1/2
-void nodeLightAttributeChanged(MNodeMessage::AttributeMessage msg, MPlug &plug, MPlug &otherPlug, void* x)
-{
+void nodeLightAttributeChanged(MNodeMessage::AttributeMessage msg, MPlug &plug, MPlug &otherPlug, void* x) {
+	
 	MDagPath path;
 	MFnDagNode(plug.node()).getPath(path);
+	MFnTransform transform(path);
 	MFnLight sceneLight(path);
 
 	MPlug colorPlug = sceneLight.findPlug("color");
-	if (plug.name() == colorPlug.name())
-	{
+
+	if (plug.name() == colorPlug.name()) {
 		MStreamUtils::stdOutStream() << "Light Color: " << sceneLight.color() << endl;
 	}
 
 	MPlug intensityPlug = sceneLight.findPlug("intensity");
-	if (intensityPlug.name() == plug.name())
-	{
+	if (intensityPlug.name() == plug.name()) {
 		MStreamUtils::stdOutStream() << "Light intensity: " << sceneLight.intensity() << endl;
 	}
 
@@ -140,13 +146,16 @@ void nodeLightAttributeChanged(MNodeMessage::AttributeMessage msg, MPlug &plug, 
 	msgString.append(to_string(sceneLight.color().b) + " ");
 	msgString.append(to_string(sceneLight.color().a) + " ");
 
-	//pass to send
-	bool msgToSend = false;
-	if (msgString.length() > 0)
-		msgToSend = true;
+	if (oldContent != msgString && oldName != objName) {
 
-	if (msgToSend) {
-		sendMsg(CMDTYPE::UPDATE_NODE, NODE_TYPE::LIGHT, 0, 0, 0, 0, objName, msgString);
+		//pass to send
+		bool msgToSend = false;
+		if (msgString.length() > 0)
+			msgToSend = true;
+
+		if (msgToSend) {
+			sendMsg(CMDTYPE::UPDATE_NODE, NODE_TYPE::LIGHT, 0, 0, 0, 0, objName, msgString);
+		}
 	}
 }
 
@@ -251,16 +260,52 @@ void activeCamera(const MString &panelName, void* cliendData) {
 void nodeTextureAttributeChanged(MNodeMessage::AttributeMessage msg, MPlug &plug, MPlug &otherPlug, void* x)
 {
 	MObject texObj(plug.node());
+	MFnDagNode textDag(texObj);
 
-	MFnDependencyNode textureNode(texObj);
-	MPlug fileTextureName = textureNode.findPlug("ftn");
+	MPlugArray connections;
+	plug.connectedTo(connections, true, true);
+	std::string materialName;
 
-	if (plug.name() == fileTextureName.name())
+	if (connections.length() > 0)
 	{
-		MString fileName;
-		fileTextureName.getValue(fileName);
-		MStreamUtils::stdOutStream() << fileName << endl;
+		std::string materialNamePlug = connections[0].name().asChar();
+		std::string splitElement = ".";
+		if (materialNamePlug.length() > 0)
+		{
+			materialName = materialNamePlug.substr(0, materialNamePlug.find(splitElement));
+			MStreamUtils::stdOutStream() << "name mat 2: " << materialName << endl;
 
+			MFnDependencyNode textureNode(texObj);
+			MPlug fileTextureName = textureNode.findPlug("ftn");
+			MString fileName;
+
+			fileTextureName.getValue(fileName);
+			MStreamUtils::stdOutStream() << fileName << endl;
+
+			std::string fileNameString = fileName.asChar();
+
+			if (fileNameString.length() > 0)
+			{
+				MStreamUtils::stdOutStream() << fileName << endl;
+				MStreamUtils::stdOutStream() << fileName.asChar() << endl;
+				std::string materialString = "";
+				materialString.append(materialName + " ");
+				materialString.append("texture ");
+				materialString.append(fileNameString);
+
+
+				MStreamUtils::stdOutStream() << "final sting: " << materialString << endl;
+
+
+				bool msgToSend = false;
+				if (materialString.length() > 0)
+					msgToSend = true;
+				if (msgToSend) {
+					sendMsg(CMDTYPE::UPDATE_MATERIAL, NODE_TYPE::MESH, materialString.length(), 0, 0, 0, "noObjName", materialString);
+				}
+
+			}
+		}
 	}
 }
 
@@ -269,6 +314,7 @@ void nodeMaterialAttributeChanged(MNodeMessage::AttributeMessage msg, MPlug &plu
 
 	MObject lamObj(plug.node());
 	MFnDependencyNode lambertDepNode(lamObj);
+
 
 	bool hasTexture = false;
 
@@ -306,7 +352,26 @@ void nodeMaterialAttributeChanged(MNodeMessage::AttributeMessage msg, MPlug &plu
 			attr = lambertItem.findPlug("colorB");
 			attr.getValue(color.b);
 
-			MStreamUtils::stdOutStream() << "color: " << color.r << ", " << color.g << ", " << color.b << endl;
+			std::string colors = "";
+			colors.append(lambertDepNode.name().asChar());
+			colors.append(" ");
+			colors.append("color ");
+			colors.append(to_string(color.r) + " ");
+			colors.append(to_string(color.g) + " ");
+			colors.append(to_string(color.b));
+
+			MStreamUtils::stdOutStream() << "colors: " << colors << endl;
+
+
+			//pass to send
+			bool msgToSend = false;
+			if (colors.length() > 0)
+				msgToSend = true;
+
+			if (msgToSend) {
+				sendMsg(CMDTYPE::UPDATE_MATERIAL, NODE_TYPE::MESH, colors.length(), 0, 0, 0, "noObjName", colors);
+			}
+
 		}
 	}
 }
@@ -435,7 +500,16 @@ void nodeAttributeChanged(MNodeMessage::AttributeMessage msg, MPlug &plug, MPlug
 	MFloatArray vArr;
 
 	mesh.getCurrentUVSetName(UVName, -1);
+
+	MIntArray uvCounts;
+	MIntArray uvIds;
+	MString* uvSet = new MString[1];
+	uvSet[0] = UVName; 
+
 	mesh.getUVs(uArr, vArr, &UVName);
+	mesh.getAssignedUVs(uvCounts, uvIds, uvSet);
+
+	MStreamUtils::stdOutStream() << "uvCounts: " << uvCounts << endl;
 
 	// get UVs 
 	int nrOfUVs = 0;
@@ -460,6 +534,7 @@ void nodeAttributeChanged(MNodeMessage::AttributeMessage msg, MPlug &plug, MPlug
 		UVArrayString.append(to_string(sortedUVs[u]) + " ");
 	}
 
+	delete[] uvSet;
 	// SEND MESSAGE ==================================================
 	std::string msgString = ""; 
 	msgString.append(vtxArrayString + " "); 
@@ -485,7 +560,7 @@ void nodeNameChangedMaterial(MObject &node, const MString &str, void*clientData)
 	MString newName = MFnDagNode(node).name();
 	MStreamUtils::stdOutStream() << "old name:" + oldName + ". New name: " + newName << endl;
 
-	std::string objName = oldName.asChar();
+	std::string objName   = oldName.asChar();
 	std::string msgString = newName.asChar();
 
 	//pass to send
@@ -506,7 +581,7 @@ void nodeNameChangedLight(MObject &node, const MString &str, void*clientData) {
 	MString newName = MFnDagNode(node).name();
 	MStreamUtils::stdOutStream() << "old name:" + oldName + ". New name: " + newName << endl;
 
-	std::string objName = oldName.asChar();
+	std::string objName   = oldName.asChar();
 	std::string msgString = newName.asChar();
 
 	//pass to send
@@ -533,20 +608,47 @@ void nodeWorldMatrixChanged(MObject &node, MDagMessage::MatrixModifiedFlags &mod
 	MMatrix worldMatrix = MMatrix(path.inclusiveMatrix());
 
 	std::string translateVector;
-	translateVector.append(to_string(worldMatrix(3, 0)) + " ");
-	translateVector.append(to_string(worldMatrix(3, 1)) + " ");
-	translateVector.append(to_string(worldMatrix(3, 2)) + " ");
+	translateVector.append(to_string(worldMatrix(0, 3)) + " ");
+	translateVector.append(to_string(worldMatrix(1, 3)) + " ");
+	translateVector.append(to_string(worldMatrix(2, 3)) + " ");
+	translateVector.append(to_string(worldMatrix(3, 3)) + " ");
+
+	std::string rotationVector;
+	rotationVector.append(to_string(worldMatrix(0, 1)) + " ");
+	rotationVector.append(to_string(worldMatrix(1, 1)) + " ");
+	rotationVector.append(to_string(worldMatrix(2, 1)) + " ");
+	rotationVector.append(to_string(worldMatrix(3, 1)) + " ");
+
+	std::string scaleVector;
+	scaleVector.append(to_string(worldMatrix(0, 2)) + " ");
+	scaleVector.append(to_string(worldMatrix(1, 2)) + " ");
+	scaleVector.append(to_string(worldMatrix(2, 2)) + " ");
+	scaleVector.append(to_string(worldMatrix(3, 2)) + " ");
+
+	std::string whatVector;
+	whatVector.append(to_string(worldMatrix(0, 0)) + " ");
+	whatVector.append(to_string(worldMatrix(1, 0)) + " ");
+	whatVector.append(to_string(worldMatrix(2, 0)) + " ");
+	whatVector.append(to_string(worldMatrix(3, 0)) + " ");
 
 	std::string objName = mesh.name().asChar();
-	std::string msgString = translateVector;
+	std::string msgString;
 
-	//pass to send
-	bool msgToSend = false;
-	if (msgString.length() > 0)
-		msgToSend = true;
+	msgString.append(whatVector);
+	msgString.append(rotationVector);
+	msgString.append(scaleVector);
+	msgString.append(translateVector);
+	
+	if (oldContent != msgString)
+	{
+		//pass to send
+		bool msgToSend = false;
+		if (msgString.length() > 0)
+			msgToSend = true;
 
-	if (msgToSend) {
-		sendMsg(CMDTYPE::UPDATE_MATRIX, NODE_TYPE::MESH, 0, 0, 0, 0, objName, msgString);
+		if (msgToSend) {
+			sendMsg(CMDTYPE::UPDATE_MATRIX, NODE_TYPE::MESH, 0, 0, 0, 0, objName, msgString);
+		}
 	}
 }
 
@@ -571,13 +673,16 @@ void nodeWorldMatrixChangedLight(MObject &node, MDagMessage::MatrixModifiedFlags
 	std::string objName = mesh.name().asChar();
 	std::string msgString = translateVector;
 
-	//pass to send
-	bool msgToSend = false;
-	if (msgString.length() > 0)
-		msgToSend = true;
+	if (oldContent != msgString)
+	{
+		//pass to send
+		bool msgToSend = false;
+		if (msgString.length() > 0)
+			msgToSend = true;
 
-	if (msgToSend) {
-		sendMsg(CMDTYPE::UPDATE_MATRIX, NODE_TYPE::LIGHT, 0, 0, 0, 0, objName, msgString);
+		if (msgToSend) {
+			sendMsg(CMDTYPE::UPDATE_MATRIX, NODE_TYPE::LIGHT, 0, 0, 0, 0, objName, msgString);
+		}
 	}
 }
 
@@ -594,11 +699,14 @@ void meshConnectionChanged(MPlug &plug, MPlug &otherPlug, bool made, void *clien
 
 	std::string meshName = mesh.name().asChar();
 	std::string testString = "shaderBallGeomShape";
+	
 	bool shaderBall = false;
-	if (meshName.find(testString) == std::string::npos)
-	{
+	bool hasTexture = false;
+
+	if (meshName.find(testString) == std::string::npos) {
 		shaderBall = false;
 	}
+
 	else {
 		shaderBall = true;
 	}
@@ -608,6 +716,13 @@ void meshConnectionChanged(MPlug &plug, MPlug &otherPlug, bool made, void *clien
 		MObjectArray shaderGroups;
 		MIntArray shaderGroupsIndecies;
 		mesh.getConnectedShaders(0, shaderGroups, shaderGroupsIndecies);
+
+		for (int i = 0; i < shaderGroups.length(); i++)
+		{
+			MObject temp = shaderGroups[i];
+			MFnDependencyNode nodeFn(temp);
+			MStreamUtils::stdOutStream() << "Shaders connected to mesh: " << nodeFn.name() << endl;
+		}
 
 		if (shaderGroups.length() > 0)
 		{
@@ -626,19 +741,92 @@ void meshConnectionChanged(MPlug &plug, MPlug &otherPlug, bool made, void *clien
 					MFnDependencyNode lambertDepNode(lambertObj);
 					MPlug colorPlug = lambertDepNode.findPlug("color");
 
-					MFnLambertShader lambertItem(lambertObj);
+					////////////////////
 
-					MColor color;
-					MPlug attr;
+					MPlugArray connetionsColor;
+					colorPlug.connectedTo(connetionsColor, true, false);
 
-					attr = lambertItem.findPlug("colorR");
-					attr.getValue(color.r);
-					attr = lambertItem.findPlug("colorG");
-					attr.getValue(color.g);
-					attr = lambertItem.findPlug("colorB");
-					attr.getValue(color.b);
+					for (int x = 0; x < connetionsColor.length(); x++)
+					{
+						if (connetionsColor[x].node().apiType() == MFn::kFileTexture)
+						{
+							MObject textureObj(connetionsColor[x].node());
 
-					MStreamUtils::stdOutStream() << "color: " << color.r << ", " << color.g << ", " << color.b << endl;
+							MFnDependencyNode textureNode(textureObj);
+							MCallbackId tempID = MNodeMessage::addAttributeChangedCallback(textureObj, nodeTextureAttributeChanged);
+							callbackIdArray.append(tempID);
+
+							
+							MPlug fileTextureName = textureNode.findPlug("ftn");
+							MString fileName;
+
+							fileTextureName.getValue(fileName);
+							MStreamUtils::stdOutStream() << fileName << endl;
+
+							std::string fileNameString = fileName.asChar();
+
+							if (fileNameString.length() > 0)
+							{
+								MStreamUtils::stdOutStream() << fileName << endl;
+								MStreamUtils::stdOutStream() << fileName.asChar() << endl;
+								std::string materialString = "";
+								materialString.append(lambertDepNode.name().asChar());
+								materialString.append(" texture ");
+								materialString.append(fileNameString);
+
+
+								MStreamUtils::stdOutStream() << "final sting: " << materialString << endl;
+
+								bool msgToSend = false;
+								if (materialString.length() > 0)
+									msgToSend = true;
+
+								if (msgToSend) {
+									sendMsg(CMDTYPE::UPDATE_MATERIALNAME, NODE_TYPE::MESH, materialString.length(), 0, 0, 0, mesh.name().asChar(), materialString);
+								}
+
+							}
+
+							hasTexture = true;
+						}
+					}
+
+					if (hasTexture == false)
+					{
+						MFnLambertShader lambertItem(lambertObj);
+
+						MColor color;
+						MPlug attr;
+
+						attr = lambertItem.findPlug("colorR");
+						attr.getValue(color.r);
+						attr = lambertItem.findPlug("colorG");
+						attr.getValue(color.g);
+						attr = lambertItem.findPlug("colorB");
+						attr.getValue(color.b);
+
+
+						std::string colors = "";
+						colors.append(lambertDepNode.name().asChar());
+						colors.append(" ");
+						colors.append("color ");
+						colors.append(to_string(color.r) + " ");
+						colors.append(to_string(color.g) + " ");
+						colors.append(to_string(color.b));
+
+						MStreamUtils::stdOutStream() << "colors: " << colors << endl;
+
+
+						//pass to send
+						bool msgToSend = false;
+						if (colors.length() > 0)
+							msgToSend = true;
+
+						if (msgToSend) {
+							sendMsg(CMDTYPE::UPDATE_MATERIALNAME, NODE_TYPE::MESH, colors.length(), 0, 0, 0, mesh.name().asChar(), colors);
+						}
+
+					}
 				}
 			}
 		}
@@ -648,7 +836,7 @@ void meshConnectionChanged(MPlug &plug, MPlug &otherPlug, bool made, void *clien
 //sending
 void vtxPlugConnected(MPlug & srcPlug, MPlug & destPlug, bool made, void* clientData) {
 
-	MStatus status = MS::kSuccess;
+	MStatus status = MS::kFailure;
 
 	if (srcPlug.partialName() == "out" && destPlug.partialName() == "i") {
 
@@ -669,33 +857,29 @@ void vtxPlugConnected(MPlug & srcPlug, MPlug & destPlug, bool made, void* client
 			MStreamUtils::stdOutStream() << "Plug name: " << plugArray[0].name().asChar() << endl;
 
 			// Make sure mesh is triangulated =======
-
-			std::size_t found = name.find(testString);
-
-			if (found != std::string::npos) {
-				MStreamUtils::stdOutStream() << "Already triangulated..." << endl;
-			}
-
-			else {
-				MStreamUtils::stdOutStream() << "Triangulating..." << endl;
+			bool triangulated = false;
+			if (name.find(testString) == std::string::npos)
+			{
 				status = MGlobal::executeCommand("polyTriangulate " + mesh.name(), true, true);
+				MStreamUtils::stdOutStream() << "TRANGULATING" << endl;
+				triangulated = true;
 			}
-		
-			/*else {
-				status = MS::kFailure;
-				MStreamUtils::stdOutStream() << "NONE" << endl;
+			else {
+				triangulated = true;
+				status = MS::kSuccess;
+			}
 
-			}*/
-
-			// if triangulated, proceed =======
-			//if (status == MS::kSuccess) {
-
-				/////////////
-				// 	 VTX   //
-				/////////////
+			
+				//////////////////////////
+				//						//
+				//			VTX			//
+				//						//
+				//////////////////////////
 
 			MPlug vtxArray = mesh.findPlug("controlPoints");
 			size_t nrElements = vtxArray.numElements();
+
+			MStreamUtils::stdOutStream() << "nrVtx: " << nrElements << endl;
 
 			//get vtx in array
 			MVectorArray vtxArrayMessy;
@@ -708,7 +892,9 @@ void vtxPlugConnected(MPlug & srcPlug, MPlug & destPlug, bool made, void* client
 				float y = 0;
 				float z = 0;
 
-				if (currentVtx.isCompound()) {
+
+				if (currentVtx.isCompound())
+				{
 					//we have control points [0] but in Maya the values are one hierarchy down so we acces them by getting the child
 					MPlug plugX = currentVtx.child(0);
 					MPlug plugY = currentVtx.child(1);
@@ -727,23 +913,24 @@ void vtxPlugConnected(MPlug & srcPlug, MPlug & destPlug, bool made, void* client
 			//sort vtx correctly
 			MIntArray triCount;
 			MIntArray triVertsIndex;
-			MVectorArray trueVtxForm;
-
 			mesh.getTriangles(triCount, triVertsIndex);
-
+			MVectorArray trueVtxForm;
 			for (int i = 0; i < triVertsIndex.length(); i++) {
 				trueVtxForm.append(vtxArrayMessy[triVertsIndex[i]]);
 			}
 
+			MStreamUtils::stdOutStream() << "trueVtxForm: " << trueVtxForm << endl;
+
 			int totalTrisCount = triCount.length() * 2;
+
+			//add command + name to string
 			std::string objName = mesh.name().asChar();
 
 			//MVector to string
 			std::string vtxArrayString;
-			size_t vtxArrElements = 0;
-
 			int vtxCount = trueVtxForm.length();
 			vtxArrayString.append(to_string(vtxCount) + " ");
+			size_t vtxArrElements = 0;
 
 			for (int u = 0; u < trueVtxForm.length(); u++) {
 				for (int v = 0; v < 3; v++) {
@@ -752,204 +939,112 @@ void vtxPlugConnected(MPlug & srcPlug, MPlug & destPlug, bool made, void* client
 				}
 			}
 
+			MStreamUtils::stdOutStream() << "trueVtxForm: " << trueVtxForm << endl;
 
-			///////////////
-			//// NORMALS //
-			///////////////
 
-			//MStreamUtils::stdOutStream() << "================================= " << endl;
+			/////////////
+				// NORMALS //
+				/////////////
 
 			MFloatVectorArray normals;
-			//MFloatVectorArray initialNormals;
 			mesh.getNormals(normals, MSpace::kWorld);
 
-
-			//MIntArray vertexCount;
-			//MIntArray vertexList;
-			//mesh.getVertices(vertexCount, vertexList);
+			//MStreamUtils::stdOutStream() << "normals: " << normals << std::endl;
 
 			MStreamUtils::stdOutStream() << "================" << endl;
 			MStreamUtils::stdOutStream() << triCount.length() << endl;
 
-
+			//MIntArray normalCounts;
 			MIntArray normalIds;
-			//mesh.getNormalIds(normalCounts, normalIds);
 
-			int currentVtx = 0; 
+			int currentVtx = 0;
 			MIntArray tempNormalIds;
-			int nrOfFaces = triCount.length(); 
+			int nrOfFaces = triCount.length();
 
 			for (int faceCnt = 0; faceCnt < nrOfFaces; faceCnt++) {
 				mesh.getFaceNormalIds(faceCnt, tempNormalIds);
-				normalIds.append(tempNormalIds[currentVtx]);
-			}
+				normalIds.append(tempNormalIds[0]);
 			
-	
+			}
+			//MStreamUtils::stdOutStream() << "nrIds: " << normalIds << std::endl;
+
 			int vtxFace = 0;
 			MVectorArray orderedNormals;
 
 			for (int i = 0; i < nrOfFaces; i++) {
 				for (int j = 0; j < 3; j++) {
 					orderedNormals.append(normals[normalIds[vtxFace]]);
+					//MStreamUtils::stdOutStream() << "normals[normalIds[vtxFace]]: " << normals[normalIds[vtxFace]] << std::endl;
+					//MStreamUtils::stdOutStream() << "orderedNormals[i]: " << orderedNormals[i] << std::endl;
 				}
 
 				vtxFace++;
 			}
-
-
-			/* 
-			MVectorArray orderedNorm; 
-			for (int i = 0; i < normalIds.length(); i++) {
-				int vtxInd = normalIds[i];
-				//MStreamUtils::stdOutStream() << "triVertsIndex: " << triVertsIndex[vtxInd] << endl;
-				//MStreamUtils::stdOutStream() << "normals[vtxInd]: " << normals[vtxInd] << endl;
-
-				orderedNorm.append(normals[vtxInd]);
-			}
-			
-			MStreamUtils::stdOutStream() << "orderedNorm: " << orderedNorm << endl;
-
-
-			//MVector to string
-			std::string nrmlArrayString;
-			size_t nrmlArrElements = 0;
-
-			int nrmlCount = orderedNorm.length();
-			nrmlArrayString.append(to_string(nrmlCount) + " ");
-
-			for (int u = 0; u < orderedNorm.length(); u++) {
-				for (int v = 0; v < 3; v++) {
-					nrmlArrayString.append(std::to_string(orderedNorm[u][v]) + " ");
-				}
-			}
-			*/
-
-
-			/*
-			//for (int j = 0; j < normalIds.length(); j++) {
-
-			//	//MStreamUtils::stdOutStream() << "normals: " << normals[j] << endl;
-			//	int normIndex = normalIds[j]; 
-			//	MStreamUtils::stdOutStream() << "Normal index: " << normIndex << endl;
-
-			//	for (int i = 0; i < 3; i++) {
-			//		MStreamUtils::stdOutStream() << "Normal at index: " << normals[normalIds[normIndex]] << endl;
-			//	}
-
-			//	MStreamUtils::stdOutStream() << " " << endl;
-
-
-			//	//orderedNormals.append(normals[normalIds[j]]);
-
-			}
-			 */
-
-
-			/*
-
-			MStreamUtils::stdOutStream() << "======================== " << endl;
-
-			MStreamUtils::stdOutStream() << "nrElements: "  << nrElements << endl;
-			MStreamUtils::stdOutStream() << "nrOfNormals: " << nrOfNormals << endl;
-
-			if (nrElements == nrOfNormals) {
-				MStreamUtils::stdOutStream() << "IN NORMAL!" << endl;
-				status = MS::kFailure;
-
-				MIntArray normCounts;
-				MIntArray triNormIndex;
-				MVectorArray normalsArray;
-
-				mesh.getNormalIds(normCounts, triNormIndex)
-
-				for (int i = 0; i < triNormIndex.length(); i++) {
-					normalsArray.append(normals[triNormIndex[i]]);
-				}
-				*/
-
-		
-			/*MStreamUtils::stdOutStream() << "normalsArray: " << normalsArray << endl;
-
-					int nrNormals = triNormIndex.length();
-					MVector to string
-					std::string NormArrayString;
-					NormArrayString.append(to_string(nrOfNormals) + " ");
-					size_t normArrElements = 0;
-				for (int u = 0; u < normalsArray.length(); u++)
-				{
-					for (int v = 0; v < 3; v++)
-					{
-						NormArrayString.append(to_string(normalsArray[u][v]) + " ");
-						normArrElements++;
-					}
-				}
-				MStreamUtils::stdOutStream() << "NormArrayString: " << NormArrayString << "_" << endl;
-				
-			*/
 
 			std::string NormArrayString;
 			size_t nrOfNormals = orderedNormals.length();
 			NormArrayString.append(to_string(nrOfNormals) + " ");
 
 			for (int u = 0; u < orderedNormals.length(); u++) {
-				for (int v = 0; v < 3; v++)	{
+				for (int v = 0; v < 3; v++) {
 					NormArrayString.append(to_string(orderedNormals[u][v]) + " ");
 				}
 			}
 
+			//MStreamUtils::stdOutStream() << "NormArrayString: " << NormArrayString << std::endl;
 
 
-			///////////////
-			////   UVS	 //
-			///////////////
-			MString UVName; 
-			mesh.getCurrentUVSetName(UVName, -1);
+				/////////////
+				//	  UV   //
+				/////////////
+
+			MString UVName;
 			MFloatArray uArr;
 			MFloatArray vArr;
-			 
+
+			mesh.getCurrentUVSetName(UVName, -1);
+
+			MIntArray uvCounts;
+			MIntArray uvIds;
+			MString* uvSet = new MString[1];
+			uvSet[0] = UVName;
+
 			mesh.getUVs(uArr, vArr, &UVName);
-			
+			mesh.getAssignedUVs(uvCounts, uvIds, uvSet);
+
+			MStreamUtils::stdOutStream() << "uvSet[0]: " << uvSet[0] << endl;
+			MStreamUtils::stdOutStream() << "uvIds: " << uvIds << endl;
+			MStreamUtils::stdOutStream() << "uvIds len: " << uvIds.length() << endl;
+			MStreamUtils::stdOutStream() << "uvCounts: " << uvCounts << endl;
+
 			MStreamUtils::stdOutStream() << "================" << endl;
-			//MStreamUtils::stdOutStream() << "UVName: " << UVName << endl;
-			//MStreamUtils::stdOutStream() << "U arr len: " << uArr.length() << endl;
-			//MStreamUtils::stdOutStream() << "V arr len: " << vArr.length() << endl;
 
-			//MStreamUtils::stdOutStream() << "uArr: " << uArr << endl;
-			//MStreamUtils::stdOutStream() << "vArr: " << vArr << endl;
-			//MStreamUtils::stdOutStream() << " " << endl;
-
-			MFloatArray sortedUVs; 
-			int nrOfUVs = 0; 
+			MFloatArray sortedUVs;
+			int nrOfUVs = 0;
 			for (int vtxNr = 0; vtxNr < trueVtxForm.length(); vtxNr++) {
-			
+
 				int vtx = triVertsIndex[vtxNr];
-				float tempU, tempV; 
+				float tempU, tempV;
 				mesh.getUV(vtx, tempU, tempV);
 
-				//MStreamUtils::stdOutStream() << vtxNr << " UV: " << tempU << " : " << tempV << endl;
 				sortedUVs.append(tempU);
 				sortedUVs.append(tempV);
-				nrOfUVs++; 
+				nrOfUVs++;
 			}
 
-			//MStreamUtils::stdOutStream() << " " << endl;
-			//MStreamUtils::stdOutStream() << "sortedUVs: " << sortedUVs << endl;
-			//StreamUtils::stdOutStream() << "sortedUVs.lenght: " << sortedUVs.length() << endl;
-			//MStreamUtils::stdOutStream() << "nrOfUVs: " << nrOfUVs << endl;
-
 			std::string UVArrayString;
-			size_t totalUVCount = nrOfUVs; 
+			size_t totalUVCount = nrOfUVs;
 			UVArrayString.append(to_string(totalUVCount) + " ");
 
 			for (int u = 0; u < sortedUVs.length(); u++) {
 				UVArrayString.append(to_string(sortedUVs[u]) + " ");
 			}
-			
-			//MStreamUtils::stdOutStream() << "UVArrayString: " << UVArrayString << endl;
-			
-			MStreamUtils::stdOutStream() << "UV nr of vtxPlugConnected: " << totalUVCount << endl;
 
-			
+			MStreamUtils::stdOutStream() << "sortedUVs: " << sortedUVs << "_" << endl;
+
+			//MStreamUtils::stdOutStream() << "masterTransformString: " << masterTransformString << "_" << endl;
+
+			delete[] uvSet; 
 			// SEND MESSAGE ==================================================
 			std::string masterTransformString;
 			masterTransformString.append(vtxArrayString + " ");
@@ -962,7 +1057,7 @@ void vtxPlugConnected(MPlug & srcPlug, MPlug & destPlug, bool made, void* client
 				msgToSend = true;
 
 			if (msgToSend) {
-				sendMsg(CMDTYPE::NEW_NODE, NODE_TYPE::MESH, nrElements, totalTrisCount, nrOfNormals, totalUVCount, objName, masterTransformString);
+				sendMsg(CMDTYPE::NEW_NODE, NODE_TYPE::MESH, nrElements, totalTrisCount, 0,0, objName, masterTransformString);
 			}
 		}
 	}
