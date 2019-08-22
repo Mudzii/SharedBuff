@@ -2,6 +2,22 @@ import sys
 import os
 import socket
 
+#commandPort -name ":1234"
+#commandPort -cl -name ":1234"
+
+#RAYLIB 
+# C/C++ --> include dir --> ...sharedBuff\shared\Project1
+# C/C++ --> include dir --> ... shared\project1
+# Linker --> lib dir --> sharedBuff\shared\x64\Debug
+# Linker --> input --> ad dep --> Project1.lib
+
+#MayaLib
+#c\c++ --> ad include lib --> ProgramFiles\Autodesk\Maya2018\include
+#c\c++ --> ad include lib --> sharedBuff\shared\Project1
+#linker --> add lib dir --> Autodesk\Maya2018\lib
+#linker --> add lib dir --> sharedBuff\shared\x64\Debug
+#linker --> iput --> additional dep --> Project1.lib
+
 s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 s.connect(('127.0.0.1', 1234))
 
