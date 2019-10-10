@@ -15,6 +15,8 @@
 #include <Windows.h>
 ComLib ourComLib("shaderMemory", 50, CONSUMER);
 
+
+// Message structs and ENUMs ========
 enum NODE_TYPE {
 	TRANSFORM,
 	MESH,
@@ -23,17 +25,32 @@ enum NODE_TYPE {
 };
 
 enum CMDTYPE {
-	DEFAULT = 1000,
-	NEW_NODE = 1001,
-	UPDATE_NODE = 1002,
-	UPDATE_MATRIX = 1003,
-	UPDATE_NAME = 1004,
-	UPDATE_MATERIAL = 1005,
+	DEFAULT				= 1000,
+	NEW_NODE			= 1001,
+	UPDATE_NODE			= 1002,
+	UPDATE_MATRIX		= 1003,
+	UPDATE_NAME			= 1004,
+	UPDATE_MATERIAL		= 1005,
 	UPDATE_MATERIALNAME = 1006
 };
 
-struct cameraFromMaya
-{
+struct MsgHeader {
+	CMDTYPE   cmdType;
+	NODE_TYPE nodeType;
+	char objName[64];
+	int msgSize;
+	int nameLen;
+};
+
+struct msgMesh {
+	int vtxCount;
+	int trisCount;
+	int normalCount;
+	int UVcount;
+};
+
+// Structs for RayLib ===============
+struct cameraFromMaya {
 	Vector3 up;
 	Vector3 forward;
 	Vector3 pos;
@@ -41,15 +58,13 @@ struct cameraFromMaya
 	float fov;
 };
 
-struct lightFromMaya
-{
+struct lightFromMaya {
 	Vector3 lightPos;
 	float radius;
 	Color color;
 };
 
-struct modelFromMaya
-{
+struct modelFromMaya {
 	Model model;
 	int index;
 	std::string name;
@@ -70,23 +85,8 @@ struct modelPos {
 	Matrix modelMatrix;
 };
 
-struct MsgHeader {
-	CMDTYPE   cmdType;
-	NODE_TYPE nodeType;
-	char objName[64];
-	int msgSize;
-	int nameLen;
-};
 
-struct msgMesh {
-	int vtxCount;
-	int trisCount;
-	int normalCount;
-	int UVcount;
-};
-
-
-//model
+// Functions ========================
 void addNode(std::vector<modelFromMaya>& objNameArray, char* buffer, int bufferSize, Shader shader, int* nrObjs, int* index, std::vector<lightFromMaya>& lightsFromMaya, std::vector<cameraFromMaya>& cameraFromMaya, std::vector<materialMaya>& materialMaya, int* nrMaterials);
 void updateNode(std::vector<modelFromMaya>& objNameArray, char* buffer, int bufferSize, Shader shader, int* nrObjs, int* index, std::vector<lightFromMaya>& lightsFromMaya, std::vector<cameraFromMaya>& cameraFromMaya, std::vector<materialMaya>& materialMaya, int* nrMaterials);
 void updateNodeMatrix(std::vector<modelFromMaya>& objNameArray, char* buffer, int bufferSize, Shader shader, int* nrObjs, int* index, std::vector<lightFromMaya>& lightsFromMaya, std::vector<cameraFromMaya>& cameraFromMaya, std::vector<materialMaya>& materialMaya, int* nrMaterials);
@@ -98,8 +98,7 @@ typedef void(*FnPtr)(std::vector<modelFromMaya>&, char*, int, Shader, int*, int*
 
 CMDTYPE recvFromMaya(char* buffer);
 
-int main()
-{
+int main() {
 	SetTraceLog(LOG_WARNING);
 
 	/////// OUR STUFF
@@ -1361,6 +1360,9 @@ void updateNodeName(std::vector<modelFromMaya>& objNameArray, char* buffer, int 
 	}
 }
 
+
+
+// OLD CODE
 ///////////////////////////
 ////					   //
 ////		LIGHT		   //
