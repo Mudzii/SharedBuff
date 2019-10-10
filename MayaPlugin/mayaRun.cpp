@@ -747,60 +747,81 @@ void vtxPlugConnected(MPlug & srcPlug, MPlug & destPlug, bool made, void* client
 
 	//if statement checking if it's otpit mesh that has been connected 
 	if (srcPlug.partialName() == "out" && destPlug.partialName() == "i") {
+
 		//if connection made
 		if (made == true) {
 
-			//mesh struct used to add variables
-			Mesh meshInfo; 
-
 			MStreamUtils::stdOutStream() <<"\n";
 			MStreamUtils::stdOutStream() << "Connection made " << "\n";
+
+			// variables
+			Mesh meshInfo; 
+			bool triangulated = false; 
+			MStatus vtxRresult = MS::kFailure;
 
 			// Get mesh through dag path
 			MDagPath path;
 			MFnDagNode(destPlug.node()).getPath(path);
 			MFnMesh mesh(path);
 
-
-			//check if mesh is triangulated or not
+			
+			// check if mesh is triangulated or not =====================
 			MPlugArray plugArray;
 			destPlug.connectedTo(plugArray, true, true);
 			std::string name = plugArray[0].name().asChar();
 
-			bool triangulated = false;
-			MStatus result = MS::kFailure;
-			std::string polyTriStringCheck = "polyTriangulate";
-
 			if (plugArray[0].name() == "polyTriangulate1.output") {
-				MStreamUtils::stdOutStream() << "TRIANGULATED \n";
-
+				vtxRresult = MS::kSuccess;
+				triangulated = true; 
 			}
 
 			else {
-				MStreamUtils::stdOutStream() << "NOT TRIANGULATED \n";
-				result = MGlobal::executeCommand("polyTriangulate " + mesh.name(), true, true);
-				triangulated = true;
+				triangulated = false; 
+				vtxRresult = MGlobal::executeCommand("polyTriangulate " + mesh.name(), true, true);
 			}
 
-			/* 
-			if (name.find(polyTriStringCheck) == std::string::npos)	{
-				//if not triangulate mesh
-				result = MGlobal::executeCommand("polyTriangulate " + mesh.name(), true, true);
-				triangulated = true;
+			// if triangulated, continue ================================
+			if (triangulated == true) {
+
+				// get mesh name
+				std::string objName = mesh.name().asChar();
+
+
+				// VTX ================
+
+				// get verticies 
+				MPointArray vtxArray; 
+				mesh.getPoints(vtxArray, MSpace::kObject);
+
+				// get triangles
+				MIntArray trisCount;
+				MIntArray trisVtxIndex;
+				int nrOfFaces = trisCount.length();
+
+				mesh.getTriangles(trisCount, trisVtxIndex);
+
+				/* 
+				// NORMALS ============
+				MFloatVectorArray normalArray;
+				mesh.getNormals(normalArray, MSpace::kWorld);
+
+				//get IDs per face
+				MIntArray normalIds;
+				MIntArray tempNormalIds;
+				for (int faceCnt = 0; faceCnt < nrOfFaces; faceCnt++) {
+					mesh.getFaceNormalIds(faceCnt, tempNormalIds);
+					normalIds.append(tempNormalIds[0]);
+				}
+				*/
+
+				MStreamUtils::stdOutStream() << "nrOfFaces " << nrOfFaces << "\n";
+
+
+
 			}
 
-			else {
-				triangulated = true;
-				result = MS::kSuccess;
-			}
-			*/
 			
-
-
-
-			
-			//when triangulated do all the things
-			
+		
 
 			// OLD CODE
 			/* 
