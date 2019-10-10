@@ -13,7 +13,7 @@
 #include <functional>
 
 #include <Windows.h>
-ComLib ourComLib("shaderMemory", 50, CONSUMER);
+ComLib comLib("shaderMemory", 50, CONSUMER);
 
 
 // Message structs and ENUMs ========
@@ -87,33 +87,42 @@ struct modelPos {
 
 
 // Functions ========================
+/* 
 void addNode(std::vector<modelFromMaya>& objNameArray, char* buffer, int bufferSize, Shader shader, int* nrObjs, int* index, std::vector<lightFromMaya>& lightsFromMaya, std::vector<cameraFromMaya>& cameraFromMaya, std::vector<materialMaya>& materialMaya, int* nrMaterials);
 void updateNode(std::vector<modelFromMaya>& objNameArray, char* buffer, int bufferSize, Shader shader, int* nrObjs, int* index, std::vector<lightFromMaya>& lightsFromMaya, std::vector<cameraFromMaya>& cameraFromMaya, std::vector<materialMaya>& materialMaya, int* nrMaterials);
 void updateNodeMatrix(std::vector<modelFromMaya>& objNameArray, char* buffer, int bufferSize, Shader shader, int* nrObjs, int* index, std::vector<lightFromMaya>& lightsFromMaya, std::vector<cameraFromMaya>& cameraFromMaya, std::vector<materialMaya>& materialMaya, int* nrMaterials);
 void updateNodeName(std::vector<modelFromMaya>& objNameArray, char* buffer, int bufferSize, Shader shader, int* nrObjs, int* index, std::vector<lightFromMaya>& lightsFromMaya, std::vector<cameraFromMaya>& cameraFromMaya, std::vector<materialMaya>& materialMaya, int* nrMaterials);
 void updateMaterial(std::vector<modelFromMaya>& objNameArray, char* buffer, int bufferSize, Shader shader, int* nrObjs, int* index, std::vector<lightFromMaya>& lightsFromMaya, std::vector<cameraFromMaya>& cameraFromMaya, std::vector<materialMaya>& materialMaya, int* nrMaterials);
 void updateMaterialName(std::vector<modelFromMaya>& objNameArray, char* buffer, int bufferSize, Shader shader, int* nrObjs, int* index, std::vector<lightFromMaya>& lightsFromMaya, std::vector<cameraFromMaya>& cameraFromMaya, std::vector<materialMaya>& materialMaya, int* nrMaterials);
+*/
 
-typedef void(*FnPtr)(std::vector<modelFromMaya>&, char*, int, Shader, int*, int*, std::vector<lightFromMaya>&, std::vector<cameraFromMaya>&, std::vector<materialMaya>&, int*);
+void addNode(std::vector<modelFromMaya>& objNameArray, std::vector<lightFromMaya>& lightsFromMaya, std::vector<cameraFromMaya>& cameraFromMaya, std::vector<materialMaya>& materialMaya, char* buffer, int bufferSize, Shader shader, int* nrObjs, int* index, int* nrMaterials);
+
+typedef void(*FnPtr)(std::vector<modelFromMaya>&, std::vector<lightFromMaya>&, std::vector<cameraFromMaya>&, std::vector<materialMaya>&, char*, int, Shader, int*, int*,  int*);
 
 CMDTYPE recvFromMaya(char* buffer);
 
 int main() {
 	SetTraceLog(LOG_WARNING);
 
-	/////// OUR STUFF
+
+	// vectors with objects from Maya ====== 
+	std::vector<materialMaya> materialMaya;
+	std::vector<cameraFromMaya> cameraMaya;
 	std::vector<modelFromMaya> modelsFromMaya;
 	std::vector<lightFromMaya> lightsFromMaya;
-	std::vector<cameraFromMaya> cameraMaya;
-	std::vector<materialMaya> materialMaya;
 
 
+	// create a light ====== 
 	Vector3 lightPos = { 0,0,0 };
 	float radius = 0.1;
 	Color color = { 1 * 255, 1 * 255, 1 * 255, 1 * 255 };
 	lightsFromMaya.push_back({ lightPos, radius, color });
 
+	// map specific commands to a specific function
 	std::map<CMDTYPE, FnPtr> funcMap;
+	funcMap[NEW_NODE] = addNode; 
+	/* 
 	funcMap[NEW_NODE] = addNode;
 	funcMap[UPDATE_NODE] = updateNode;
 	funcMap[UPDATE_MATRIX] = updateNodeMatrix;
@@ -121,14 +130,15 @@ int main() {
 	funcMap[UPDATE_MATERIAL] = updateMaterial;
 	funcMap[UPDATE_MATERIALNAME] = updateMaterialName;
 
-
+	*/
+	
+	// create a simple cube
 	int modelIndex = 0;
 	int nrOfObj = 0;
 	int nrMaterials = 0;
 	Model cube;
 	size_t tempArraySize = 0;
-	//
-
+	
 	// Initialization
 	//--------------------------------------------------------------------------------------
 	int screenWidth = 1200;
@@ -139,12 +149,12 @@ int main() {
 	InitWindow(screenWidth, screenHeight, "demo");
 
 	// Define the camera to look into our 3d world
-	Camera camera = { 0 };
+	Camera camera	= { 0 };
 	camera.position = { 4.0f, 4.0f, 4.0f };
-	camera.target = { 0.0f, 1.0f, -1.0f };
-	camera.up = { 0.0f, 1.0f, 0.0f };
-	camera.fovy = 45.0f;
-	camera.type = CAMERA_PERSPECTIVE;
+	camera.target	= { 0.0f, 1.0f, -1.0f };
+	camera.up		= { 0.0f, 1.0f, 0.0f };
+	camera.fovy		= 45.0f;
+	camera.type		= CAMERA_PERSPECTIVE;
 
 	cameraMaya.push_back({ camera.up, camera.target, camera.position });
 
@@ -163,7 +173,6 @@ int main() {
 	Model model1 = LoadModelFromMesh(mesh1);
 	model1.material = material1;                     // Set shader effect to 3d model
 
-
 	unsigned char colors[12] = { 255, 0, 0, 255, 0, 255, 0, 255, 0, 0, 255, 255 };
 
 	std::cout << "-----------------" << std::endl;
@@ -174,12 +183,14 @@ int main() {
 	//initializing camera!!!!
 
 	int modelLoc = GetShaderLocation(shader1, "model");
-	int viewLoc = GetShaderLocation(shader1, "view");
-	int projLoc = GetShaderLocation(shader1, "projection");
+	int viewLoc  = GetShaderLocation(shader1, "view");
+	int projLoc  = GetShaderLocation(shader1, "projection");
 
 	int lightLoc = GetShaderLocation(shader1, "lightPos");
 
 	// =====================================
+
+	char* tempArray; 
 
 	// Main game loop
 	while (!WindowShouldClose())                // Detect window close button or ESC key
@@ -192,35 +203,36 @@ int main() {
 		//----------------------------------------------------------------------------------
 		BeginDrawing();
 
-		///////////////////////// TEST FOR DRAW MODEL UNDER RUNTIME
-		tempArraySize = ourComLib.nextSize();
-		char* tempArray = new char[tempArraySize];
+		// Get what CMDTYPE the message sent from maya is 
+		tempArraySize = comLib.nextSize();
+		tempArray = new char[tempArraySize];
 
 		CMDTYPE messageType = CMDTYPE::DEFAULT;
 		messageType = recvFromMaya(tempArray);
 
 		if (messageType != CMDTYPE::DEFAULT) {
-			funcMap[messageType](modelsFromMaya, tempArray, tempArraySize, shader1, &nrOfObj, &modelIndex, lightsFromMaya, cameraMaya, materialMaya, &nrMaterials);
+
+			std::cout << "CMD TYPE: " << messageType << std::endl;
+			funcMap[messageType](modelsFromMaya, lightsFromMaya, cameraMaya, materialMaya, tempArray, tempArraySize, shader1, &nrOfObj, &modelIndex, &nrMaterials);
 		}
+		
+		delete[] tempArray; 
 
-
-		int i = 0;
-		i++;
-
-		if (tempArray != NULL) {
-			delete[] tempArray;
-		}
+		
 		//////////////////////////////
+		/* 
 		camera.target = cameraMaya[0].forward;
 		camera.position = cameraMaya[0].pos;
 		camera.fovy = cameraMaya[0].fov;
 		camera.type = cameraMaya[0].type;
 		camera.up = cameraMaya[0].up;
+		*/
 
 
-
+		/* 
 		float *test = Vector3ToFloat(lightsFromMaya[0].lightPos);
 		SetShaderValueMatrix(shader1, viewLoc, GetCameraMatrix(camera));
+		*/
 
 		//std::cout << "Before: " << lightsFromMaya[0].lightPos.x << " " << lightsFromMaya[0].lightPos.y << " " << lightsFromMaya[0].lightPos.z << std::endl;
 		SetShaderValue(shader1, lightLoc, Vector3ToFloat(lightsFromMaya[0].lightPos), 1);
@@ -248,8 +260,9 @@ int main() {
 
 		BeginMode3D(camera);
 
-		DrawSphere(lightsFromMaya[0].lightPos, 0.1, lightsFromMaya[0].color);
+		//DrawSphere(lightsFromMaya[0].lightPos, 0.1, lightsFromMaya[0].color);
 
+		/* 
 		for (int i = 0; i < modelsFromMaya.size(); i++)
 		{
 			auto m = modelsFromMaya[i];
@@ -260,6 +273,7 @@ int main() {
 			DrawModel(m.model, {}, 1.0, finalColor);
 
 		}
+		*/
 
 		DrawGrid(10, 1.0f);     // Draw a grid
 
@@ -277,9 +291,13 @@ int main() {
 	UnloadShader(shader1);       // Unload shader
 	UnloadTexture(texture1);     // Unload texture
 	UnloadModel(model1);
+	/*
 	for (int i = 0; i < modelsFromMaya.size(); i++) {
 		UnloadModel(modelsFromMaya[i].model);
 	}
+	*/
+
+
 	//UnloadModel(tri);
 	//UnloadModel(cubeMod);
 	//UnloadModel(cube);
@@ -289,1080 +307,1158 @@ int main() {
 	return 0;
 }
 
+CMDTYPE recvFromMaya(char* buffer) {
 
-CMDTYPE recvFromMaya(char* buffer)
-{
+	MsgHeader msgHeader = {}; 
+	msgHeader.cmdType   = CMDTYPE::DEFAULT;
 
-	
-
-	MsgHeader msgHeader = {};
-	msgHeader.cmdType = CMDTYPE::DEFAULT;
-
-	size_t nr = ourComLib.nextSize();
+	size_t nr = comLib.nextSize();
 	size_t oldBuffSize = nr;
 
-	char* msgBuff = new char[oldBuffSize];
-
+	buffer = new char[oldBuffSize];
 	if (nr > oldBuffSize) {
-		delete[] msgBuff;
-		msgBuff = new char[nr];
+		delete[] buffer;
+		buffer = new char[nr];
 		oldBuffSize = nr;
 	}
 
-	bool receive = ourComLib.recv(msgBuff, nr);
+	// get message from Maya ======
+	if (comLib.recv(buffer, nr)) {
+		memcpy((char*)&msgHeader, buffer, sizeof(MsgHeader));
 
-	if (receive == true) {
-
-		memcpy((char*)&msgHeader, msgBuff, sizeof(MsgHeader));
-
-		char* msg = new char[msgHeader.msgSize];
 		if (msgHeader.nodeType == NODE_TYPE::MESH) {
-			
 
-			msgMesh mesh = {};
+			std::cout << "RCV MESH" << std::endl;
 
-			//memcpy((char*)&mesh, msgBuff + sizeof(MsgHeader), sizeof(msgMesh));
-			//memcpy((char*)msg, msgBuff + sizeof(MsgHeader) + sizeof(msgMesh), msgHeader.msgSize);
+			msgMesh meshInfo = {};
+			memcpy((char*)&meshInfo, buffer + sizeof(MsgHeader), sizeof(msgMesh));
 
-			memcpy(buffer, msgBuff, sizeof(MsgHeader));		//HEADER FIRST
-			memcpy(buffer + sizeof(MsgHeader), msgBuff + sizeof(MsgHeader), sizeof(msgMesh));	//MESH STRUCT
-			//memcpy(buffer + sizeof(MsgHeader) + sizeof(msgMesh), msgBuff + sizeof(MsgHeader) + sizeof(msgMesh), msgHeader.msgSize);		//THE MSG
-			
-			memcpy(buffer + sizeof(MsgHeader) + sizeof(msgMesh), msgBuff + sizeof(MsgHeader) + sizeof(msgMesh), sizeof(float) * (mesh.vtxCount * 3));
+			int vtxCount	   = meshInfo.trisCount * 3; 
+			float* meshVtx	   = new float[vtxCount * 3];
+			float* meshNormals = new float[vtxCount * 3];
+			float* meshUVs	   = new float[vtxCount * 2 * 2];
 
-			std::cout << "msgBuff" << std::endl; 
-			for (unsigned i = 0; i < sizeof(buffer); i++) {
-				std::cout << msgBuff[i] << std::endl;
-			}
-			std::cout << std::endl;
-		}
-
-		else {
-			memcpy((char*)msg, msgBuff + sizeof(MsgHeader), msgHeader.msgSize);
-
-			memcpy(buffer, msgBuff, sizeof(MsgHeader));		//HEADER
-			memcpy(buffer + sizeof(MsgHeader), msgBuff + sizeof(MsgHeader), msgHeader.msgSize);	//MSG
+			memcpy((char*)meshVtx, buffer + sizeof(MsgHeader) + sizeof(msgMesh), (sizeof(float) * vtxCount * 3));
+			memcpy((char*)meshNormals, buffer + sizeof(MsgHeader) + sizeof(msgMesh) + (sizeof(float) * vtxCount * 3), (sizeof(float) * vtxCount * 3));
+			memcpy((char*)meshUVs, buffer + sizeof(MsgHeader) + sizeof(msgMesh) + (sizeof(float) * vtxCount * 3) + (sizeof(float) * vtxCount * 3), (sizeof(float) * vtxCount * 2 * 2));
 
 
-		}
 
-		//std::cout << "print msg: " << msg << "_" << std::endl;
-		if (msg != NULL) {
-			delete[] msg;
+
+			delete[] meshVtx;
+			delete[] meshNormals;
+			delete[] meshUVs;
+
 		}
 	}
 
-	if (msgBuff != NULL) {
-		delete[] msgBuff;
-	}
-	return msgHeader.cmdType;
+	delete[] buffer; 
+	return msgHeader.cmdType; 
 }
 
-/////////////////////////
-//					   //
-//		MODEL		   //
-//					   //
-/////////////////////////
 
-void addNode(std::vector<modelFromMaya>& objNameArray, char* buffer, int bufferSize, Shader shader1, int* nrObjs, int* index, std::vector<lightFromMaya>& lightsFromMaya, std::vector<cameraFromMaya>& cameraFromMaya, std::vector<materialMaya>& materialMaya, int* nrMaterials)
-{
-	std::cout << "ADD" << std::endl;
-	// Get elements from buffer
+void addNode(std::vector<modelFromMaya>& objNameArray, std::vector<lightFromMaya>& lightsFromMaya, std::vector<cameraFromMaya>& cameraFromMaya, std::vector<materialMaya>& materialMaya, char* buffer, int bufferSize, Shader shader, int* nrObjs, int* index, int* nrMaterials) {
+
+	std::cout << "IN FUNCTION ADD A NODE" << std::endl; 
+
 	MsgHeader msgHeader = {};
-	std::string objectName = "";
-	memcpy((char*)&msgHeader, buffer, sizeof(MsgHeader));
-	objectName = msgHeader.objName;
-	objectName = objectName.substr(0, msgHeader.nameLen);
+	//memcpy((char*)&msgHeader, buffer, sizeof(MsgHeader));
 
-	std::cout << "in add node and printing cmdType " << msgHeader.cmdType << " " << std::endl;
-	std::cout << "in add node and printing node_TYPE " << msgHeader.nodeType << " " << std::endl;
+	//std::cout << "msgHeader: " << msgHeader.objName << std::endl;
 
-	if (msgHeader.nodeType == NODE_TYPE::MESH) {
-		
-		std::cout << "============================" << std::endl;
-		std::cout << "ADD MODEL: " << std::endl;
-		msgMesh mesh = {};
-
-		memcpy((char*)&mesh, buffer + sizeof(MsgHeader), sizeof(msgMesh));	//mesh struct
-
-		//char* msgElements = new char[msgHeader.msgSize];
-		//memcpy((char*)msgElements, buffer + sizeof(MsgHeader) + sizeof(msgMesh), msgHeader.msgSize);	//copy msg
-
-		float* verticeArray = new float[sizeof(float) * (mesh.vtxCount * 3)];
-		//memcpy((char*)verticeArray, buffer + sizeof(msgMesh) + sizeof(MsgHeader) , sizeof(float) * (mesh.vtxCount * 3));
-		memcpy(verticeArray, buffer + sizeof(MsgHeader) + sizeof(msgMesh), sizeof(float) * (mesh.vtxCount * 3));
-
-		
-
-		std::cout << "mesh trisCount: " << mesh.trisCount << "____" << std::endl;
-		std::cout << std::endl; 
-		std::cout << "mesh trisCount: " << mesh.trisCount << "____" << std::endl;
-		std::cout << std::endl;
-		
-		std::cout << "mesh vtx: " << verticeArray[0] << "____" << std::endl;
-		std::cout << std::endl;
-
-		//setup stringstream
-		//std::string msgString(msgElements, msgHeader.msgSize);
-		//std::istringstream ss(msgString);
-
-		/* 
-		
-		//std::cout << "vtxArrTest: " << vtxArrTest << " _ " << std::endl;
-
-		int nrOfElements = mesh.trisCount * 3 * 3; //for each tris, add each vtx and then [x,y,z]
-
-		int nrVtx;
-		int vtxCheck = 0;
-		int nrNorm;
-		int normCheck = 0;
-
-
-		//ss >> nrVtx;
-		
-		float* arrayVtx = new float[nrVtx * 3];
-		int lengthVtxArr = 0;
-
-		std::string tempX, tempY, tempZ = "";
-		int element = 0;
-		float tempFloat = 0.0f;
-
-		std::string tempNormX, tempNormY, tempNormZ = "";
-		int lengthNormArr = 0;
-		float* arrayNorm;
-
-		std::string tempU, tempV = "";
-		int nrUV;
-		int UVCheck = 0;
-		int lenghtUVArr = 0;
-		float* arrayUV;
-
-		std::string colorOrTexture;
-		Vector4 newColor = { 255, 255, 255,255 };
-		std::string materialName;
-		Texture2D texture;
-		std::string texturePath;
-		
-
-		
-		while (!ss.eof()) {
-
-			while (vtxCheck < nrVtx)
-			{
-				ss >> tempX >> tempY >> tempZ;
-
-				if (element >= nrOfElements) {
-					std::cout << "Last element fount " << std::endl;
-					break;
-				}
-
-				if (std::stringstream(tempX) >> tempFloat && std::stringstream(tempY) >> tempFloat && std::stringstream(tempZ) >> tempFloat) {
-					//std::cout << "TEMP: " << tempX << " : " << tempY << " : " << tempX << std::endl;
-
-					arrayVtx[element] = (float)std::stof(tempX);
-					arrayVtx[element + 1] = (float)std::stof(tempY);
-					arrayVtx[element + 2] = (float)std::stof(tempZ);
-
-					lengthVtxArr = lengthVtxArr + 3;
-					element = element + 3;
-				}
-				vtxCheck++;
-			}
-
-			ss >> nrNorm;
-
-			arrayNorm = new float[nrNorm * 3];
-
-			element = 0;
-
-			while (normCheck < nrNorm)
-			{
-				ss >> tempNormX >> tempNormY >> tempNormZ;
-
-				if (element >= nrOfElements) {
-					std::cout << "Last element fount " << std::endl;
-					break;
-				}
-
-				arrayNorm[element] = (float)std::stof(tempNormX);
-				arrayNorm[element + 1] = (float)std::stof(tempNormY);
-				arrayNorm[element + 2] = (float)std::stof(tempNormZ);
-
-				lengthNormArr = lengthNormArr + 3;
-				element = element + 3;
-
-				normCheck++;
-
-			}
-
-			ss >> nrUV;
-			std::cout << "nrUV: " << nrUV << std::endl;
-			arrayUV = new float[nrUV * 2];
-			element = 0;
-
-			while (UVCheck < nrUV)
-			{
-				std::cout << UVCheck << " UV's" << std::endl;
-				ss >> tempU >> tempV;
-
-				if (element >= nrOfElements) {
-					//std::cout << "Last element fount " << std::endl;
-					break;
-				}
-
-				arrayUV[element] = (float)std::stof(tempU);
-				arrayUV[element + 1] = 1.0f - (float)std::stof(tempV);
-
-				//std::cout << "TEMP U:" << arrayUV[element] << std::endl;
-				//std::cout << "TEMP V:" << arrayUV[element + 1] << std::endl;
-				//std::cout << " " << std::endl;
-
-				lenghtUVArr = lenghtUVArr + 2;
-				element = element + 2;
-				UVCheck++;
-			}
-
-			std::cout << "arrayUV: " << std::endl;
-			//for(int i = 0; i < lenghtUVArr; i++)
-				//std::cout << arrayUV << std::endl;
-
-			//Material stuff
-			ss >> materialName;
-			ss >> colorOrTexture;
-			std::cout << "materialName: " << materialName << std::endl;
-			std::cout << "colorOrTexture: " << colorOrTexture << std::endl;
-			if (colorOrTexture == "color")
-			{
-				ss >> newColor.x >> newColor.y >> newColor.z;
-				std::cout << "´newColor: " << newColor.x << " " << newColor.y << " " << newColor.z << " " << std::endl;
-			}
-			else if (colorOrTexture == "texture") {
-				ss >> texturePath;
-				std::cout << "texturePath: " << texturePath << std::endl;
-			}
-
-
-
-			//check if alreay exists
-			bool exists = false;
-			for (int i = 0; i < *nrMaterials; i++) {
-				if (materialMaya[i].name == materialName) {
-					exists = true;
-					materialMaya.erase(materialMaya.begin() + i);
-
-					if (colorOrTexture == "color")
-					{
-						Color tempColor = { newColor.x * 255, newColor.y * 255, newColor.z * 255, 255 };
-						std::string textureCheck = "noTexture";
-						materialMaya.insert(materialMaya.begin() + i, { textureCheck, tempColor, colorOrTexture, materialName });
-					}
-					else {
-						Color tempColor = { newColor.x * 255, newColor.y * 255, newColor.z * 255, 255 };
-						materialMaya.insert(materialMaya.begin() + i, { texturePath, tempColor, colorOrTexture, materialName });
-					}
-				}
-			}
-
-			if (exists == false)
-			{
-				if (colorOrTexture == "color")
-				{
-					Color tempColor = { newColor.x * 255, newColor.y * 255, newColor.z * 255, 255 };
-					std::string textureCheck = "noTexture";
-					materialMaya.push_back({ textureCheck, tempColor, colorOrTexture, materialName });
-					*nrMaterials = *nrMaterials + 1;
-				}
-				else {
-					Color tempColor = { newColor.x * 255, newColor.y * 255, newColor.z * 255, 255 };
-					materialMaya.push_back({ texturePath, tempColor, colorOrTexture, materialName });
-					*nrMaterials = *nrMaterials + 1;
-				}
-			}
-
-			break;
-		}
-		
-
-		//std::cout << arrayNorm << std::endl;
-		
-
-		bool exists = false;
-		for (int i = 0; i < *nrObjs; i++) {
-			if (objNameArray[i].name == objectName) {
-				exists = true;
-			}
-		}
-
-
-		if (exists == false) {
-
-			Mesh tempMeshToAdd = {};
-			tempMeshToAdd.vertexCount = lengthVtxArr;
-			tempMeshToAdd.vertices = new float[lengthVtxArr];
-			memcpy(tempMeshToAdd.vertices, arrayVtx, sizeof(float) * tempMeshToAdd.vertexCount);
-
-			tempMeshToAdd.normals = new float[lengthNormArr];
-			memcpy(tempMeshToAdd.normals, arrayNorm, sizeof(float) * lengthNormArr);
-
-			tempMeshToAdd.texcoords = new float[lenghtUVArr];
-			memcpy(tempMeshToAdd.texcoords, arrayUV, sizeof(float) * lenghtUVArr);
-
-			rlLoadMesh(&tempMeshToAdd, false);
-
-			Model tempModelToAdd = LoadModelFromMesh(tempMeshToAdd);
-			tempModelToAdd.material.shader = shader1;
-
-			Color tempColor = { newColor.x * 255, newColor.y * 255, newColor.z * 255, 255 };
-
-			std::cout << "colorOrTexture2: " << colorOrTexture << std::endl;
-
-			if (colorOrTexture == "color")
-			{
-				std::cout << "newColor: " << newColor.x << " " << newColor.y << " " << newColor.z << " " << std::endl;
-				objNameArray.push_back({ tempModelToAdd, *index, objectName, MatrixTranslate(0,0,0), tempColor, materialName });
-			}
-			else if (colorOrTexture == "texture")
-			{
-				std::cout << "adding Texture" << std::endl;
-				texture = LoadTexture(texturePath.c_str());
-				tempModelToAdd.material.maps[MAP_DIFFUSE].texture = texture;
-				objNameArray.push_back({ tempModelToAdd, *index, objectName, MatrixTranslate(0,0,0), {255,255,255,255}, materialName });
-			}
-
-
-			*index = *index + 1;
-			*nrObjs = *nrObjs + 1;
-		}
-
-
-		//int lengthString = msgStringForAddMaterial.length() + 1;
-		//cstr = new char[lengthString];
-		//strcpy(cstr, msgStringForAddMaterial.c_str());
-		//std::cout << "cstr:" << cstr << std::endl;
-
-		 
-		if (msgElements != NULL) {
-			delete[] msgElements;
-		}
-		if (arrayVtx != NULL) {
-			delete[] arrayVtx;
-		}
-		if (arrayNorm != NULL) {
-			delete[] arrayNorm;
-		}
-		if (arrayUV != NULL) {
-			delete[] arrayUV;
-		}
-		
-	
-	}
-
-
-	if (msgHeader.nodeType == NODE_TYPE::LIGHT)
-	{
-		std::cout << "============================" << std::endl;
-		std::cout << "ADD LIGHT: " << std::endl;
-
-		char* msgElements = new char[msgHeader.msgSize];
-		memcpy((char*)msgElements, buffer + sizeof(MsgHeader), msgHeader.msgSize);	//copy msg
-
-		// setup stringstream
-		std::string msgString(msgElements, msgHeader.msgSize);
-		std::istringstream ss(msgString);
-
-
-		int check = 0;
-
-		Vector3 posFromString;
-		Vector4 tempLight;
-
-		ss >> posFromString.x >> posFromString.y >> posFromString.z >> tempLight.x >> tempLight.y >> tempLight.z >> tempLight.w;
-
-		//std::cout << "lightPos: " << lightPos[0] << " " << lightPos[1] << " " << lightPos[2] << "lightColor: " << lightColor[0] << " " << lightColor[1] << " " << lightColor[2] << " " << lightColor[3] << std::endl;
-
-		Color tempColor = { tempLight.x * 255, tempLight.y * 255, tempLight.z * 255, tempLight.w * 255 };
-		Vector3 tempPos = { posFromString.x, posFromString.y, posFromString.z };
-
-		lightsFromMaya.erase(lightsFromMaya.begin());
-		lightsFromMaya.insert(lightsFromMaya.begin(), { tempPos, 0.1, tempColor });
-
-		if (msgElements != NULL) {
-			delete[] msgElements;
-		}
-		*/
-	}
-	
-}
-
-void updateNode(std::vector<modelFromMaya>& objNameArray, char* buffer, int bufferSize, Shader shader1, int* nrObjs, int* index, std::vector<lightFromMaya>& lightsFromMaya, std::vector<cameraFromMaya>& cameraFromMaya, std::vector<materialMaya>& materialMaya, int* nrMaterials)
-{
-	// Get elements from buffer
-	MsgHeader msgHeader = {};
-	std::string objectName = "";
-	memcpy((char*)&msgHeader, buffer, sizeof(MsgHeader));
-	objectName = msgHeader.objName;
-	objectName = objectName.substr(0, msgHeader.nameLen);
-
-	//std::cout << "in update and printing cmdType " << msgHeader.cmdType << " " << std::endl;
-	//std::cout << "in update and printing node_TYPE " << msgHeader.nodeType << " " << std::endl;
-
-	if (msgHeader.nodeType == NODE_TYPE::MESH)
-	{
-		std::cout << "============================" << std::endl;
-		std::cout << "UPDATE MODEL: " << std::endl;
-		msgMesh mesh = {};
-
-		memcpy((char*)&mesh, buffer + sizeof(MsgHeader), sizeof(msgMesh));	//mesh struct
-		char* msgElements = new char[msgHeader.msgSize];
-		memcpy((char*)msgElements, buffer + sizeof(MsgHeader) + sizeof(msgMesh), msgHeader.msgSize);	//copy msg
-
-		int nrVtx;
-		int vtxCheck = 0;
-		int nrNorm;
-		int normCheck = 0;
-
-		// setup stringstream
-		std::string msgString(msgElements, msgHeader.msgSize);
-		std::istringstream ss(msgString);
-
-		ss >> nrVtx;
-
-		float* arrayNorm;
-		int lengthNormArr = 0;
-		float* arrayVtx = new float[nrVtx * 3];
-		int lengthVtxArr = 0;
-
-		std::string tempX, tempY, tempZ = "";
-		int element = 0;
-		float tempFloat = 0.0f;
-
-		std::string tempU, tempV = "";
-		int nrUV;
-		int UVCheck = 0;
-		int lenghtUVArr = 0;
-		float* arrayUV;
-
-		int nrOfElements = mesh.trisCount * 3 * 3; //for each tris, add each vtx and then [x,y,z]
-
-		std::string tempNormX, tempNormY, tempNormZ = "";
-
-
-		while (!ss.eof()) {
-
-			while (vtxCheck < nrVtx)
-			{
-				ss >> tempX >> tempY >> tempZ;
-
-				if (element >= nrOfElements) {
-					std::cout << "Last element fount " << std::endl;
-					break;
-				}
-
-				if (std::stringstream(tempX) >> tempFloat && std::stringstream(tempY) >> tempFloat && std::stringstream(tempZ) >> tempFloat) {
-					//std::cout << "TEMP: " << tempX << " : " << tempY << " : " << tempX << std::endl;
-
-					arrayVtx[element] = (float)std::stof(tempX);
-					arrayVtx[element + 1] = (float)std::stof(tempY);
-					arrayVtx[element + 2] = (float)std::stof(tempZ);
-
-					lengthVtxArr = lengthVtxArr + 3;
-					element = element + 3;
-				}
-				vtxCheck++;
-			}
-
-			ss >> nrNorm;
-
-			arrayNorm = new float[nrNorm * 3];
-
-			element = 0;
-
-			while (normCheck < nrNorm)
-			{
-				ss >> tempNormX >> tempNormY >> tempNormZ;
-
-				if (element >= nrOfElements) {
-					std::cout << "Last element fount " << std::endl;
-					break;
-				}
-
-				arrayNorm[element] = (float)std::stof(tempNormX);
-				arrayNorm[element + 1] = (float)std::stof(tempNormY);
-				arrayNorm[element + 2] = (float)std::stof(tempNormZ);
-
-				lengthNormArr = lengthNormArr + 3;
-				element = element + 3;
-
-				normCheck++;
-
-			}
-
-			ss >> nrUV;
-			std::cout << "nrUV: " << nrUV << std::endl;
-			arrayUV = new float[nrUV * 2];
-			element = 0;
-
-			while (UVCheck < nrUV)
-			{
-				std::cout << UVCheck << " UV's" << std::endl;
-				ss >> tempU >> tempV;
-
-				if (element >= nrOfElements) {
-					//std::cout << "Last element fount " << std::endl;
-					break;
-				}
-
-				arrayUV[element] = (float)std::stof(tempU);
-				arrayUV[element + 1] = 1.0f - (float)std::stof(tempV);
-
-				//std::cout << "TEMP U:" << arrayUV[element] << std::endl;
-				//std::cout << "TEMP V:" << arrayUV[element + 1] << std::endl;
-				//std::cout << " " << std::endl;
-
-				lenghtUVArr = lenghtUVArr + 2;
-				element = element + 2;
-				UVCheck++;
-			}
-
-			std::cout << "arrayUV: " << std::endl;
-
-			break;
-
-		}
-
-		for (int i = 0; i < *nrObjs; i++)
-		{
-			if (objNameArray[i].name == objectName)
-			{
-				int tempIndex = objNameArray[i].index;
-
-				Mesh tempMeshToAdd = {};
-				tempMeshToAdd.vertexCount = lengthVtxArr;
-				tempMeshToAdd.vertices = new float[lengthVtxArr];
-				memcpy(tempMeshToAdd.vertices, arrayVtx, sizeof(float) * tempMeshToAdd.vertexCount);
-
-				tempMeshToAdd.normals = new float[lengthNormArr];
-				memcpy(tempMeshToAdd.normals, arrayNorm, sizeof(float) * lengthNormArr);
-
-				tempMeshToAdd.texcoords = new float[lenghtUVArr];
-				memcpy(tempMeshToAdd.texcoords, arrayUV, sizeof(float) * lenghtUVArr);
-
-				rlLoadMesh(&tempMeshToAdd, false);
-
-				Model tempModelToAdd = LoadModelFromMesh(tempMeshToAdd);
-				tempModelToAdd.material.shader = shader1;
-				Color tempColor = objNameArray[i].color;
-				Matrix tempMat = objNameArray[i].modelMatrix;
-				std::string tempMaterialName = objNameArray[i].materialName;
-
-				std::cout << "mtName: " << tempMaterialName << std::endl;
-				objNameArray.erase(objNameArray.begin() + i);
-
-				std::cout << "mtName: " << materialMaya.size() << std::endl;
-				for (int i = 0; i < materialMaya.size(); i++)
-				{
-					std::cout << "materialMaya: " << materialMaya[i].name << std::endl;
-					if (materialMaya[i].name == tempMaterialName)
-					{
-						if (materialMaya[i].ColorOrTexture == "color")
-						{
-							std::cout << "clor: " << std::endl;
-							//objNameArray.insert(objNameArray.begin() + i, { tempModel, tempIndex2, tempName2, newModelMatrix, tempColor, tempMaterialName });
-							tempColor = materialMaya[i].color;
-						}
-						else if (materialMaya[i].ColorOrTexture == "texture")
-						{
-							std::cout << "text: " << std::endl;
-							//std::cout << "texture stuff: " << texture.height << std::endl;
-							Texture2D tempTexture = LoadTexture(materialMaya[i].fileTexuteName.c_str());
-							tempModelToAdd.material.maps[MAP_DIFFUSE].texture = tempTexture;
-							//objNameArray.insert(objNameArray.begin() + i, { tempModel, tempIndex2, tempName2, newModelMatrix, {255,255,255,255}, tempMaterialName });
-						}
-					}
-				}
-
-				objNameArray.insert(objNameArray.begin() + i, { tempModelToAdd, tempIndex, objectName, tempMat, tempColor, tempMaterialName });
-			}
-		}
-
-		if (msgElements != NULL) {
-			delete[] msgElements;
-		}
-		if (arrayVtx != NULL) {
-			delete[] arrayVtx;
-		}
-	}
-
-	if (msgHeader.nodeType == NODE_TYPE::LIGHT)
-	{
-		std::cout << "============================" << std::endl;
-		std::cout << "UPDATE LIGHT: " << std::endl;
-
-		char* msgElements = new char[msgHeader.msgSize];
-		memcpy((char*)msgElements, buffer + sizeof(MsgHeader), msgHeader.msgSize);	//copy msg
-
-		// setup stringstream
-		std::string msgString(msgElements, msgHeader.msgSize);
-		std::istringstream ss(msgString);
-
-		Vector4 lightColor = { 0, 0, 0, 255 };
-
-		ss >> lightColor.x >> lightColor.y >> lightColor.z >> lightColor.w;
-
-		Color tempColor = { lightColor.x * 255, lightColor.y * 255, lightColor.z * 255, lightColor.w * 255 };
-		Vector3 tempPos = lightsFromMaya[0].lightPos;
-
-		lightsFromMaya.erase(lightsFromMaya.begin());
-		lightsFromMaya.insert(lightsFromMaya.begin(), { tempPos, 0.1, tempColor });
-
-		if (msgElements != NULL) {
-			delete[] msgElements;
-		}
-	}
-	if (msgHeader.nodeType == NODE_TYPE::CAMERA)
-	{
-		Vector3 upDir = { 0,0,0 };
-		Vector3 viewDir = { 0,0,0 };
-		Vector3 pos = { 0,0,0 };
-		int type = 0;
-
-		char* msgElements = new char[msgHeader.msgSize];
-		memcpy((char*)msgElements, buffer + sizeof(MsgHeader), msgHeader.msgSize);	//copy msg
-
-		// setup stringstream
-		std::string msgString(msgElements, msgHeader.msgSize);
-		std::istringstream ss(msgString);
-
-		std::string cameraName;
-		ss >> cameraName;
-
-
-		float fov;
-
-		ss >> upDir.x >> upDir.y >> upDir.z >> viewDir.x >> viewDir.y >> viewDir.z >> pos.x >> pos.y >> pos.z >> fov;
-
-		//std::cout << "camer astuff" << upDir.x << " " << upDir.y << " " << upDir.z << " " << viewDir.x << " " << viewDir.y << " " << viewDir.z << " " << pos.x << " " << pos.y << " " << pos.z << " " << fov << std::endl;
-
-		float FieldOfView = 0;
-
-		if (cameraName == "|persp|perspShape") {
-			type = CAMERA_PERSPECTIVE;
-			//std::cout << "perspective" << std::endl;
-			//radians to degrees
-			float degreesFOV = fov * (180.0 / 3.141592653589793238463);
-			FieldOfView = degreesFOV;
-		}
-		else {
-			type = CAMERA_ORTHOGRAPHIC;
-			//std::cout << "orto" << std::endl; 
-			FieldOfView = fov;
-		}
-
-
-		cameraFromMaya.erase(cameraFromMaya.begin());
-		cameraFromMaya.insert(cameraFromMaya.begin(), { upDir, viewDir, pos, type, FieldOfView });
-	}
-
-	//	std::cout << "============================" << std::endl;
-}
-
-void updateNodeMatrix(std::vector<modelFromMaya>& objNameArray, char* buffer, int bufferSize, Shader shader, int* nrObjs, int* index, std::vector<lightFromMaya>& lightsFromMaya, std::vector<cameraFromMaya>& cameraFromMaya, std::vector<materialMaya>& materialMaya, int* nrMaterials)
-{
-	// Get elements from buffer
-	MsgHeader msgHeader = {};
-	std::string objectName = "";
-	memcpy((char*)&msgHeader, buffer, sizeof(MsgHeader));
-	objectName = msgHeader.objName;
-	objectName = objectName.substr(0, msgHeader.nameLen);
-
-	std::cout << "in matrix and printing cmdType " << msgHeader.cmdType << " " << std::endl;
-	std::cout << "in matrix and printing node_TYPE " << msgHeader.nodeType << " " << std::endl;
-
-	if (msgHeader.nodeType == NODE_TYPE::MESH)
-	{
-		std::cout << "============================" << std::endl;
-		std::cout << "UPDATE MATRIX MODEL: " << std::endl;
-		msgMesh mesh = {};
-
-		memcpy((char*)&mesh, buffer + sizeof(MsgHeader), sizeof(msgMesh));	//mesh struct
-
-		char* msgElements = new char[msgHeader.msgSize];
-		memcpy((char*)msgElements, buffer + sizeof(MsgHeader) + sizeof(msgMesh), msgHeader.msgSize);	//copy msg
-
-		// setup stringstream
-		std::string msgString(msgElements, msgHeader.msgSize);
-		std::istringstream ss(msgString);
-
-		Vector4 row1;
-		Vector4 row2;
-		Vector4 row3;
-		Vector4 row4;
-
-		ss >> row1.x >> row1.y >> row1.z >> row1.w >> row2.x >> row2.y >> row2.z >> row2.w >> row3.x >> row3.y >> row3.z >> row3.w >> row4.x >> row4.y >> row4.z >> row4.w;
-
-		Matrix tempMatrix = { row1.x ,row1.y ,row1.z , row1.w ,
-		row2.x ,row2.y ,row2.z ,row2.w ,
-		row3.x ,row3.y ,row3.z , row3.w ,
-		row4.x ,row4.y ,row4.z, row4.w
-		};
-
-		for (int i = 0; i < *nrObjs; i++)
-		{
-			std::cout << "objName: " << objNameArray[i].name << std::endl;
-			std::cout << "tempName: " << objectName << std::endl;
-			if (objNameArray[i].name == objectName)
-			{
-				int tempIndex = objNameArray[i].index;
-				Model tempModel = objNameArray[i].model;
-				int tempIndex2 = objNameArray[i].index;
-				std::string tempName2 = objNameArray[i].name;
-				Matrix newModelMatrix = tempMatrix;
-				Color tempColor = objNameArray[i].color;
-				std::string tempMaterialName = objNameArray[i].materialName;
-
-				objNameArray.erase(objNameArray.begin() + i);
-				objNameArray.insert(objNameArray.begin() + i, { tempModel, tempIndex2, tempName2, newModelMatrix, tempColor, tempMaterialName });
-			}
-		}
-
-		if (msgElements != NULL) {
-			delete[] msgElements;
-		}
-	}
-
-	if (msgHeader.nodeType == NODE_TYPE::LIGHT)
-	{
-		std::cout << "============================" << std::endl;
-		std::cout << "UPDATE LIGHT MATRIX" << std::endl;
-
-		char* msgElements = new char[msgHeader.msgSize];
-		memcpy((char*)msgElements, buffer + sizeof(MsgHeader), msgHeader.msgSize);	//copy msg
-
-		// setup stringstream
-		std::string msgString(msgElements, msgHeader.msgSize);
-		std::istringstream ss(msgString);
-
-		Vector3 lightPos;
-
-		ss >> lightPos.x >> lightPos.y >> lightPos.z;
-
-		std::cout << lightPos.x << " " << lightPos.y << " " << lightPos.z << " " << std::endl;
-
-		Color tempColor = lightsFromMaya[0].color;
-
-		lightsFromMaya.erase(lightsFromMaya.begin());
-		lightsFromMaya.insert(lightsFromMaya.begin(), { lightPos, 0.1, tempColor });
-
-		if (msgElements != NULL) {
-			delete[] msgElements;
-		}
-	}
+	std::cout << std::endl;
 
 }
 
-//ipdate material
-void updateMaterial(std::vector<modelFromMaya>& objNameArray, char* buffer, int bufferSize, Shader shader, int* nrObjs, int* index, std::vector<lightFromMaya>& lightsFromMaya, std::vector<cameraFromMaya>& cameraFromMaya, std::vector<materialMaya>& materialMaya, int* nrMaterials)
-{
-	MsgHeader msgHeader = {};
-	std::string objectName = "";
-	memcpy((char*)&msgHeader, buffer, sizeof(MsgHeader));
-	objectName = msgHeader.objName;
-	objectName = objectName.substr(0, msgHeader.nameLen);
 
-	if (msgHeader.nodeType == NODE_TYPE::MESH)
-	{
-		std::cout << "MATERIAL COLOR UPDATE" << std::endl;
-		msgMesh mesh = {};
+//CMDTYPE recvFromMaya(char* buffer)
+//{
+//
+//	
+//
+//	MsgHeader msgHeader = {};
+//	msgHeader.cmdType = CMDTYPE::DEFAULT;
+//
+//	size_t nr = comLib.nextSize();
+//	size_t oldBuffSize = nr;
+//
+//	char* msgBuff = new char[oldBuffSize];
+//
+//	if (nr > oldBuffSize) {
+//		delete[] msgBuff;
+//		msgBuff = new char[nr];
+//		oldBuffSize = nr;
+//	}
+//
+//	bool receive = comLib.recv(msgBuff, nr);
+//
+//	if (receive == true) {
+//
+//		memcpy((char*)&msgHeader, msgBuff, sizeof(MsgHeader));
+//
+//		char* msg = new char[msgHeader.msgSize];
+//		if (msgHeader.nodeType == NODE_TYPE::MESH) {
+//			
+//
+//			msgMesh mesh = {};
+//
+//			//memcpy((char*)&mesh, msgBuff + sizeof(MsgHeader), sizeof(msgMesh));
+//			//memcpy((char*)msg, msgBuff + sizeof(MsgHeader) + sizeof(msgMesh), msgHeader.msgSize);
+//
+//			memcpy(buffer, msgBuff, sizeof(MsgHeader));		//HEADER FIRST
+//			memcpy(buffer + sizeof(MsgHeader), msgBuff + sizeof(MsgHeader), sizeof(msgMesh));	//MESH STRUCT
+//			//memcpy(buffer + sizeof(MsgHeader) + sizeof(msgMesh), msgBuff + sizeof(MsgHeader) + sizeof(msgMesh), msgHeader.msgSize);		//THE MSG
+//			
+//			memcpy(buffer + sizeof(MsgHeader) + sizeof(msgMesh), msgBuff + sizeof(MsgHeader) + sizeof(msgMesh), sizeof(float) * (mesh.vtxCount * 3));
+//
+//			std::cout << "msgBuff" << std::endl; 
+//			for (unsigned i = 0; i < sizeof(buffer); i++) {
+//				std::cout << msgBuff[i] << std::endl;
+//			}
+//			std::cout << std::endl;
+//		}
+//
+//		else {
+//			memcpy((char*)msg, msgBuff + sizeof(MsgHeader), msgHeader.msgSize);
+//
+//			memcpy(buffer, msgBuff, sizeof(MsgHeader));		//HEADER
+//			memcpy(buffer + sizeof(MsgHeader), msgBuff + sizeof(MsgHeader), msgHeader.msgSize);	//MSG
+//
+//
+//		}
+//
+//		//std::cout << "print msg: " << msg << "_" << std::endl;
+//		if (msg != NULL) {
+//			delete[] msg;
+//		}
+//	}
+//
+//	if (msgBuff != NULL) {
+//		delete[] msgBuff;
+//	}
+//	return msgHeader.cmdType;
+//}
+//
+///////////////////////////
+////					   //
+////		MODEL		   //
+////					   //
+///////////////////////////
+//
+//void addNode(std::vector<modelFromMaya>& objNameArray, char* buffer, int bufferSize, Shader shader1, int* nrObjs, int* index, std::vector<lightFromMaya>& lightsFromMaya, std::vector<cameraFromMaya>& cameraFromMaya, std::vector<materialMaya>& materialMaya, int* nrMaterials)
+//{
+//	std::cout << "ADD" << std::endl;
+//	// Get elements from buffer
+//	MsgHeader msgHeader = {};
+//	std::string objectName = "";
+//	memcpy((char*)&msgHeader, buffer, sizeof(MsgHeader));
+//	objectName = msgHeader.objName;
+//	objectName = objectName.substr(0, msgHeader.nameLen);
+//
+//	std::cout << "in add node and printing cmdType " << msgHeader.cmdType << " " << std::endl;
+//	std::cout << "in add node and printing node_TYPE " << msgHeader.nodeType << " " << std::endl;
+//
+//	if (msgHeader.nodeType == NODE_TYPE::MESH) {
+//		
+//		std::cout << "============================" << std::endl;
+//		std::cout << "ADD MODEL: " << std::endl;
+//		msgMesh mesh = {};
+//
+//		memcpy((char*)&mesh, buffer + sizeof(MsgHeader), sizeof(msgMesh));	//mesh struct
+//
+//		//char* msgElements = new char[msgHeader.msgSize];
+//		//memcpy((char*)msgElements, buffer + sizeof(MsgHeader) + sizeof(msgMesh), msgHeader.msgSize);	//copy msg
+//
+//		float* verticeArray = new float[sizeof(float) * (mesh.vtxCount * 3)];
+//		//memcpy((char*)verticeArray, buffer + sizeof(msgMesh) + sizeof(MsgHeader) , sizeof(float) * (mesh.vtxCount * 3));
+//		memcpy(verticeArray, buffer + sizeof(MsgHeader) + sizeof(msgMesh), sizeof(float) * (mesh.vtxCount * 3));
+//
+//		
+//
+//		std::cout << "mesh trisCount: " << mesh.trisCount << "____" << std::endl;
+//		std::cout << std::endl; 
+//		std::cout << "mesh trisCount: " << mesh.trisCount << "____" << std::endl;
+//		std::cout << std::endl;
+//		
+//		std::cout << "mesh vtx: " << verticeArray[0] << "____" << std::endl;
+//		std::cout << std::endl;
+//
+//		//setup stringstream
+//		//std::string msgString(msgElements, msgHeader.msgSize);
+//		//std::istringstream ss(msgString);
+//
+//		/* 
+//		
+//		//std::cout << "vtxArrTest: " << vtxArrTest << " _ " << std::endl;
+//
+//		int nrOfElements = mesh.trisCount * 3 * 3; //for each tris, add each vtx and then [x,y,z]
+//
+//		int nrVtx;
+//		int vtxCheck = 0;
+//		int nrNorm;
+//		int normCheck = 0;
+//
+//
+//		//ss >> nrVtx;
+//		
+//		float* arrayVtx = new float[nrVtx * 3];
+//		int lengthVtxArr = 0;
+//
+//		std::string tempX, tempY, tempZ = "";
+//		int element = 0;
+//		float tempFloat = 0.0f;
+//
+//		std::string tempNormX, tempNormY, tempNormZ = "";
+//		int lengthNormArr = 0;
+//		float* arrayNorm;
+//
+//		std::string tempU, tempV = "";
+//		int nrUV;
+//		int UVCheck = 0;
+//		int lenghtUVArr = 0;
+//		float* arrayUV;
+//
+//		std::string colorOrTexture;
+//		Vector4 newColor = { 255, 255, 255,255 };
+//		std::string materialName;
+//		Texture2D texture;
+//		std::string texturePath;
+//		
+//
+//		
+//		while (!ss.eof()) {
+//
+//			while (vtxCheck < nrVtx)
+//			{
+//				ss >> tempX >> tempY >> tempZ;
+//
+//				if (element >= nrOfElements) {
+//					std::cout << "Last element fount " << std::endl;
+//					break;
+//				}
+//
+//				if (std::stringstream(tempX) >> tempFloat && std::stringstream(tempY) >> tempFloat && std::stringstream(tempZ) >> tempFloat) {
+//					//std::cout << "TEMP: " << tempX << " : " << tempY << " : " << tempX << std::endl;
+//
+//					arrayVtx[element] = (float)std::stof(tempX);
+//					arrayVtx[element + 1] = (float)std::stof(tempY);
+//					arrayVtx[element + 2] = (float)std::stof(tempZ);
+//
+//					lengthVtxArr = lengthVtxArr + 3;
+//					element = element + 3;
+//				}
+//				vtxCheck++;
+//			}
+//
+//			ss >> nrNorm;
+//
+//			arrayNorm = new float[nrNorm * 3];
+//
+//			element = 0;
+//
+//			while (normCheck < nrNorm)
+//			{
+//				ss >> tempNormX >> tempNormY >> tempNormZ;
+//
+//				if (element >= nrOfElements) {
+//					std::cout << "Last element fount " << std::endl;
+//					break;
+//				}
+//
+//				arrayNorm[element] = (float)std::stof(tempNormX);
+//				arrayNorm[element + 1] = (float)std::stof(tempNormY);
+//				arrayNorm[element + 2] = (float)std::stof(tempNormZ);
+//
+//				lengthNormArr = lengthNormArr + 3;
+//				element = element + 3;
+//
+//				normCheck++;
+//
+//			}
+//
+//			ss >> nrUV;
+//			std::cout << "nrUV: " << nrUV << std::endl;
+//			arrayUV = new float[nrUV * 2];
+//			element = 0;
+//
+//			while (UVCheck < nrUV)
+//			{
+//				std::cout << UVCheck << " UV's" << std::endl;
+//				ss >> tempU >> tempV;
+//
+//				if (element >= nrOfElements) {
+//					//std::cout << "Last element fount " << std::endl;
+//					break;
+//				}
+//
+//				arrayUV[element] = (float)std::stof(tempU);
+//				arrayUV[element + 1] = 1.0f - (float)std::stof(tempV);
+//
+//				//std::cout << "TEMP U:" << arrayUV[element] << std::endl;
+//				//std::cout << "TEMP V:" << arrayUV[element + 1] << std::endl;
+//				//std::cout << " " << std::endl;
+//
+//				lenghtUVArr = lenghtUVArr + 2;
+//				element = element + 2;
+//				UVCheck++;
+//			}
+//
+//			std::cout << "arrayUV: " << std::endl;
+//			//for(int i = 0; i < lenghtUVArr; i++)
+//				//std::cout << arrayUV << std::endl;
+//
+//			//Material stuff
+//			ss >> materialName;
+//			ss >> colorOrTexture;
+//			std::cout << "materialName: " << materialName << std::endl;
+//			std::cout << "colorOrTexture: " << colorOrTexture << std::endl;
+//			if (colorOrTexture == "color")
+//			{
+//				ss >> newColor.x >> newColor.y >> newColor.z;
+//				std::cout << "´newColor: " << newColor.x << " " << newColor.y << " " << newColor.z << " " << std::endl;
+//			}
+//			else if (colorOrTexture == "texture") {
+//				ss >> texturePath;
+//				std::cout << "texturePath: " << texturePath << std::endl;
+//			}
+//
+//
+//
+//			//check if alreay exists
+//			bool exists = false;
+//			for (int i = 0; i < *nrMaterials; i++) {
+//				if (materialMaya[i].name == materialName) {
+//					exists = true;
+//					materialMaya.erase(materialMaya.begin() + i);
+//
+//					if (colorOrTexture == "color")
+//					{
+//						Color tempColor = { newColor.x * 255, newColor.y * 255, newColor.z * 255, 255 };
+//						std::string textureCheck = "noTexture";
+//						materialMaya.insert(materialMaya.begin() + i, { textureCheck, tempColor, colorOrTexture, materialName });
+//					}
+//					else {
+//						Color tempColor = { newColor.x * 255, newColor.y * 255, newColor.z * 255, 255 };
+//						materialMaya.insert(materialMaya.begin() + i, { texturePath, tempColor, colorOrTexture, materialName });
+//					}
+//				}
+//			}
+//
+//			if (exists == false)
+//			{
+//				if (colorOrTexture == "color")
+//				{
+//					Color tempColor = { newColor.x * 255, newColor.y * 255, newColor.z * 255, 255 };
+//					std::string textureCheck = "noTexture";
+//					materialMaya.push_back({ textureCheck, tempColor, colorOrTexture, materialName });
+//					*nrMaterials = *nrMaterials + 1;
+//				}
+//				else {
+//					Color tempColor = { newColor.x * 255, newColor.y * 255, newColor.z * 255, 255 };
+//					materialMaya.push_back({ texturePath, tempColor, colorOrTexture, materialName });
+//					*nrMaterials = *nrMaterials + 1;
+//				}
+//			}
+//
+//			break;
+//		}
+//		
+//
+//		//std::cout << arrayNorm << std::endl;
+//		
+//
+//		bool exists = false;
+//		for (int i = 0; i < *nrObjs; i++) {
+//			if (objNameArray[i].name == objectName) {
+//				exists = true;
+//			}
+//		}
+//
+//
+//		if (exists == false) {
+//
+//			Mesh tempMeshToAdd = {};
+//			tempMeshToAdd.vertexCount = lengthVtxArr;
+//			tempMeshToAdd.vertices = new float[lengthVtxArr];
+//			memcpy(tempMeshToAdd.vertices, arrayVtx, sizeof(float) * tempMeshToAdd.vertexCount);
+//
+//			tempMeshToAdd.normals = new float[lengthNormArr];
+//			memcpy(tempMeshToAdd.normals, arrayNorm, sizeof(float) * lengthNormArr);
+//
+//			tempMeshToAdd.texcoords = new float[lenghtUVArr];
+//			memcpy(tempMeshToAdd.texcoords, arrayUV, sizeof(float) * lenghtUVArr);
+//
+//			rlLoadMesh(&tempMeshToAdd, false);
+//
+//			Model tempModelToAdd = LoadModelFromMesh(tempMeshToAdd);
+//			tempModelToAdd.material.shader = shader1;
+//
+//			Color tempColor = { newColor.x * 255, newColor.y * 255, newColor.z * 255, 255 };
+//
+//			std::cout << "colorOrTexture2: " << colorOrTexture << std::endl;
+//
+//			if (colorOrTexture == "color")
+//			{
+//				std::cout << "newColor: " << newColor.x << " " << newColor.y << " " << newColor.z << " " << std::endl;
+//				objNameArray.push_back({ tempModelToAdd, *index, objectName, MatrixTranslate(0,0,0), tempColor, materialName });
+//			}
+//			else if (colorOrTexture == "texture")
+//			{
+//				std::cout << "adding Texture" << std::endl;
+//				texture = LoadTexture(texturePath.c_str());
+//				tempModelToAdd.material.maps[MAP_DIFFUSE].texture = texture;
+//				objNameArray.push_back({ tempModelToAdd, *index, objectName, MatrixTranslate(0,0,0), {255,255,255,255}, materialName });
+//			}
+//
+//
+//			*index = *index + 1;
+//			*nrObjs = *nrObjs + 1;
+//		}
+//
+//
+//		//int lengthString = msgStringForAddMaterial.length() + 1;
+//		//cstr = new char[lengthString];
+//		//strcpy(cstr, msgStringForAddMaterial.c_str());
+//		//std::cout << "cstr:" << cstr << std::endl;
+//
+//		 
+//		if (msgElements != NULL) {
+//			delete[] msgElements;
+//		}
+//		if (arrayVtx != NULL) {
+//			delete[] arrayVtx;
+//		}
+//		if (arrayNorm != NULL) {
+//			delete[] arrayNorm;
+//		}
+//		if (arrayUV != NULL) {
+//			delete[] arrayUV;
+//		}
+//		
+//	
+//	}
+//
+//
+//	if (msgHeader.nodeType == NODE_TYPE::LIGHT)
+//	{
+//		std::cout << "============================" << std::endl;
+//		std::cout << "ADD LIGHT: " << std::endl;
+//
+//		char* msgElements = new char[msgHeader.msgSize];
+//		memcpy((char*)msgElements, buffer + sizeof(MsgHeader), msgHeader.msgSize);	//copy msg
+//
+//		// setup stringstream
+//		std::string msgString(msgElements, msgHeader.msgSize);
+//		std::istringstream ss(msgString);
+//
+//
+//		int check = 0;
+//
+//		Vector3 posFromString;
+//		Vector4 tempLight;
+//
+//		ss >> posFromString.x >> posFromString.y >> posFromString.z >> tempLight.x >> tempLight.y >> tempLight.z >> tempLight.w;
+//
+//		//std::cout << "lightPos: " << lightPos[0] << " " << lightPos[1] << " " << lightPos[2] << "lightColor: " << lightColor[0] << " " << lightColor[1] << " " << lightColor[2] << " " << lightColor[3] << std::endl;
+//
+//		Color tempColor = { tempLight.x * 255, tempLight.y * 255, tempLight.z * 255, tempLight.w * 255 };
+//		Vector3 tempPos = { posFromString.x, posFromString.y, posFromString.z };
+//
+//		lightsFromMaya.erase(lightsFromMaya.begin());
+//		lightsFromMaya.insert(lightsFromMaya.begin(), { tempPos, 0.1, tempColor });
+//
+//		if (msgElements != NULL) {
+//			delete[] msgElements;
+//		}
+//		*/
+//	}
+//	
+//}
+//
+//void updateNode(std::vector<modelFromMaya>& objNameArray, char* buffer, int bufferSize, Shader shader1, int* nrObjs, int* index, std::vector<lightFromMaya>& lightsFromMaya, std::vector<cameraFromMaya>& cameraFromMaya, std::vector<materialMaya>& materialMaya, int* nrMaterials)
+//{
+//	// Get elements from buffer
+//	MsgHeader msgHeader = {};
+//	std::string objectName = "";
+//	memcpy((char*)&msgHeader, buffer, sizeof(MsgHeader));
+//	objectName = msgHeader.objName;
+//	objectName = objectName.substr(0, msgHeader.nameLen);
+//
+//	//std::cout << "in update and printing cmdType " << msgHeader.cmdType << " " << std::endl;
+//	//std::cout << "in update and printing node_TYPE " << msgHeader.nodeType << " " << std::endl;
+//
+//	if (msgHeader.nodeType == NODE_TYPE::MESH)
+//	{
+//		std::cout << "============================" << std::endl;
+//		std::cout << "UPDATE MODEL: " << std::endl;
+//		msgMesh mesh = {};
+//
+//		memcpy((char*)&mesh, buffer + sizeof(MsgHeader), sizeof(msgMesh));	//mesh struct
+//		char* msgElements = new char[msgHeader.msgSize];
+//		memcpy((char*)msgElements, buffer + sizeof(MsgHeader) + sizeof(msgMesh), msgHeader.msgSize);	//copy msg
+//
+//		int nrVtx;
+//		int vtxCheck = 0;
+//		int nrNorm;
+//		int normCheck = 0;
+//
+//		// setup stringstream
+//		std::string msgString(msgElements, msgHeader.msgSize);
+//		std::istringstream ss(msgString);
+//
+//		ss >> nrVtx;
+//
+//		float* arrayNorm;
+//		int lengthNormArr = 0;
+//		float* arrayVtx = new float[nrVtx * 3];
+//		int lengthVtxArr = 0;
+//
+//		std::string tempX, tempY, tempZ = "";
+//		int element = 0;
+//		float tempFloat = 0.0f;
+//
+//		std::string tempU, tempV = "";
+//		int nrUV;
+//		int UVCheck = 0;
+//		int lenghtUVArr = 0;
+//		float* arrayUV;
+//
+//		int nrOfElements = mesh.trisCount * 3 * 3; //for each tris, add each vtx and then [x,y,z]
+//
+//		std::string tempNormX, tempNormY, tempNormZ = "";
+//
+//
+//		while (!ss.eof()) {
+//
+//			while (vtxCheck < nrVtx)
+//			{
+//				ss >> tempX >> tempY >> tempZ;
+//
+//				if (element >= nrOfElements) {
+//					std::cout << "Last element fount " << std::endl;
+//					break;
+//				}
+//
+//				if (std::stringstream(tempX) >> tempFloat && std::stringstream(tempY) >> tempFloat && std::stringstream(tempZ) >> tempFloat) {
+//					//std::cout << "TEMP: " << tempX << " : " << tempY << " : " << tempX << std::endl;
+//
+//					arrayVtx[element] = (float)std::stof(tempX);
+//					arrayVtx[element + 1] = (float)std::stof(tempY);
+//					arrayVtx[element + 2] = (float)std::stof(tempZ);
+//
+//					lengthVtxArr = lengthVtxArr + 3;
+//					element = element + 3;
+//				}
+//				vtxCheck++;
+//			}
+//
+//			ss >> nrNorm;
+//
+//			arrayNorm = new float[nrNorm * 3];
+//
+//			element = 0;
+//
+//			while (normCheck < nrNorm)
+//			{
+//				ss >> tempNormX >> tempNormY >> tempNormZ;
+//
+//				if (element >= nrOfElements) {
+//					std::cout << "Last element fount " << std::endl;
+//					break;
+//				}
+//
+//				arrayNorm[element] = (float)std::stof(tempNormX);
+//				arrayNorm[element + 1] = (float)std::stof(tempNormY);
+//				arrayNorm[element + 2] = (float)std::stof(tempNormZ);
+//
+//				lengthNormArr = lengthNormArr + 3;
+//				element = element + 3;
+//
+//				normCheck++;
+//
+//			}
+//
+//			ss >> nrUV;
+//			std::cout << "nrUV: " << nrUV << std::endl;
+//			arrayUV = new float[nrUV * 2];
+//			element = 0;
+//
+//			while (UVCheck < nrUV)
+//			{
+//				std::cout << UVCheck << " UV's" << std::endl;
+//				ss >> tempU >> tempV;
+//
+//				if (element >= nrOfElements) {
+//					//std::cout << "Last element fount " << std::endl;
+//					break;
+//				}
+//
+//				arrayUV[element] = (float)std::stof(tempU);
+//				arrayUV[element + 1] = 1.0f - (float)std::stof(tempV);
+//
+//				//std::cout << "TEMP U:" << arrayUV[element] << std::endl;
+//				//std::cout << "TEMP V:" << arrayUV[element + 1] << std::endl;
+//				//std::cout << " " << std::endl;
+//
+//				lenghtUVArr = lenghtUVArr + 2;
+//				element = element + 2;
+//				UVCheck++;
+//			}
+//
+//			std::cout << "arrayUV: " << std::endl;
+//
+//			break;
+//
+//		}
+//
+//		for (int i = 0; i < *nrObjs; i++)
+//		{
+//			if (objNameArray[i].name == objectName)
+//			{
+//				int tempIndex = objNameArray[i].index;
+//
+//				Mesh tempMeshToAdd = {};
+//				tempMeshToAdd.vertexCount = lengthVtxArr;
+//				tempMeshToAdd.vertices = new float[lengthVtxArr];
+//				memcpy(tempMeshToAdd.vertices, arrayVtx, sizeof(float) * tempMeshToAdd.vertexCount);
+//
+//				tempMeshToAdd.normals = new float[lengthNormArr];
+//				memcpy(tempMeshToAdd.normals, arrayNorm, sizeof(float) * lengthNormArr);
+//
+//				tempMeshToAdd.texcoords = new float[lenghtUVArr];
+//				memcpy(tempMeshToAdd.texcoords, arrayUV, sizeof(float) * lenghtUVArr);
+//
+//				rlLoadMesh(&tempMeshToAdd, false);
+//
+//				Model tempModelToAdd = LoadModelFromMesh(tempMeshToAdd);
+//				tempModelToAdd.material.shader = shader1;
+//				Color tempColor = objNameArray[i].color;
+//				Matrix tempMat = objNameArray[i].modelMatrix;
+//				std::string tempMaterialName = objNameArray[i].materialName;
+//
+//				std::cout << "mtName: " << tempMaterialName << std::endl;
+//				objNameArray.erase(objNameArray.begin() + i);
+//
+//				std::cout << "mtName: " << materialMaya.size() << std::endl;
+//				for (int i = 0; i < materialMaya.size(); i++)
+//				{
+//					std::cout << "materialMaya: " << materialMaya[i].name << std::endl;
+//					if (materialMaya[i].name == tempMaterialName)
+//					{
+//						if (materialMaya[i].ColorOrTexture == "color")
+//						{
+//							std::cout << "clor: " << std::endl;
+//							//objNameArray.insert(objNameArray.begin() + i, { tempModel, tempIndex2, tempName2, newModelMatrix, tempColor, tempMaterialName });
+//							tempColor = materialMaya[i].color;
+//						}
+//						else if (materialMaya[i].ColorOrTexture == "texture")
+//						{
+//							std::cout << "text: " << std::endl;
+//							//std::cout << "texture stuff: " << texture.height << std::endl;
+//							Texture2D tempTexture = LoadTexture(materialMaya[i].fileTexuteName.c_str());
+//							tempModelToAdd.material.maps[MAP_DIFFUSE].texture = tempTexture;
+//							//objNameArray.insert(objNameArray.begin() + i, { tempModel, tempIndex2, tempName2, newModelMatrix, {255,255,255,255}, tempMaterialName });
+//						}
+//					}
+//				}
+//
+//				objNameArray.insert(objNameArray.begin() + i, { tempModelToAdd, tempIndex, objectName, tempMat, tempColor, tempMaterialName });
+//			}
+//		}
+//
+//		if (msgElements != NULL) {
+//			delete[] msgElements;
+//		}
+//		if (arrayVtx != NULL) {
+//			delete[] arrayVtx;
+//		}
+//	}
+//
+//	if (msgHeader.nodeType == NODE_TYPE::LIGHT)
+//	{
+//		std::cout << "============================" << std::endl;
+//		std::cout << "UPDATE LIGHT: " << std::endl;
+//
+//		char* msgElements = new char[msgHeader.msgSize];
+//		memcpy((char*)msgElements, buffer + sizeof(MsgHeader), msgHeader.msgSize);	//copy msg
+//
+//		// setup stringstream
+//		std::string msgString(msgElements, msgHeader.msgSize);
+//		std::istringstream ss(msgString);
+//
+//		Vector4 lightColor = { 0, 0, 0, 255 };
+//
+//		ss >> lightColor.x >> lightColor.y >> lightColor.z >> lightColor.w;
+//
+//		Color tempColor = { lightColor.x * 255, lightColor.y * 255, lightColor.z * 255, lightColor.w * 255 };
+//		Vector3 tempPos = lightsFromMaya[0].lightPos;
+//
+//		lightsFromMaya.erase(lightsFromMaya.begin());
+//		lightsFromMaya.insert(lightsFromMaya.begin(), { tempPos, 0.1, tempColor });
+//
+//		if (msgElements != NULL) {
+//			delete[] msgElements;
+//		}
+//	}
+//	if (msgHeader.nodeType == NODE_TYPE::CAMERA)
+//	{
+//		Vector3 upDir = { 0,0,0 };
+//		Vector3 viewDir = { 0,0,0 };
+//		Vector3 pos = { 0,0,0 };
+//		int type = 0;
+//
+//		char* msgElements = new char[msgHeader.msgSize];
+//		memcpy((char*)msgElements, buffer + sizeof(MsgHeader), msgHeader.msgSize);	//copy msg
+//
+//		// setup stringstream
+//		std::string msgString(msgElements, msgHeader.msgSize);
+//		std::istringstream ss(msgString);
+//
+//		std::string cameraName;
+//		ss >> cameraName;
+//
+//
+//		float fov;
+//
+//		ss >> upDir.x >> upDir.y >> upDir.z >> viewDir.x >> viewDir.y >> viewDir.z >> pos.x >> pos.y >> pos.z >> fov;
+//
+//		//std::cout << "camer astuff" << upDir.x << " " << upDir.y << " " << upDir.z << " " << viewDir.x << " " << viewDir.y << " " << viewDir.z << " " << pos.x << " " << pos.y << " " << pos.z << " " << fov << std::endl;
+//
+//		float FieldOfView = 0;
+//
+//		if (cameraName == "|persp|perspShape") {
+//			type = CAMERA_PERSPECTIVE;
+//			//std::cout << "perspective" << std::endl;
+//			//radians to degrees
+//			float degreesFOV = fov * (180.0 / 3.141592653589793238463);
+//			FieldOfView = degreesFOV;
+//		}
+//		else {
+//			type = CAMERA_ORTHOGRAPHIC;
+//			//std::cout << "orto" << std::endl; 
+//			FieldOfView = fov;
+//		}
+//
+//
+//		cameraFromMaya.erase(cameraFromMaya.begin());
+//		cameraFromMaya.insert(cameraFromMaya.begin(), { upDir, viewDir, pos, type, FieldOfView });
+//	}
+//
+//	//	std::cout << "============================" << std::endl;
+//}
+//
+//void updateNodeMatrix(std::vector<modelFromMaya>& objNameArray, char* buffer, int bufferSize, Shader shader, int* nrObjs, int* index, std::vector<lightFromMaya>& lightsFromMaya, std::vector<cameraFromMaya>& cameraFromMaya, std::vector<materialMaya>& materialMaya, int* nrMaterials)
+//{
+//	// Get elements from buffer
+//	MsgHeader msgHeader = {};
+//	std::string objectName = "";
+//	memcpy((char*)&msgHeader, buffer, sizeof(MsgHeader));
+//	objectName = msgHeader.objName;
+//	objectName = objectName.substr(0, msgHeader.nameLen);
+//
+//	std::cout << "in matrix and printing cmdType " << msgHeader.cmdType << " " << std::endl;
+//	std::cout << "in matrix and printing node_TYPE " << msgHeader.nodeType << " " << std::endl;
+//
+//	if (msgHeader.nodeType == NODE_TYPE::MESH)
+//	{
+//		std::cout << "============================" << std::endl;
+//		std::cout << "UPDATE MATRIX MODEL: " << std::endl;
+//		msgMesh mesh = {};
+//
+//		memcpy((char*)&mesh, buffer + sizeof(MsgHeader), sizeof(msgMesh));	//mesh struct
+//
+//		char* msgElements = new char[msgHeader.msgSize];
+//		memcpy((char*)msgElements, buffer + sizeof(MsgHeader) + sizeof(msgMesh), msgHeader.msgSize);	//copy msg
+//
+//		// setup stringstream
+//		std::string msgString(msgElements, msgHeader.msgSize);
+//		std::istringstream ss(msgString);
+//
+//		Vector4 row1;
+//		Vector4 row2;
+//		Vector4 row3;
+//		Vector4 row4;
+//
+//		ss >> row1.x >> row1.y >> row1.z >> row1.w >> row2.x >> row2.y >> row2.z >> row2.w >> row3.x >> row3.y >> row3.z >> row3.w >> row4.x >> row4.y >> row4.z >> row4.w;
+//
+//		Matrix tempMatrix = { row1.x ,row1.y ,row1.z , row1.w ,
+//		row2.x ,row2.y ,row2.z ,row2.w ,
+//		row3.x ,row3.y ,row3.z , row3.w ,
+//		row4.x ,row4.y ,row4.z, row4.w
+//		};
+//
+//		for (int i = 0; i < *nrObjs; i++)
+//		{
+//			std::cout << "objName: " << objNameArray[i].name << std::endl;
+//			std::cout << "tempName: " << objectName << std::endl;
+//			if (objNameArray[i].name == objectName)
+//			{
+//				int tempIndex = objNameArray[i].index;
+//				Model tempModel = objNameArray[i].model;
+//				int tempIndex2 = objNameArray[i].index;
+//				std::string tempName2 = objNameArray[i].name;
+//				Matrix newModelMatrix = tempMatrix;
+//				Color tempColor = objNameArray[i].color;
+//				std::string tempMaterialName = objNameArray[i].materialName;
+//
+//				objNameArray.erase(objNameArray.begin() + i);
+//				objNameArray.insert(objNameArray.begin() + i, { tempModel, tempIndex2, tempName2, newModelMatrix, tempColor, tempMaterialName });
+//			}
+//		}
+//
+//		if (msgElements != NULL) {
+//			delete[] msgElements;
+//		}
+//	}
+//
+//	if (msgHeader.nodeType == NODE_TYPE::LIGHT)
+//	{
+//		std::cout << "============================" << std::endl;
+//		std::cout << "UPDATE LIGHT MATRIX" << std::endl;
+//
+//		char* msgElements = new char[msgHeader.msgSize];
+//		memcpy((char*)msgElements, buffer + sizeof(MsgHeader), msgHeader.msgSize);	//copy msg
+//
+//		// setup stringstream
+//		std::string msgString(msgElements, msgHeader.msgSize);
+//		std::istringstream ss(msgString);
+//
+//		Vector3 lightPos;
+//
+//		ss >> lightPos.x >> lightPos.y >> lightPos.z;
+//
+//		std::cout << lightPos.x << " " << lightPos.y << " " << lightPos.z << " " << std::endl;
+//
+//		Color tempColor = lightsFromMaya[0].color;
+//
+//		lightsFromMaya.erase(lightsFromMaya.begin());
+//		lightsFromMaya.insert(lightsFromMaya.begin(), { lightPos, 0.1, tempColor });
+//
+//		if (msgElements != NULL) {
+//			delete[] msgElements;
+//		}
+//	}
+//
+//}
+//
+////ipdate material
+//void updateMaterial(std::vector<modelFromMaya>& objNameArray, char* buffer, int bufferSize, Shader shader, int* nrObjs, int* index, std::vector<lightFromMaya>& lightsFromMaya, std::vector<cameraFromMaya>& cameraFromMaya, std::vector<materialMaya>& materialMaya, int* nrMaterials)
+//{
+//	MsgHeader msgHeader = {};
+//	std::string objectName = "";
+//	memcpy((char*)&msgHeader, buffer, sizeof(MsgHeader));
+//	objectName = msgHeader.objName;
+//	objectName = objectName.substr(0, msgHeader.nameLen);
+//
+//	if (msgHeader.nodeType == NODE_TYPE::MESH)
+//	{
+//		std::cout << "MATERIAL COLOR UPDATE" << std::endl;
+//		msgMesh mesh = {};
+//
+//		memcpy((char*)&mesh, buffer + sizeof(MsgHeader), sizeof(msgMesh));	//mesh struct
+//
+//		char* msgElements = new char[msgHeader.msgSize];
+//		memcpy((char*)msgElements, buffer + sizeof(MsgHeader) + sizeof(msgMesh), msgHeader.msgSize);	//copy msg
+//
+//		// setup stringstream
+//		std::string msgString(msgElements, msgHeader.msgSize);
+//		std::istringstream ss(msgString);
+//
+//		std::string matieralName;
+//		ss >> matieralName;
+//
+//		std::cout << "matName from buffer: " << matieralName << std::endl;
+//
+//		Texture2D texture;
+//		std::string colorOrTexture;
+//		ss >> colorOrTexture;
+//
+//		Vector4 lightColor = { 255,255,255,255 };
+//		std::string texturePath;
+//
+//		if (colorOrTexture == "color")
+//		{
+//			std::cout << "is color" << std::endl;
+//
+//			ss >> lightColor.x >> lightColor.y >> lightColor.z;
+//			//std::cout << "tempColor: " << lightColor[0] << ", " << lightColor[1] << ", " << lightColor[2] << std::endl;
+//		}
+//		else if (colorOrTexture == "texture")
+//		{
+//			std::cout << "is texture" << std::endl;
+//			ss >> texturePath;
+//			std::cout << "texture: " << texturePath << std::endl;
+//			texture = LoadTexture(texturePath.c_str());
+//		}
+//
+//		for (int i = 0; i < *nrMaterials; i++) {
+//			if (materialMaya[i].name == matieralName) {
+//
+//				materialMaya.erase(materialMaya.begin() + i);
+//
+//				if (colorOrTexture == "color")
+//				{
+//					Color tempColor = { lightColor.x * 255, lightColor.y * 255, lightColor.z * 255, 255 };
+//					std::string textureCheck = "noTexture";
+//					materialMaya.insert(materialMaya.begin() + i, { textureCheck, tempColor, colorOrTexture, matieralName });
+//				}
+//				else {
+//					Color tempColor = { lightColor.x * 255, lightColor.y * 255, lightColor.z * 255, 255 };
+//					materialMaya.insert(materialMaya.begin() + i, { texturePath, tempColor, colorOrTexture, matieralName });
+//				}
+//			}
+//			else {
+//				if (colorOrTexture == "color")
+//				{
+//					Color tempColor = { lightColor.x * 255, lightColor.y * 255, lightColor.z * 255, 255 };
+//					std::string textureCheck = "noTexture";
+//					materialMaya.push_back({ textureCheck, tempColor, colorOrTexture, matieralName });
+//					*nrMaterials = *nrMaterials + 1;
+//				}
+//				else {
+//					Color tempColor = { lightColor.x * 255, lightColor.y * 255, lightColor.z * 255, 255 };
+//					materialMaya.push_back({ texturePath, tempColor, colorOrTexture, matieralName });
+//					*nrMaterials = *nrMaterials + 1;
+//				}
+//			}
+//		}
+//
+//		for (int i = 0; i < *nrObjs; i++)
+//		{
+//			if (objNameArray[i].materialName == matieralName)
+//			{
+//				std::cout << "matName " << objNameArray[i].materialName << std::endl;
+//
+//				int tempIndex = objNameArray[i].index;
+//				Model tempModel = objNameArray[i].model;
+//				int tempIndex2 = objNameArray[i].index;
+//				std::string tempName2 = objNameArray[i].name;
+//				Matrix newModelMatrix = objNameArray[i].modelMatrix;
+//				Color tempColor = { lightColor.x * 255, lightColor.y * 255, lightColor.z * 255, 255 };
+//				std::string tempMaterialName = objNameArray[i].materialName;
+//
+//				objNameArray.erase(objNameArray.begin() + i);
+//
+//				if (colorOrTexture == "color")
+//				{
+//					objNameArray.insert(objNameArray.begin() + i, { tempModel, tempIndex2, tempName2, newModelMatrix, tempColor, tempMaterialName });
+//				}
+//				else if (colorOrTexture == "texture")
+//				{
+//					std::cout << "texture stuff: " << texture.height << std::endl;
+//					tempModel.material.maps[MAP_DIFFUSE].texture = texture;
+//					objNameArray.insert(objNameArray.begin() + i, { tempModel, tempIndex2, tempName2, newModelMatrix, {255,255,255,255}, tempMaterialName });
+//				}
+//			}
+//		}
+//
+//		if (msgElements != NULL) {
+//			delete[] msgElements;
+//		}
+//	}
+//}
+//
+////addMaterial
+//void updateMaterialName(std::vector<modelFromMaya>& objNameArray, char* buffer, int bufferSize, Shader shader, int* nrObjs, int* index, std::vector<lightFromMaya>& lightsFromMaya, std::vector<cameraFromMaya>& cameraFromMaya, std::vector<materialMaya>& materialMaya, int* nrMaterials)
+//{
+//	MsgHeader msgHeader = {};
+//	std::string objectName = "";
+//	memcpy((char*)&msgHeader, buffer, sizeof(MsgHeader));
+//	objectName = msgHeader.objName;
+//	objectName = objectName.substr(0, msgHeader.nameLen);
+//
+//	if (msgHeader.nodeType == NODE_TYPE::MESH)
+//	{
+//		std::cout << "MATERIAL" << std::endl;
+//		std::cout << "meshName: " << objectName << std::endl;
+//		msgMesh mesh = {};
+//
+//		memcpy((char*)&mesh, buffer + sizeof(MsgHeader), sizeof(msgMesh));	//mesh struct
+//
+//		char* msgElements = new char[msgHeader.msgSize];
+//		memcpy((char*)msgElements, buffer + sizeof(MsgHeader) + sizeof(msgMesh), msgHeader.msgSize);	//copy msg
+//
+//		// setup stringstream
+//		std::string msgString(msgElements, msgHeader.msgSize);
+//		std::istringstream ss(msgString);
+//
+//		std::cout << "msgString: " << msgString << "__________________________" << std::endl;
+//
+//		std::string materialName;
+//		ss >> materialName;
+//
+//		std::cout << "mat name: " << materialName << std::endl;
+//
+//		Color newColor = { 255, 255, 255,255 };
+//		Texture2D texture;
+//		std::string colorOrTexture;
+//		ss >> colorOrTexture;
+//
+//		std::cout << "colorOrTexture: " << colorOrTexture << std::endl;
+//		Vector4 lightColor = { 255,255,255,255 };
+//		std::string texturePath;
+//
+//		if (colorOrTexture == "color")
+//		{
+//
+//			std::cout << "is color" << std::endl;
+//
+//			ss >> lightColor.x >> lightColor.y >> lightColor.z;
+//			//std::cout << "tempColor: " << lightColor[0] << ", " << lightColor[1] << ", " << lightColor[2] << std::endl; 
+//
+//		}
+//		else if (colorOrTexture == "texture")
+//		{
+//			std::cout << "is texture" << std::endl;
+//			ss >> texturePath;
+//			std::cout << "texture: " << texturePath << std::endl;
+//			texture = LoadTexture(texturePath.c_str());
+//		}
+//
+//		bool exists = false;
+//		for (int i = 0; i < *nrMaterials; i++) {
+//			if (materialMaya[i].name == materialName) {
+//				exists = true;
+//				materialMaya.erase(materialMaya.begin() + i);
+//
+//				if (colorOrTexture == "color")
+//				{
+//					Color tempColor = { lightColor.x * 255, lightColor.y * 255, lightColor.z * 255, 255 };
+//					std::string textureCheck = "noTexture";
+//					materialMaya.insert(materialMaya.begin() + i, { textureCheck, tempColor, colorOrTexture, materialName });
+//				}
+//				else {
+//					Color tempColor = { lightColor.x * 255, lightColor.y * 255, lightColor.z * 255, 255 };
+//					materialMaya.insert(materialMaya.begin() + i, { texturePath, tempColor, colorOrTexture, materialName });
+//				}
+//			}
+//		}
+//
+//
+//		if (exists == false)
+//		{
+//			if (colorOrTexture == "color")
+//			{
+//				Color tempColor = { lightColor.x * 255, lightColor.y * 255, lightColor.z * 255, 255 };
+//				std::string textureCheck = "noTexture";
+//				materialMaya.push_back({ textureCheck, tempColor, colorOrTexture, materialName });
+//				*nrMaterials = *nrMaterials + 1;
+//			}
+//			else {
+//				Color tempColor = { lightColor.x * 255, lightColor.y * 255, lightColor.z * 255, 255 };
+//				materialMaya.push_back({ texturePath, tempColor, colorOrTexture, materialName });
+//				*nrMaterials = *nrMaterials + 1;
+//			}
+//		}
+//
+//		for (int i = 0; i < *nrObjs; i++)
+//		{
+//			if (objNameArray[i].name == objectName)
+//			{
+//				int tempIndex = objNameArray[i].index;
+//				Model tempModel = objNameArray[i].model;
+//				int tempIndex2 = objNameArray[i].index;
+//				std::string tempName2 = objNameArray[i].name;
+//				Matrix newModelMatrix = objNameArray[i].modelMatrix;
+//				Color tempColor = { lightColor.x * 255, lightColor.y * 255, lightColor.z * 255, 255 };
+//				std::string tempMaterialName = materialName;
+//
+//				std::cout << "matName: " << materialName << std::endl;
+//
+//				objNameArray.erase(objNameArray.begin() + i);
+//
+//				if (colorOrTexture == "color")
+//				{
+//					objNameArray.insert(objNameArray.begin() + i, { tempModel, tempIndex2, tempName2, newModelMatrix, tempColor, tempMaterialName });
+//					std::cout << "tempColor: " << tempColor.r << ", " << tempColor.g << ", " << tempColor.b << std::endl;
+//				}
+//				else if (colorOrTexture == "texture")
+//				{
+//					std::cout << "texture stuff: " << texture.height << std::endl;
+//					tempModel.material.maps[MAP_DIFFUSE].texture = texture;
+//					objNameArray.insert(objNameArray.begin() + i, { tempModel, tempIndex2, tempName2, newModelMatrix, {255,255,255,255}, tempMaterialName });
+//				}
+//			}
+//		}
+//
+//		if (msgElements != NULL) {
+//			delete[] msgElements;
+//		}
+//	}
+//}
+//
+//void updateNodeName(std::vector<modelFromMaya>& objNameArray, char* buffer, int bufferSize, Shader shader, int* nrObjs, int* index, std::vector<lightFromMaya>& lightsFromMaya, std::vector<cameraFromMaya>& cameraFromMaya, std::vector<materialMaya>& materialMaya, int* nrMaterials)
+//{
+//	// Get elements from buffer
+//	MsgHeader msgHeader = {};
+//	std::string objectName = "";
+//	memcpy((char*)&msgHeader, buffer, sizeof(MsgHeader));
+//	objectName = msgHeader.objName;
+//	objectName = objectName.substr(0, msgHeader.nameLen);
+//
+//	std::cout << "oldName: " << objectName << "_" << std::endl;
+//
+//	if (msgHeader.nodeType == NODE_TYPE::MESH)
+//	{
+//		std::cout << "============================" << std::endl;
+//		std::cout << "UPDATE NAME MODEL: " << std::endl;
+//		msgMesh mesh = {};
+//
+//		memcpy((char*)&mesh, buffer + sizeof(MsgHeader), sizeof(msgMesh));	//mesh struct
+//		char* msgElements = new char[msgHeader.msgSize];
+//		memcpy((char*)msgElements, buffer + sizeof(MsgHeader) + sizeof(msgMesh), msgHeader.msgSize);	//copy msg
+//
+//		// setup stringstream
+//		std::string msgString(msgElements, msgHeader.msgSize);
+//		std::istringstream ss(msgString);
+//
+//		std::string newName = "";
+//
+//		ss >> newName;
+//		newName = newName.substr(0, newName.length() - 1);
+//
+//
+//		std::cout << "newName: " << newName << "_" << std::endl;
+//
+//		for (int i = 0; i < *nrObjs; i++)
+//		{
+//			if (objNameArray[i].name == objectName)
+//			{
+//				int tempIndex = objNameArray[i].index;
+//				Model tempModel = objNameArray[i].model;
+//				Matrix tempMatrix = objNameArray[i].modelMatrix;
+//				Color tempColor = objNameArray[i].color;
+//				std::string tempMaterialName = objNameArray[i].materialName;
+//
+//				objNameArray.erase(objNameArray.begin() + i);
+//				objNameArray.insert(objNameArray.begin() + i, { tempModel, tempIndex, newName, tempMatrix, tempColor, tempMaterialName });
+//			}
+//		}
+//
+//		if (msgElements != NULL) {
+//			delete[] msgElements;
+//		}
+//	}
+//}
+//
+//
+//
 
-		memcpy((char*)&mesh, buffer + sizeof(MsgHeader), sizeof(msgMesh));	//mesh struct
-
-		char* msgElements = new char[msgHeader.msgSize];
-		memcpy((char*)msgElements, buffer + sizeof(MsgHeader) + sizeof(msgMesh), msgHeader.msgSize);	//copy msg
-
-		// setup stringstream
-		std::string msgString(msgElements, msgHeader.msgSize);
-		std::istringstream ss(msgString);
-
-		std::string matieralName;
-		ss >> matieralName;
-
-		std::cout << "matName from buffer: " << matieralName << std::endl;
-
-		Texture2D texture;
-		std::string colorOrTexture;
-		ss >> colorOrTexture;
-
-		Vector4 lightColor = { 255,255,255,255 };
-		std::string texturePath;
-
-		if (colorOrTexture == "color")
-		{
-			std::cout << "is color" << std::endl;
-
-			ss >> lightColor.x >> lightColor.y >> lightColor.z;
-			//std::cout << "tempColor: " << lightColor[0] << ", " << lightColor[1] << ", " << lightColor[2] << std::endl;
-		}
-		else if (colorOrTexture == "texture")
-		{
-			std::cout << "is texture" << std::endl;
-			ss >> texturePath;
-			std::cout << "texture: " << texturePath << std::endl;
-			texture = LoadTexture(texturePath.c_str());
-		}
-
-		for (int i = 0; i < *nrMaterials; i++) {
-			if (materialMaya[i].name == matieralName) {
-
-				materialMaya.erase(materialMaya.begin() + i);
-
-				if (colorOrTexture == "color")
-				{
-					Color tempColor = { lightColor.x * 255, lightColor.y * 255, lightColor.z * 255, 255 };
-					std::string textureCheck = "noTexture";
-					materialMaya.insert(materialMaya.begin() + i, { textureCheck, tempColor, colorOrTexture, matieralName });
-				}
-				else {
-					Color tempColor = { lightColor.x * 255, lightColor.y * 255, lightColor.z * 255, 255 };
-					materialMaya.insert(materialMaya.begin() + i, { texturePath, tempColor, colorOrTexture, matieralName });
-				}
-			}
-			else {
-				if (colorOrTexture == "color")
-				{
-					Color tempColor = { lightColor.x * 255, lightColor.y * 255, lightColor.z * 255, 255 };
-					std::string textureCheck = "noTexture";
-					materialMaya.push_back({ textureCheck, tempColor, colorOrTexture, matieralName });
-					*nrMaterials = *nrMaterials + 1;
-				}
-				else {
-					Color tempColor = { lightColor.x * 255, lightColor.y * 255, lightColor.z * 255, 255 };
-					materialMaya.push_back({ texturePath, tempColor, colorOrTexture, matieralName });
-					*nrMaterials = *nrMaterials + 1;
-				}
-			}
-		}
-
-		for (int i = 0; i < *nrObjs; i++)
-		{
-			if (objNameArray[i].materialName == matieralName)
-			{
-				std::cout << "matName " << objNameArray[i].materialName << std::endl;
-
-				int tempIndex = objNameArray[i].index;
-				Model tempModel = objNameArray[i].model;
-				int tempIndex2 = objNameArray[i].index;
-				std::string tempName2 = objNameArray[i].name;
-				Matrix newModelMatrix = objNameArray[i].modelMatrix;
-				Color tempColor = { lightColor.x * 255, lightColor.y * 255, lightColor.z * 255, 255 };
-				std::string tempMaterialName = objNameArray[i].materialName;
-
-				objNameArray.erase(objNameArray.begin() + i);
-
-				if (colorOrTexture == "color")
-				{
-					objNameArray.insert(objNameArray.begin() + i, { tempModel, tempIndex2, tempName2, newModelMatrix, tempColor, tempMaterialName });
-				}
-				else if (colorOrTexture == "texture")
-				{
-					std::cout << "texture stuff: " << texture.height << std::endl;
-					tempModel.material.maps[MAP_DIFFUSE].texture = texture;
-					objNameArray.insert(objNameArray.begin() + i, { tempModel, tempIndex2, tempName2, newModelMatrix, {255,255,255,255}, tempMaterialName });
-				}
-			}
-		}
-
-		if (msgElements != NULL) {
-			delete[] msgElements;
-		}
-	}
-}
-
-//addMaterial
-void updateMaterialName(std::vector<modelFromMaya>& objNameArray, char* buffer, int bufferSize, Shader shader, int* nrObjs, int* index, std::vector<lightFromMaya>& lightsFromMaya, std::vector<cameraFromMaya>& cameraFromMaya, std::vector<materialMaya>& materialMaya, int* nrMaterials)
-{
-	MsgHeader msgHeader = {};
-	std::string objectName = "";
-	memcpy((char*)&msgHeader, buffer, sizeof(MsgHeader));
-	objectName = msgHeader.objName;
-	objectName = objectName.substr(0, msgHeader.nameLen);
-
-	if (msgHeader.nodeType == NODE_TYPE::MESH)
-	{
-		std::cout << "MATERIAL" << std::endl;
-		std::cout << "meshName: " << objectName << std::endl;
-		msgMesh mesh = {};
-
-		memcpy((char*)&mesh, buffer + sizeof(MsgHeader), sizeof(msgMesh));	//mesh struct
-
-		char* msgElements = new char[msgHeader.msgSize];
-		memcpy((char*)msgElements, buffer + sizeof(MsgHeader) + sizeof(msgMesh), msgHeader.msgSize);	//copy msg
-
-		// setup stringstream
-		std::string msgString(msgElements, msgHeader.msgSize);
-		std::istringstream ss(msgString);
-
-		std::cout << "msgString: " << msgString << "__________________________" << std::endl;
-
-		std::string materialName;
-		ss >> materialName;
-
-		std::cout << "mat name: " << materialName << std::endl;
-
-		Color newColor = { 255, 255, 255,255 };
-		Texture2D texture;
-		std::string colorOrTexture;
-		ss >> colorOrTexture;
-
-		std::cout << "colorOrTexture: " << colorOrTexture << std::endl;
-		Vector4 lightColor = { 255,255,255,255 };
-		std::string texturePath;
-
-		if (colorOrTexture == "color")
-		{
-
-			std::cout << "is color" << std::endl;
-
-			ss >> lightColor.x >> lightColor.y >> lightColor.z;
-			//std::cout << "tempColor: " << lightColor[0] << ", " << lightColor[1] << ", " << lightColor[2] << std::endl; 
-
-		}
-		else if (colorOrTexture == "texture")
-		{
-			std::cout << "is texture" << std::endl;
-			ss >> texturePath;
-			std::cout << "texture: " << texturePath << std::endl;
-			texture = LoadTexture(texturePath.c_str());
-		}
-
-		bool exists = false;
-		for (int i = 0; i < *nrMaterials; i++) {
-			if (materialMaya[i].name == materialName) {
-				exists = true;
-				materialMaya.erase(materialMaya.begin() + i);
-
-				if (colorOrTexture == "color")
-				{
-					Color tempColor = { lightColor.x * 255, lightColor.y * 255, lightColor.z * 255, 255 };
-					std::string textureCheck = "noTexture";
-					materialMaya.insert(materialMaya.begin() + i, { textureCheck, tempColor, colorOrTexture, materialName });
-				}
-				else {
-					Color tempColor = { lightColor.x * 255, lightColor.y * 255, lightColor.z * 255, 255 };
-					materialMaya.insert(materialMaya.begin() + i, { texturePath, tempColor, colorOrTexture, materialName });
-				}
-			}
-		}
 
 
-		if (exists == false)
-		{
-			if (colorOrTexture == "color")
-			{
-				Color tempColor = { lightColor.x * 255, lightColor.y * 255, lightColor.z * 255, 255 };
-				std::string textureCheck = "noTexture";
-				materialMaya.push_back({ textureCheck, tempColor, colorOrTexture, materialName });
-				*nrMaterials = *nrMaterials + 1;
-			}
-			else {
-				Color tempColor = { lightColor.x * 255, lightColor.y * 255, lightColor.z * 255, 255 };
-				materialMaya.push_back({ texturePath, tempColor, colorOrTexture, materialName });
-				*nrMaterials = *nrMaterials + 1;
-			}
-		}
-
-		for (int i = 0; i < *nrObjs; i++)
-		{
-			if (objNameArray[i].name == objectName)
-			{
-				int tempIndex = objNameArray[i].index;
-				Model tempModel = objNameArray[i].model;
-				int tempIndex2 = objNameArray[i].index;
-				std::string tempName2 = objNameArray[i].name;
-				Matrix newModelMatrix = objNameArray[i].modelMatrix;
-				Color tempColor = { lightColor.x * 255, lightColor.y * 255, lightColor.z * 255, 255 };
-				std::string tempMaterialName = materialName;
-
-				std::cout << "matName: " << materialName << std::endl;
-
-				objNameArray.erase(objNameArray.begin() + i);
-
-				if (colorOrTexture == "color")
-				{
-					objNameArray.insert(objNameArray.begin() + i, { tempModel, tempIndex2, tempName2, newModelMatrix, tempColor, tempMaterialName });
-					std::cout << "tempColor: " << tempColor.r << ", " << tempColor.g << ", " << tempColor.b << std::endl;
-				}
-				else if (colorOrTexture == "texture")
-				{
-					std::cout << "texture stuff: " << texture.height << std::endl;
-					tempModel.material.maps[MAP_DIFFUSE].texture = texture;
-					objNameArray.insert(objNameArray.begin() + i, { tempModel, tempIndex2, tempName2, newModelMatrix, {255,255,255,255}, tempMaterialName });
-				}
-			}
-		}
-
-		if (msgElements != NULL) {
-			delete[] msgElements;
-		}
-	}
-}
-
-void updateNodeName(std::vector<modelFromMaya>& objNameArray, char* buffer, int bufferSize, Shader shader, int* nrObjs, int* index, std::vector<lightFromMaya>& lightsFromMaya, std::vector<cameraFromMaya>& cameraFromMaya, std::vector<materialMaya>& materialMaya, int* nrMaterials)
-{
-	// Get elements from buffer
-	MsgHeader msgHeader = {};
-	std::string objectName = "";
-	memcpy((char*)&msgHeader, buffer, sizeof(MsgHeader));
-	objectName = msgHeader.objName;
-	objectName = objectName.substr(0, msgHeader.nameLen);
-
-	std::cout << "oldName: " << objectName << "_" << std::endl;
-
-	if (msgHeader.nodeType == NODE_TYPE::MESH)
-	{
-		std::cout << "============================" << std::endl;
-		std::cout << "UPDATE NAME MODEL: " << std::endl;
-		msgMesh mesh = {};
-
-		memcpy((char*)&mesh, buffer + sizeof(MsgHeader), sizeof(msgMesh));	//mesh struct
-		char* msgElements = new char[msgHeader.msgSize];
-		memcpy((char*)msgElements, buffer + sizeof(MsgHeader) + sizeof(msgMesh), msgHeader.msgSize);	//copy msg
-
-		// setup stringstream
-		std::string msgString(msgElements, msgHeader.msgSize);
-		std::istringstream ss(msgString);
-
-		std::string newName = "";
-
-		ss >> newName;
-		newName = newName.substr(0, newName.length() - 1);
 
 
-		std::cout << "newName: " << newName << "_" << std::endl;
 
-		for (int i = 0; i < *nrObjs; i++)
-		{
-			if (objNameArray[i].name == objectName)
-			{
-				int tempIndex = objNameArray[i].index;
-				Model tempModel = objNameArray[i].model;
-				Matrix tempMatrix = objNameArray[i].modelMatrix;
-				Color tempColor = objNameArray[i].color;
-				std::string tempMaterialName = objNameArray[i].materialName;
 
-				objNameArray.erase(objNameArray.begin() + i);
-				objNameArray.insert(objNameArray.begin() + i, { tempModel, tempIndex, newName, tempMatrix, tempColor, tempMaterialName });
-			}
-		}
 
-		if (msgElements != NULL) {
-			delete[] msgElements;
-		}
-	}
-}
+
+
+
 
 
 
 // OLD CODE
+
 ///////////////////////////
 ////					   //
 ////		LIGHT		   //
