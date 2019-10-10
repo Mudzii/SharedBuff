@@ -914,6 +914,7 @@ void vtxPlugConnected(MPlug & srcPlug, MPlug & destPlug, bool made, void* client
 					memcpy((char*)msg + sizeof(MsgHeader) + sizeof(Mesh) + (sizeof(float) * sortedVtxArray.length() * 3) + (sizeof(float) * sortedNormals.length() * 3), meshUVs, sortedUVs.length() * 2);
 
 
+
 					//send it
 					if (comLib.send(msg, totalMsgSize)) {
 						MStreamUtils::stdOutStream() << "vtxPlugConnected: Message sent" << "\n";
