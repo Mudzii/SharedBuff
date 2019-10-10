@@ -796,10 +796,12 @@ void vtxPlugConnected(MPlug & srcPlug, MPlug & destPlug, bool made, void* client
 				// get triangles
 				MIntArray trisCount;
 				MIntArray trisVtxIndex;
+
 				mesh.getTriangles(trisCount, trisVtxIndex);
+				size_t nrOfFaces = trisCount.length();
 
-				size_t nrOfTris = trisCount.length();
-
+				MStreamUtils::stdOutStream() << "nrOfFaces " << nrOfFaces << "\n";
+				/* 
 				// NORMALS ============
 				MFloatVectorArray normalArray;
 				mesh.getNormals(normalArray, MSpace::kWorld);
@@ -807,11 +809,11 @@ void vtxPlugConnected(MPlug & srcPlug, MPlug & destPlug, bool made, void* client
 				//get IDs per face
 				MIntArray normalIds;
 				MIntArray tempNormalIds;
-				for (int faceCnt = 0; faceCnt < nrOfTris; faceCnt++) {
+				for (int faceCnt = 0; faceCnt < nrOfFaces; faceCnt++) {
 					mesh.getFaceNormalIds(faceCnt, tempNormalIds);
 					normalIds.append(tempNormalIds[0]);
 				}
-				
+				*/
 
 
 
