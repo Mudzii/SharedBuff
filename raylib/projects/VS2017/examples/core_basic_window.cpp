@@ -13,7 +13,7 @@
 #include <functional>
 
 #include <Windows.h>
-ComLib ourComLib("buffer2", 50, CONSUMER);
+ComLib ourComLib("shaderMemory", 50, CONSUMER);
 
 enum NODE_TYPE {
 	TRANSFORM,
@@ -81,6 +81,8 @@ struct MsgHeader {
 struct msgMesh {
 	int vtxCount;
 	int trisCount;
+	int normalCount;
+	int UVcount;
 };
 
 
@@ -291,6 +293,9 @@ int main()
 
 CMDTYPE recvFromMaya(char* buffer)
 {
+
+	
+
 	MsgHeader msgHeader = {};
 	msgHeader.cmdType = CMDTYPE::DEFAULT;
 
@@ -312,19 +317,25 @@ CMDTYPE recvFromMaya(char* buffer)
 		memcpy((char*)&msgHeader, msgBuff, sizeof(MsgHeader));
 
 		char* msg = new char[msgHeader.msgSize];
-
 		if (msgHeader.nodeType == NODE_TYPE::MESH) {
+			
 
 			msgMesh mesh = {};
 
-			memcpy((char*)&mesh, msgBuff + sizeof(MsgHeader), sizeof(msgMesh));
-			memcpy((char*)msg, msgBuff + sizeof(MsgHeader) + sizeof(msgMesh), msgHeader.msgSize);
-
+			//memcpy((char*)&mesh, msgBuff + sizeof(MsgHeader), sizeof(msgMesh));
+			//memcpy((char*)msg, msgBuff + sizeof(MsgHeader) + sizeof(msgMesh), msgHeader.msgSize);
 
 			memcpy(buffer, msgBuff, sizeof(MsgHeader));		//HEADER FIRST
 			memcpy(buffer + sizeof(MsgHeader), msgBuff + sizeof(MsgHeader), sizeof(msgMesh));	//MESH STRUCT
-			memcpy(buffer + sizeof(MsgHeader) + sizeof(msgMesh), msgBuff + sizeof(MsgHeader) + sizeof(msgMesh), msgHeader.msgSize);		//THE MSG
+			//memcpy(buffer + sizeof(MsgHeader) + sizeof(msgMesh), msgBuff + sizeof(MsgHeader) + sizeof(msgMesh), msgHeader.msgSize);		//THE MSG
+			
+			memcpy(buffer + sizeof(MsgHeader) + sizeof(msgMesh), msgBuff + sizeof(MsgHeader) + sizeof(msgMesh), sizeof(float) * (mesh.vtxCount * 3));
 
+			std::cout << "msgBuff" << std::endl; 
+			for (unsigned i = 0; i < sizeof(buffer); i++) {
+				std::cout << msgBuff[i] << std::endl;
+			}
+			std::cout << std::endl;
 		}
 
 		else {
@@ -367,8 +378,8 @@ void addNode(std::vector<modelFromMaya>& objNameArray, char* buffer, int bufferS
 	std::cout << "in add node and printing cmdType " << msgHeader.cmdType << " " << std::endl;
 	std::cout << "in add node and printing node_TYPE " << msgHeader.nodeType << " " << std::endl;
 
-	if (msgHeader.nodeType == NODE_TYPE::MESH)
-	{
+	if (msgHeader.nodeType == NODE_TYPE::MESH) {
+		
 		std::cout << "============================" << std::endl;
 		std::cout << "ADD MODEL: " << std::endl;
 		msgMesh mesh = {};
@@ -378,8 +389,9 @@ void addNode(std::vector<modelFromMaya>& objNameArray, char* buffer, int bufferS
 		//char* msgElements = new char[msgHeader.msgSize];
 		//memcpy((char*)msgElements, buffer + sizeof(MsgHeader) + sizeof(msgMesh), msgHeader.msgSize);	//copy msg
 
-		char* verticeArray = new char[sizeof(char) * mesh.vtxCount * 3];
-		memcpy((char*)verticeArray, buffer + sizeof(msgMesh) + sizeof(MsgHeader) , sizeof(char) * mesh.vtxCount * 3);
+		float* verticeArray = new float[sizeof(float) * (mesh.vtxCount * 3)];
+		//memcpy((char*)verticeArray, buffer + sizeof(msgMesh) + sizeof(MsgHeader) , sizeof(float) * (mesh.vtxCount * 3));
+		memcpy(verticeArray, buffer + sizeof(MsgHeader) + sizeof(msgMesh), sizeof(float) * (mesh.vtxCount * 3));
 
 		
 
@@ -388,20 +400,17 @@ void addNode(std::vector<modelFromMaya>& objNameArray, char* buffer, int bufferS
 		std::cout << "mesh trisCount: " << mesh.trisCount << "____" << std::endl;
 		std::cout << std::endl;
 		
-		for (int x = 0; x < mesh.vtxCount * 3; x++) {
-			std::cout << "ARR: " << verticeArray[x] << std::endl;
-		}
+		std::cout << "mesh vtx: " << verticeArray[0] << "____" << std::endl;
+		std::cout << std::endl;
 
-		// setup stringstream
+		//setup stringstream
 		//std::string msgString(msgElements, msgHeader.msgSize);
 		//std::istringstream ss(msgString);
 
-
-
+		/* 
 		
 		//std::cout << "vtxArrTest: " << vtxArrTest << " _ " << std::endl;
 
-		/* 
 		int nrOfElements = mesh.trisCount * 3 * 3; //for each tris, add each vtx and then [x,y,z]
 
 		int nrVtx;
@@ -436,9 +445,6 @@ void addNode(std::vector<modelFromMaya>& objNameArray, char* buffer, int bufferS
 		std::string texturePath;
 		
 
-		*/
-
-		/* 
 		
 		while (!ss.eof()) {
 
@@ -648,7 +654,7 @@ void addNode(std::vector<modelFromMaya>& objNameArray, char* buffer, int bufferS
 		if (arrayUV != NULL) {
 			delete[] arrayUV;
 		}
-		*/
+		
 	
 	}
 
@@ -684,7 +690,7 @@ void addNode(std::vector<modelFromMaya>& objNameArray, char* buffer, int bufferS
 		if (msgElements != NULL) {
 			delete[] msgElements;
 		}
-
+		*/
 	}
 	
 }

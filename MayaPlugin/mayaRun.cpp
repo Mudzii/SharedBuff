@@ -9,28 +9,38 @@
 #include <C:\Users\Mudzi\source\repos\SharedBuff\shared\Project1\ComLib.h>
 #pragma comment(lib, "Project1.lib")
 
-ComLib ourComLib("buffer2", 50, PRODUCER);
+ComLib comLib("shaderMemory", 50, PRODUCER);
 
 using namespace std;
-MCallbackIdArray callbackIdArray;
 MObject m_node;
 MStatus status = MS::kSuccess;
+MCallbackIdArray callbackIdArray;
 bool initBool = false;
 
+
+// Structs and ENUMs =========================================
+
+// NODE TYPE for what kind of node that is sent
 enum NODE_TYPE {
-	TRANSFORM, MESH, LIGHT,
+	TRANSFORM,
+	MESH,
+	LIGHT,
 	CAMERA
 };
+
+// what kind of command is sent
 enum CMDTYPE {
-	DEFAULT = 1000,
-	NEW_NODE = 1001,
-	UPDATE_NODE = 1002,
-	UPDATE_MATRIX = 1003,
-	UPDATE_NAME = 1004,
-	UPDATE_MATERIAL = 1005,
+	DEFAULT				= 1000,
+	NEW_NODE			= 1001,
+	UPDATE_NODE			= 1002,
+	UPDATE_MATRIX		= 1003,
+	UPDATE_NAME			= 1004,
+	UPDATE_MATERIAL		= 1005,
 	UPDATE_MATERIALNAME = 1006
 
 };
+
+// header for message
 struct MsgHeader {
 	CMDTYPE	  cmdType;
 	NODE_TYPE nodeType;
@@ -39,21 +49,26 @@ struct MsgHeader {
 	int nameLen;
 };
 
+//mesh struch
 struct Mesh {
 	int vtxCount;
 	int trisCount;
+	int normalCount; 
+	int UVcount; 
 };
 
 
-MTimer gTimer;
-float globalTime = 0;
+// ===========================================================
 
-// keep track of created meshes to maintain them
-queue<MObject> newMeshes;
-queue<MObject> newLights;
+MTimer gTimer;
+float globalTime = 0.0f;
+
+// keep track of created meshes/ lights to maintain them
+queue<MObject> meshQueue;
+queue<MObject> lightQueue;
 
 string oldContent = "";
-string oldName = "";
+string oldName	  = "";
 
 bool sendMsg(CMDTYPE msgType, NODE_TYPE nodeT, int nrOfElements, int trisCount, std::string objName, std::string &msgString) {
 
@@ -85,7 +100,7 @@ bool sendMsg(CMDTYPE msgType, NODE_TYPE nodeT, int nrOfElements, int trisCount, 
 		memcpy((char*)msg + sizeof(MsgHeader) + sizeof(Mesh), msgString.c_str(), msgHeader.msgSize);
 
 		//send it
-		sent = ourComLib.send(msg, totalMsgSize);
+		sent = comLib.send(msg, totalMsgSize);
 		delete[]msg;
 
 	}
@@ -99,7 +114,7 @@ bool sendMsg(CMDTYPE msgType, NODE_TYPE nodeT, int nrOfElements, int trisCount, 
 		memcpy((char*)msg, &msgHeader, sizeof(MsgHeader));
 		memcpy((char*)msg + sizeof(MsgHeader), msgString.c_str(), msgHeader.msgSize);
 
-		sent = ourComLib.send(msg, totalMsgSize);
+		sent = comLib.send(msg, totalMsgSize);
 		// =========================== 
 		delete[]msg;
 	}
@@ -111,7 +126,7 @@ bool sendMsg(CMDTYPE msgType, NODE_TYPE nodeT, int nrOfElements, int trisCount, 
 
 }
 
-//sending (CLEAN)
+//sending 
 void nodeLightAttributeChanged(MNodeMessage::AttributeMessage msg, MPlug &plug, MPlug &otherPlug, void* x)
 {
 	//only supports one light
@@ -136,11 +151,11 @@ void nodeLightAttributeChanged(MNodeMessage::AttributeMessage msg, MPlug &plug, 
 		msgToSend = true;
 
 	if (msgToSend) {
-		sendMsg(CMDTYPE::UPDATE_NODE, NODE_TYPE::LIGHT, 0, 0, "light", msgString);
+		//sendMsg(CMDTYPE::UPDATE_NODE, NODE_TYPE::LIGHT, 0, 0, "light", msgString);
 	}
 }
 
-//sending (CLEAN)
+//sending 
 void activeCamera(const MString &panelName, void* cliendData) {
 
 	MStatus status;
@@ -205,12 +220,12 @@ void activeCamera(const MString &panelName, void* cliendData) {
 			msgToSend = true;
 
 		if (msgToSend) {
-			sendMsg(CMDTYPE::UPDATE_NODE, NODE_TYPE::CAMERA, 0, 0, objName, msgString);
+			//sendMsg(CMDTYPE::UPDATE_NODE, NODE_TYPE::CAMERA, 0, 0, objName, msgString);
 		}
 	}
 }
 
-//sending (CLEAN)
+//sending 
 void nodeTextureAttributeChanged(MNodeMessage::AttributeMessage msg, MPlug &plug, MPlug &otherPlug, void* x)
 {
 	MObject textureObj(plug.node());
@@ -246,7 +261,7 @@ void nodeTextureAttributeChanged(MNodeMessage::AttributeMessage msg, MPlug &plug
 				if (materialString.length() > 0)
 					msgToSend = true;
 				if (msgToSend) {
-					sendMsg(CMDTYPE::UPDATE_MATERIAL, NODE_TYPE::MESH, materialString.length(), 0, "noObjName", materialString);
+					//sendMsg(CMDTYPE::UPDATE_MATERIAL, NODE_TYPE::MESH, materialString.length(), 0, "noObjName", materialString);
 				}
 
 			}
@@ -254,7 +269,7 @@ void nodeTextureAttributeChanged(MNodeMessage::AttributeMessage msg, MPlug &plug
 	}
 }
 
-//sending (CLEAN)
+//sending 
 void nodeMaterialAttributeChanged(MNodeMessage::AttributeMessage msg, MPlug &plug, MPlug &otherPlug, void* x)
 {
 	MObject lamObj(plug.node());
@@ -309,13 +324,13 @@ void nodeMaterialAttributeChanged(MNodeMessage::AttributeMessage msg, MPlug &plu
 				msgToSend = true;
 
 			if (msgToSend) {
-				sendMsg(CMDTYPE::UPDATE_MATERIAL, NODE_TYPE::MESH, colors.length(), 0, "noObjName", colors);
+				//sendMsg(CMDTYPE::UPDATE_MATERIAL, NODE_TYPE::MESH, colors.length(), 0, "noObjName", colors);
 			}
 		}
 	}
 }
 
-//sending (CLEAN)
+//sending 
 void nodeAttributeChanged(MNodeMessage::AttributeMessage msg, MPlug &plug, MPlug &otherPlug, void* x)
 {
 	MDagPath path;
@@ -478,13 +493,13 @@ void nodeAttributeChanged(MNodeMessage::AttributeMessage msg, MPlug &plug, MPlug
 			msgToSend = true;
 
 		if (msgToSend) {
-			sendMsg(CMDTYPE::UPDATE_NODE, NODE_TYPE::MESH, nrElements, totalTrisCount, objName, masterTransformString);
+			//sendMsg(CMDTYPE::UPDATE_NODE, NODE_TYPE::MESH, nrElements, totalTrisCount, objName, masterTransformString);
 		}
 	}
 
 }
 
-//sending (CLEAN)
+//sending 
 void nodeNameChangedMaterial(MObject &node, const MString &str, void*clientData) {
 
 	// Get the new name of the node, and use it from now on.
@@ -500,11 +515,11 @@ void nodeNameChangedMaterial(MObject &node, const MString &str, void*clientData)
 		msgToSend = true;
 
 	if (msgToSend) {
-		sendMsg(CMDTYPE::UPDATE_NAME, NODE_TYPE::MESH, 0, 0, objName, msgString);
+		//sendMsg(CMDTYPE::UPDATE_NAME, NODE_TYPE::MESH, 0, 0, objName, msgString);
 	}
 }
 
-//sending (CLEAN)
+//sending 
 void nodeWorldMatrixChanged(MObject &node, MDagMessage::MatrixModifiedFlags &modified, void *clientData)
 {
 
@@ -557,12 +572,12 @@ void nodeWorldMatrixChanged(MObject &node, MDagMessage::MatrixModifiedFlags &mod
 			msgToSend = true;
 
 		if (msgToSend) {
-			sendMsg(CMDTYPE::UPDATE_MATRIX, NODE_TYPE::MESH, 0, 0, objName, msgString);
+			//sendMsg(CMDTYPE::UPDATE_MATRIX, NODE_TYPE::MESH, 0, 0, objName, msgString);
 		}
 	}
 }
 
-//sending (CLEAN)
+//sending 
 void nodeWorldMatrixChangedLight(MObject &node, MDagMessage::MatrixModifiedFlags &modified, void *clientData)
 {
 	MDagPath path;
@@ -589,12 +604,12 @@ void nodeWorldMatrixChangedLight(MObject &node, MDagMessage::MatrixModifiedFlags
 			msgToSend = true;
 
 		if (msgToSend) {
-			sendMsg(CMDTYPE::UPDATE_MATRIX, NODE_TYPE::LIGHT, 0, 0, objName, msgString);
+			//sendMsg(CMDTYPE::UPDATE_MATRIX, NODE_TYPE::LIGHT, 0, 0, objName, msgString);
 		}
 	}
 }
 
-//sending 2/2 (CLEAN)
+//sending 
 void meshConnectionChanged(MPlug &plug, MPlug &otherPlug, bool made, void *clientData)
 {
 	MDagPath path;
@@ -682,7 +697,7 @@ void meshConnectionChanged(MPlug &plug, MPlug &otherPlug, bool made, void *clien
 									msgToSend = true;
 
 								if (msgToSend) {
-									sendMsg(CMDTYPE::UPDATE_MATERIALNAME, NODE_TYPE::MESH, materialString.length(), 0, mesh.name().asChar(), materialString);
+									//sendMsg(CMDTYPE::UPDATE_MATERIALNAME, NODE_TYPE::MESH, materialString.length(), 0, mesh.name().asChar(), materialString);
 								}
 
 							}
@@ -717,7 +732,7 @@ void meshConnectionChanged(MPlug &plug, MPlug &otherPlug, bool made, void *clien
 							msgToSend = true;
 
 						if (msgToSend) {
-							sendMsg(CMDTYPE::UPDATE_MATERIALNAME, NODE_TYPE::MESH, colors.length(), 0, mesh.name().asChar(), colors);
+							//sendMsg(CMDTYPE::UPDATE_MATERIALNAME, NODE_TYPE::MESH, colors.length(), 0, mesh.name().asChar(), colors);
 						}
 
 					}
@@ -727,41 +742,74 @@ void meshConnectionChanged(MPlug &plug, MPlug &otherPlug, bool made, void *clien
 	}
 }
 
-//sending (CLEAN)
-void vtxPlugConnected(MPlug & srcPlug, MPlug & destPlug, bool made, void* clientData)
-{
-	//if statement checking if it's a new connection is made or broken
-	if (srcPlug.partialName() == "out" && destPlug.partialName() == "i")
-	{
-		//if made
-		if (made == true)
-		{
+// Callback function when a vtx connection is made to the dependency graph (such as triangulated, topology is changed, a new mesh is added)
+void vtxPlugConnected(MPlug & srcPlug, MPlug & destPlug, bool made, void* clientData) {
+
+	//if statement checking if it's otpit mesh that has been connected 
+	if (srcPlug.partialName() == "out" && destPlug.partialName() == "i") {
+		//if connection made
+		if (made == true) {
+
+			//mesh struct used to add variables
+			Mesh meshInfo; 
+
+			MStreamUtils::stdOutStream() <<"\n";
+			MStreamUtils::stdOutStream() << "Connection made " << "\n";
+
+			// Get mesh through dag path
 			MDagPath path;
 			MFnDagNode(destPlug.node()).getPath(path);
 			MFnMesh mesh(path);
 
-			//check if triangulated or not
+
+			//check if mesh is triangulated or not
 			MPlugArray plugArray;
 			destPlug.connectedTo(plugArray, true, true);
 			std::string name = plugArray[0].name().asChar();
 
-			MStatus result = MS::kFailure;
 			bool triangulated = false;
+			MStatus result = MS::kFailure;
 			std::string polyTriStringCheck = "polyTriangulate";
-			if (name.find(polyTriStringCheck) == std::string::npos)
-			{
+
+			if (plugArray[0].name() == "polyTriangulate1.output") {
+				MStreamUtils::stdOutStream() << "TRIANGULATED \n";
+
+			}
+
+			else {
+				MStreamUtils::stdOutStream() << "NOT TRIANGULATED \n";
+				result = MGlobal::executeCommand("polyTriangulate " + mesh.name(), true, true);
+				triangulated = true;
+			}
+
+			/* 
+			if (name.find(polyTriStringCheck) == std::string::npos)	{
 				//if not triangulate mesh
 				result = MGlobal::executeCommand("polyTriangulate " + mesh.name(), true, true);
 				triangulated = true;
 			}
+
 			else {
 				triangulated = true;
 				result = MS::kSuccess;
 			}
+			*/
+			
 
+
+
+			
 			//when triangulated do all the things
-			if (result == MS::kSuccess)
-			{
+			
+
+			// OLD CODE
+			/* 
+			if (result == MS::kSuccess) {
+
+				//get object name to send
+				std::string objName = mesh.name().asChar();
+
+
 				//////////////////////////
 				//						//
 				//			VTX			//
@@ -810,22 +858,44 @@ void vtxPlugConnected(MPlug & srcPlug, MPlug & destPlug, bool made, void* client
 					vtxByTriangleSorted.append(vtxArrayMessy[triVertsIndex[i]]);
 				}
 
+
 				//old variables DELETE
 				int totalTrisCount = triCount.length() * 2;
 
-				//get object name to send
-				std::string objName = mesh.name().asChar();
 
+				int vtxCount = vtxByTriangleSorted.length();
+				
 				//Create string to be sent with all the vtx information
 				std::string vtxArrayString;
-				int vtxCount = vtxByTriangleSorted.length();
 				vtxArrayString.append(to_string(vtxCount) + " ");
 				for (int u = 0; u < vtxByTriangleSorted.length(); u++) {
 					for (int v = 0; v < 3; v++) {
 						vtxArrayString.append(std::to_string(vtxByTriangleSorted[u][v]) + " ");
 					}
 				}
+				
 
+				//  TEEEEST --------------------------
+
+				float* vtxArrayToSend = new float[vtxCount * 3];
+				int arrLen = 0; 
+				int pos = 0; 
+
+				for (int u = 0; u < vtxByTriangleSorted.length(); u++) {
+	
+					for (int v = 0; v < 3; v++) {
+						vtxArrayToSend[pos + v] = vtxByTriangleSorted[u][v];
+						arrLen++; 
+					}
+
+					pos += 3; 
+
+				}
+
+				
+
+
+				// -----------------------------------
 
 				//////////////////////////
 				//						//
@@ -854,6 +924,7 @@ void vtxPlugConnected(MPlug & srcPlug, MPlug & destPlug, bool made, void* client
 					}
 				}
 
+				
 				//create string with normals to be sent
 				std::string NormArrayString;
 				size_t nrOfNormals = orderedNormals.length();
@@ -863,6 +934,7 @@ void vtxPlugConnected(MPlug & srcPlug, MPlug & destPlug, bool made, void* client
 						NormArrayString.append(to_string(orderedNormals[u][v]) + " ");
 					}
 				}
+				
 
 
 				//////////////////////////
@@ -895,12 +967,14 @@ void vtxPlugConnected(MPlug & srcPlug, MPlug & destPlug, bool made, void* client
 					orderedUVs.append(vArr[uvIds[i]]);
 				}
 
+				
 				//create the string message to be sent
 				std::string UVArrayString;
 				UVArrayString.append(to_string(totalUVCount) + " ");
 				for (int i = 0; i < orderedUVs.length(); i++) {
 					UVArrayString.append(to_string(orderedUVs[i]) + " ");
 				}
+				
 
 
 				//////////////////////////
@@ -986,24 +1060,76 @@ void vtxPlugConnected(MPlug & srcPlug, MPlug & destPlug, bool made, void* client
 					itLamberts.next();
 				}
 
-				//create final string to be sent to the raylib 
+				
+				//create final string to be sent to the raylib
 				std::string msgString;
 				msgString.append(vtxArrayString + " ");
 				msgString.append(NormArrayString + " ");
 				msgString.append(UVArrayString + " ");
 				msgString.append(materialString);
+				
 
 				//pass to send
 				bool msgToSend = false;
 				if (vtxCount > 0)
 					msgToSend = true;
 
-				if (msgToSend) {
-					sendMsg(CMDTYPE::NEW_NODE, NODE_TYPE::MESH, nrElements, totalTrisCount, objName, msgString);
-				}
+				if (oldName != objName) {
 
+					if (msgToSend) {
+						//sendMsg(CMDTYPE::NEW_NODE, NODE_TYPE::MESH, nrElements, totalTrisCount, objName, msgString);
+
+
+
+						size_t totalMsgSize = (sizeof(MsgHeader) + sizeof(Mesh) + (sizeof(float) * (vtxCount * 3)));
+						const char* msg = new char[totalMsgSize];
+						
+
+						// Fill header ================= 
+						MsgHeader msgHeader;
+						msgHeader.nodeType = NODE_TYPE::MESH;
+						msgHeader.cmdType = CMDTYPE::NEW_NODE;
+						msgHeader.nameLen = objName.length();
+						msgHeader.msgSize = totalMsgSize;
+						memcpy(msgHeader.objName, objName.c_str(), objName.length());
+
+						//define mesh struct variables
+						Mesh mesh;
+						mesh.trisCount = totalTrisCount;
+						mesh.vtxCount = nrElements;
+
+						// Copy MSG ================== 
+
+
+						//size_t lenghtVtx = vtxArrayString.length(); 
+						//MStreamUtils::stdOutStream() << "lenghtVtx: " << lenghtVtx << "\n";
+						//MStreamUtils::stdOutStream() << "totalMsgSize: " << totalMsgSize << "\n";
+
+						memcpy((char*)msg, &msgHeader, sizeof(MsgHeader));
+						memcpy((char*)msg + sizeof(MsgHeader), &mesh, sizeof(Mesh));
+						memcpy((char*)msg + sizeof(MsgHeader) + sizeof(Mesh), vtxArrayToSend, sizeof(float) * (mesh.vtxCount * 3));
+						//memcpy((char*)msg + sizeof(MsgHeader) + sizeof(Mesh), msgString.c_str(), msgHeader.msgSize);
+
+						//send it
+						if (comLib.send(msg, totalMsgSize)) {
+							MStreamUtils::stdOutStream() << "vtxPlugConnected: Message sent" << "\n";
+						}
+						
+
+						oldContent = msg;
+						oldName = objName;
+
+						delete[]msg; 
+					}
+
+				}
 				delete[] UVSetNamePointer;
+				delete[] vtxArrayToSend;
 			}
+
+			*/
+
+
 		}
 	}
 }
@@ -1020,7 +1146,7 @@ void nodeAdded(MObject &node, void * clientData)
 	if (node.hasFn(MFn::kMesh))
 	{
 		MStatus Result = MS::kSuccess;
-		newMeshes.push(node);
+		meshQueue.push(node);
 		MCallbackId tempID = MDGMessage::addConnectionCallback(vtxPlugConnected, NULL, &status);
 		if (Result == MS::kSuccess) {
 			callbackIdArray.append(tempID);
@@ -1034,7 +1160,7 @@ void nodeAdded(MObject &node, void * clientData)
 
 	if (node.hasFn(MFn::kLight))
 	{
-		newLights.push(node);
+		lightQueue.push(node);
 	}
 
 	//... implement this and other callbacks
@@ -1049,9 +1175,9 @@ void timerCallback(float elapsedTime, float lastTime, void* clientData)
 	MCallbackId tempID;
 	MStatus Result = MS::kSuccess;
 
-	for (int i = 0; i < newMeshes.size(); i++) {
+	for (int i = 0; i < meshQueue.size(); i++) {
 
-		MObject currenNode = newMeshes.back();
+		MObject currenNode = meshQueue.back();
 		if (currenNode.hasFn(MFn::kMesh)) {
 
 			MFnMesh currentMesh = currenNode;
@@ -1061,7 +1187,7 @@ void timerCallback(float elapsedTime, float lastTime, void* clientData)
 			MFnDagNode currentDagNode = currenNode;
 			MFnTransform transform(path);
 
-			unsigned int nrOfPrnts = currentDagNode.parentCount();
+			//unsigned int nrOfPrnts = currentDagNode.parentCount();
 			MObject parentTransf = currentDagNode.parent(0);
 
 			tempID = MDagMessage::addWorldMatrixModifiedCallback(path, nodeWorldMatrixChanged, NULL, &Result);
@@ -1079,12 +1205,12 @@ void timerCallback(float elapsedTime, float lastTime, void* clientData)
 				callbackIdArray.append(tempID);
 			}
 		}
-		newMeshes.pop();
+		meshQueue.pop();
 	}
 
-	for (int i = 0; i < newLights.size(); i++) {
+	for (int i = 0; i < lightQueue.size(); i++) {
 
-		MObject currenNode = newLights.back();
+		MObject currenNode = lightQueue.back();
 		if (currenNode.hasFn(MFn::kLight))
 		{
 			MFnLight sceneLight(currenNode);
@@ -1133,14 +1259,16 @@ void timerCallback(float elapsedTime, float lastTime, void* clientData)
 				msgToSend = true;
 
 			if (msgToSend) {
-				sendMsg(CMDTYPE::NEW_NODE, NODE_TYPE::LIGHT, 0, 0, objName, msgString);
+				//sendMsg(CMDTYPE::NEW_NODE, NODE_TYPE::LIGHT, 0, 0, objName, msgString);
 			}
 		}
-		newLights.pop();
+		lightQueue.pop();
 	}
 
 }
 
+
+// Load and Unload Plugin
 EXPORT MStatus initializePlugin(MObject obj)
 {
 
@@ -1196,7 +1324,6 @@ EXPORT MStatus initializePlugin(MObject obj)
 
 	return res;
 }
-
 
 EXPORT MStatus uninitializePlugin(MObject obj) {
 	MFnPlugin plugin(obj);
