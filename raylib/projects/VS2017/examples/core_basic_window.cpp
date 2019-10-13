@@ -483,6 +483,7 @@ void updateNode(std::vector<modelFromMaya>& objNameArray, std::vector<lightFromM
 
 	}
 
+
 }
 
 void updateNodeName(std::vector<modelFromMaya>& objNameArray, std::vector<lightFromMaya>& lightsFromMaya, std::vector<cameraFromMaya>& cameraFromMaya, std::vector<materialMaya>& materialMaya, char* buffer, int bufferSize, Shader shader, int* nrObjs, int* index, int* nrMaterials) {
