@@ -431,6 +431,7 @@ void addNode(std::vector<modelFromMaya>& modelArray, std::vector<lightFromMaya>&
 			tempModel.material.shader = shader;
 
 
+
 			if (tempMat.type == 0) {
 				std::cout << "adding color" << std::endl;
 
