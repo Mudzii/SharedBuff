@@ -587,6 +587,7 @@ void updateNodeName(std::vector<modelFromMaya>& objNameArray, std::vector<lightF
 
 }
 
+// update matrix of objects by removing and replacing with new 
 void updateNodeMatrix(std::vector<modelFromMaya>& modelArray, std::vector<lightFromMaya>& lightsArray, std::vector<cameraFromMaya>& cameraArray, std::vector<materialMaya>& materialMaya, char* buffer, int bufferSize, Shader shader, int* nrObjs, int* index, int* nrMaterials) {
 
 	//std::cout << "UPDATE NODE MATRIX FUNCTION" << std::endl;
