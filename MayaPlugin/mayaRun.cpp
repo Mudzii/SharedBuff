@@ -1030,6 +1030,7 @@ void nodeWorldMatrixChanged(MObject &node, MDagMessage::MatrixModifiedFlags &mod
 	*/
 
 
+
 	size_t totalMsgSize = (sizeof(MsgHeader) + sizeof(Matrix));
 	const char* msg = new char[totalMsgSize];
 
