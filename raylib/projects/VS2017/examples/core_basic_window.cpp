@@ -364,7 +364,7 @@ void recvFromMaya(char* buffer, std::map<CMDTYPE, FnPtr> functionMap, std::vecto
 // =======================================================================
 
 //add node adds a new node to the rayLib
-void addNode(std::vector<modelFromMaya>& modelArray, std::vector<lightFromMaya>& lightsFromMaya, std::vector<cameraFromMaya>& cameraFromMaya, std::vector<materialMaya>& materialArray, char* buffer, int bufferSize, Shader shader, int* nrObjs, int* index, int* nrMaterials) {
+void addNode(std::vector<modelFromMaya>& modelArray, std::vector<lightFromMaya>& lightsArray, std::vector<cameraFromMaya>& cameraArray, std::vector<materialMaya>& materialArray, char* buffer, int bufferSize, Shader shader, int* nrObjs, int* index, int* nrMaterials) {
 
 	std::cout << "ADD NODE FUNCTION" << std::endl; 
 
@@ -376,9 +376,11 @@ void addNode(std::vector<modelFromMaya>& modelArray, std::vector<lightFromMaya>&
 
 	if (msgHeader.nodeType == NODE_TYPE::MESH) {
 
+		// get mesh info send over 
 		msgMesh meshInfo = {};
 		memcpy((char*)&meshInfo, buffer + sizeof(MsgHeader), sizeof(msgMesh));
 
+		// create arrays to store information 
 		int vtxCount	   = meshInfo.trisCount * 3;
 		float* meshVtx	   = new float[vtxCount * 3];
 		float* meshNormals = new float[vtxCount * 3];
@@ -390,12 +392,36 @@ void addNode(std::vector<modelFromMaya>& modelArray, std::vector<lightFromMaya>&
 		
 		materialMaya tempMat = {}; 
 		memcpy((char*)&tempMat, buffer + sizeof(MsgHeader) + sizeof(msgMesh) + (sizeof(float) * vtxCount * 3) + (sizeof(float) * vtxCount * 3) + (sizeof(float) * vtxCount * 2 * 2), sizeof(materialMaya));
+		Color tempColor = { tempMat.color.r * 255, tempMat.color.g * 255, tempMat.color.b * 255, tempMat.color.a };
 
 		std::string materialName = tempMat.materialName;
 		materialName = materialName.substr(0, tempMat.matNameLen);
 
 		std::string textureName = tempMat.fileTextureName;
 		textureName = textureName.substr(0, tempMat.textureNameLen);
+
+
+		// Check if material already exists
+		bool materialExists = false; 
+		for (int i = 0; i < *nrMaterials; i++) {
+			if (materialArray[i].materialName == materialName) {
+
+				// if it exists, remove it and replace it
+				materialExists = true;
+
+				materialArray.erase(materialArray.begin() + i);
+				materialArray.insert(materialArray.begin() + i, { tempMat });
+
+	
+			}
+		}
+
+		//if material doesn't exist, add it to array
+		if (materialExists == false) {
+
+			materialArray.push_back({ tempMat });
+			*nrMaterials = *nrMaterials + 1;
+		}
 
 
 		// check of mesh already exists
@@ -410,7 +436,6 @@ void addNode(std::vector<modelFromMaya>& modelArray, std::vector<lightFromMaya>&
 			std::cout << "Mesh doesn't exist" << std::endl; 
 
 			Mesh tempMesh = {};
-			Color tempColor = { tempMat.color.r * 255, tempMat.color.g * 255, tempMat.color.b * 255, tempMat.color.a };
 			
 			// vtx
 			tempMesh.vertexCount = vtxCount; 
@@ -471,7 +496,7 @@ void addNode(std::vector<modelFromMaya>& modelArray, std::vector<lightFromMaya>&
 }
 
 //update node "updates" an already existing node by removing it and replacing it with a new one
-void updateNode(std::vector<modelFromMaya>& modelArray, std::vector<lightFromMaya>& lightsArray, std::vector<cameraFromMaya>& cameraArray, std::vector<materialMaya>& materialMaya, char* buffer, int bufferSize, Shader shader, int* nrObjs, int* index, int* nrMaterials) {
+void updateNode(std::vector<modelFromMaya>& modelArray, std::vector<lightFromMaya>& lightsArray, std::vector<cameraFromMaya>& cameraArray, std::vector<materialMaya>& materialArray, char* buffer, int bufferSize, Shader shader, int* nrObjs, int* index, int* nrMaterials) {
 
 	//std::cout << "UPDATE NODE FUNCTION" << std::endl;
 
@@ -497,7 +522,7 @@ void updateNode(std::vector<modelFromMaya>& modelArray, std::vector<lightFromMay
 		memcpy((char*)meshNormals, buffer + sizeof(MsgHeader) + sizeof(msgMesh) + (sizeof(float) * vtxCount * 3), (sizeof(float) * vtxCount * 3));
 		memcpy((char*)meshUVs, buffer + sizeof(MsgHeader) + sizeof(msgMesh) + (sizeof(float) * vtxCount * 3) + (sizeof(float) * vtxCount * 3), (sizeof(float) * vtxCount * 2 * 2));
 
-
+	
 		//std::cout << "OBJ NAME: " << objectName << std::endl;
 		//std::cout << "vtxCount: " << vtxCount << std::endl;
 
@@ -524,44 +549,42 @@ void updateNode(std::vector<modelFromMaya>& modelArray, std::vector<lightFromMay
 				Model tempModel = LoadModelFromMesh(tempMesh);
 				tempModel.material.shader = shader;
 				
-				//Color tempColor = objNameArray[i].color;
-				//Matrix tempMat = objNameArray[i].modelMatrix;
-				//std::string tempMaterialName = objNameArray[i].materialName;
+				
+
+				Color tempColor = modelArray[i].color;
+				std::string tempMaterialName = modelArray[i].materialName;		
+				Matrix tempMatrix = modelArray[i].modelMatrix;
 
 				// erase old model and replace with new
 				modelArray.erase(modelArray.begin() + i);
-	
-				/*
 
+				for (int i = 0; i < materialArray.size(); i++) {
+					if (materialArray[i].materialName == tempMaterialName) {
 
-				std::cout << "mtName: " << materialMaya.size() << std::endl;
-				for (int i = 0; i < materialMaya.size(); i++){
-					std::cout << "materialMaya: " << materialMaya[i].name << std::endl;
-					if (materialMaya[i].name == tempMaterialName){
-						if (materialMaya[i].ColorOrTexture == "color"){
-							std::cout << "clor: " << std::endl;
-							//objNameArray.insert(objNameArray.begin() + i, { tempModel, tempIndex2, tempName2, newModelMatrix, tempColor, tempMaterialName });
-							tempColor = materialMaya[i].color;
+						if (materialArray[i].type == 0) {
+							//modelArray.insert(modelArray.begin() + i, { tempModel, tempIndex, objectName, tempMatrix, tempColor, tempMaterialName });
+							tempColor = materialArray[i].color;
 						}
-						else if (materialMaya[i].ColorOrTexture == "texture"){
-							std::cout << "text: " << std::endl;
-							//std::cout << "texture stuff: " << texture.height << std::endl;
-							Texture2D tempTexture = LoadTexture(materialMaya[i].fileTexuteName.c_str());
-							tempModelToAdd.material.maps[MAP_DIFFUSE].texture = tempTexture;
-							//objNameArray.insert(objNameArray.begin() + i, { tempModel, tempIndex2, tempName2, newModelMatrix, {255,255,255,255}, tempMaterialName });
+
+						else if (materialArray[i].type == 1) {
+							Texture2D tempTexture = LoadTexture(materialArray[i].fileTextureName); 
+							tempModel.material.maps[MAP_DIFFUSE].texture = tempTexture;
+							//modelArray.insert(modelArray.begin() + i, { tempModel, tempIndex, objectName, tempMatrix, {255,255,255,255}, tempMaterialName });
+
 						}
+
 					}
 				}
 
-				objNameArray.insert(objNameArray.begin() + i, { tempModelToAdd, tempIndex, objectName, tempMat, tempColor, tempMaterialName });
-
-				*/
-
-				modelArray.push_back({ tempModel, *index, objectName, MatrixTranslate(0,0,0), {255,255,255,255} });
+				// replace with new			
+				modelArray.insert(modelArray.begin() + i, {tempModel, tempIndex, objectName, tempMatrix, tempColor, tempMaterialName});
 
 			}
 
 		}
+
+
+
 
 
 		// delete the arrays
