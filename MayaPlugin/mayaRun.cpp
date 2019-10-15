@@ -26,6 +26,20 @@ struct Vec3 {
 	float z;
 };
 
+struct Color {
+	float r; 
+	float g; 
+	float b; 
+	float a; 
+};
+
+struct Matrix {
+	float a11, a12, a13, a14; 
+	float a21, a22, a23, a24; 
+	float a31, a32, a33, a34; 
+	float a41, a42, a43, a44; 
+};
+
 // NODE TYPE for what kind of node that is sent
 enum NODE_TYPE {
 	TRANSFORM,
@@ -63,12 +77,20 @@ struct Mesh {
 	int UVcount;
 };
 
+//camera struct
 struct Camera {
 	Vec3 up;
 	Vec3 forward;
 	Vec3 pos;
 	int type;
 	float fov;
+};
+
+//light struct
+struct Lights {
+	Vec3 lightPos; 
+	float radius; 
+	Color color; 
 };
 
 // ===========================================================
@@ -90,8 +112,11 @@ string oldName	  = "";
 // ==================================================================================
 
 // MESH =============================================================================
+// ==================================================================================
 
-// Callback function when a vtx connection is made to the dependency graph (such as triangulated, topology is changed, a new mesh is added)
+// Callback function for when a vtx connection is made to the dependency graph (such as triangulated, topology is changed, a new mesh is added)
+
+// FIX material
 void vtxPlugConnected(MPlug & srcPlug, MPlug & destPlug, bool made, void* clientData) {
 
 	//if statement checking if it's otpit mesh that has been connected 
@@ -227,7 +252,7 @@ void vtxPlugConnected(MPlug & srcPlug, MPlug & destPlug, bool made, void* client
 
 				int uvPos = 0;
 				for (int j = 0; j < sortedUVs.length(); j++) {
-					meshUVs[j] = sortedUVs[j];
+					meshUVs[j] = 1.0f - sortedUVs[j];
 					uvPos += 2;
 				}
 
@@ -619,8 +644,481 @@ void vtxPlugConnected(MPlug & srcPlug, MPlug & destPlug, bool made, void* client
 	}
 }
 
+// Callback function for when an attribute is changed for a node
+void nodeAttributeChanged(MNodeMessage::AttributeMessage msg, MPlug &plug, MPlug &otherPlug, void* x) {
+
+	MStreamUtils::stdOutStream() << "\n";
+	MStreamUtils::stdOutStream() << "Attribute changed " << "\n";
+
+	// variables
+	Mesh meshInfo = {};
+	MStatus vtxRresult = MS::kFailure;
+
+	// Get mesh through dag path
+	MDagPath path;
+	MFnDagNode(plug.node()).getPath(path);
+	MFnTransform transform(path);
+	MFnMesh mesh(path);
+
+	// get mesh name
+	std::string objName = mesh.name().asChar();
+
+	// VTX ================
+
+	// get verticies 
+	MPointArray vtxArray;
+	mesh.getPoints(vtxArray, MSpace::kObject);
+
+	// get triangles
+	MIntArray trisCount;
+	MIntArray trisVtxIndex;
+	mesh.getTriangles(trisCount, trisVtxIndex);
+	size_t nrOfTris = trisCount.length();
+
+	// NORMALS ============
+	MFloatVectorArray normalArray;
+	mesh.getNormals(normalArray, MSpace::kWorld);
+
+	//get IDs per face
+	MIntArray normalIds;
+	MIntArray tempNormalIds;
+	for (int faceCnt = 0; faceCnt < nrOfTris; faceCnt++) {
+		mesh.getFaceNormalIds(faceCnt, tempNormalIds);
+		normalIds.append(tempNormalIds[0]);
+	}
+
+
+	// UVs ================
+
+	//get all UVs
+	MFloatArray uArray;
+	MFloatArray vArray;
+	mesh.getUVs(uArray, vArray);
+
+	//get UVs IDs 
+	MIntArray uvCounts;
+	MIntArray uvIds;
+	mesh.getAssignedUVs(uvCounts, uvIds, NULL);
+
+
+	// fill meshInfo struct
+	meshInfo.trisCount = nrOfTris;
+	meshInfo.vtxCount = vtxArray.length();
+	meshInfo.normalCount = normalIds.length();
+	meshInfo.UVcount = uvIds.length();
+
+	//sort arrays  ================
+	MPointArray sortedVtxArray;
+	for (int i = 0; i < trisVtxIndex.length(); i++) {
+		sortedVtxArray.append(vtxArray[trisVtxIndex[i]]);
+	}
+
+	MVectorArray sortedNormals;
+	for (int i = 0; i < meshInfo.trisCount; i++) {
+		for (int j = 0; j < 3; j++) {
+			sortedNormals.append(normalArray[normalIds[i]]);
+		}
+	}
+
+	MFloatArray sortedUVs;
+	for (int i = 0; i < uvIds.length(); i++) {
+		sortedUVs.append(uArray[uvIds[i]]);
+		sortedUVs.append(vArray[uvIds[i]]);
+	}
+
+	// float arrays that store mesh info  ================
+	float* meshVtx = new float[sortedVtxArray.length() * 3];
+	float* meshNormals = new float[sortedNormals.length() * 3];
+	float* meshUVs = new float[sortedUVs.length() * 2];
+
+	// fill arrays with info
+	int vtxPos = 0;
+	for (int i = 0; i < sortedVtxArray.length(); i++) {
+		// vtx
+		meshVtx[vtxPos] = sortedVtxArray[i][0];
+		meshVtx[vtxPos + 1] = sortedVtxArray[i][1];
+		meshVtx[vtxPos + 2] = sortedVtxArray[i][2];
+
+		// normals
+		meshNormals[vtxPos] = sortedNormals[i][0];
+		meshNormals[vtxPos + 1] = sortedNormals[i][1];
+		meshNormals[vtxPos + 2] = sortedNormals[i][2];
+
+		vtxPos += 3;
+	}
+
+	int uvPos = 0;
+	for (int j = 0; j < sortedUVs.length(); j++) {
+		meshUVs[j] = 1.0f - sortedUVs[j];
+		uvPos += 2;
+	}
+
+	//MStreamUtils::stdOutStream() << "\n";
+
+	//MStreamUtils::stdOutStream() << "sortedVtxArray.length(): " << sortedVtxArray.length() << "\n";
+	//MStreamUtils::stdOutStream() << "VTX POS: " << vtxPos << "\n";
+	//MStreamUtils::stdOutStream() << "uvPos: " << uvPos << "\n";
+
+	// Send message to RayLib ================
+	bool msgToSend = false;
+	if (meshInfo.vtxCount > 0)
+		msgToSend = true;
+
+	if (msgToSend && oldName != objName) {
+
+
+		size_t totalMsgSize = (sizeof(MsgHeader) + sizeof(Mesh) + (2 * (sizeof(float) * sortedVtxArray.length() * 3)) + sortedUVs.length() * 2);
+		const char* msg = new char[totalMsgSize];
+
+		// Fill header ========
+		MsgHeader msgHeader;
+		msgHeader.msgSize = totalMsgSize;
+		msgHeader.nodeType = NODE_TYPE::MESH;
+		msgHeader.nameLen = objName.length();
+		msgHeader.cmdType = CMDTYPE::UPDATE_NODE;
+		memcpy(msgHeader.objName, objName.c_str(), objName.length());
+
+		// copy over msg ======
+
+		memcpy((char*)msg, &msgHeader, sizeof(MsgHeader));
+		memcpy((char*)msg + sizeof(MsgHeader), &meshInfo, sizeof(Mesh));
+		memcpy((char*)msg + sizeof(MsgHeader) + sizeof(Mesh), meshVtx, (sizeof(float) * sortedVtxArray.length() * 3));
+		memcpy((char*)msg + sizeof(MsgHeader) + sizeof(Mesh) + (sizeof(float) * sortedVtxArray.length() * 3), meshNormals, (sizeof(float) * sortedNormals.length() * 3));
+		memcpy((char*)msg + sizeof(MsgHeader) + sizeof(Mesh) + (sizeof(float) * sortedVtxArray.length() * 3) + (sizeof(float) * sortedNormals.length() * 3), meshUVs, sortedUVs.length() * 2);
+
+
+
+		//send it
+		if (comLib.send(msg, totalMsgSize)) {
+			MStreamUtils::stdOutStream() << "Attribute changed: Message sent" << "\n";
+		}
+
+
+		oldContent = msg;
+		oldName = objName;
+
+		delete[]msg;
+
+
+	}
+
+	// delete allocated arrays
+	delete[] meshVtx;
+	delete[] meshNormals;
+	delete[] meshUVs;
+
+
+	// OLD CODE
+	/*
+	MDagPath path;
+	MFnDagNode(plug.node()).getPath(path);
+	MFnTransform transform(path);
+	MFnMesh mesh(path);
+
+	//////////////////////////
+	//						//
+	//			VTX			//
+	//						//
+	//////////////////////////
+
+				//get all vertecies
+	MPlug vtxArray = mesh.findPlug("controlPoints");
+	size_t nrElements = vtxArray.numElements();
+
+	//get vtx in array
+	MVectorArray vtxArrayMessy;
+	for (int i = 0; i < nrElements; i++)
+	{
+		//get plug for i array item (gives: shape.vrts[x])
+		MPlug currentVtx = vtxArray.elementByLogicalIndex(i);
+
+		float x = 0;
+		float y = 0;
+		float z = 0;
+		//if its has attributes == vertex
+		if (currentVtx.isCompound())
+		{
+			//we have control points [0] but in Maya the values are one hierarchy down so we acces them by getting the child
+			MPlug plugX = currentVtx.child(0);
+			MPlug plugY = currentVtx.child(1);
+			MPlug plugZ = currentVtx.child(2);
+
+			//get value and story them in our xyz
+			plugX.getValue(x);
+			plugY.getValue(y);
+			plugZ.getValue(z);
+
+			//add vtx to array
+			MVector tempPoint = { x, y, z };
+			vtxArrayMessy.append(tempPoint);
+		}
+	}
+
+	//sort vtx correctly by index with the triangles in mind
+	MIntArray triCount;
+	MIntArray triVertsIndex;
+	mesh.getTriangles(triCount, triVertsIndex);
+	MVectorArray vtxByTriangleSorted;
+	for (int i = 0; i < triVertsIndex.length(); i++) {
+		vtxByTriangleSorted.append(vtxArrayMessy[triVertsIndex[i]]);
+	}
+
+	//old variables DELETE
+	int totalTrisCount = triCount.length() * 2;
+
+	//get object name to send
+	std::string objName = mesh.name().asChar();
+
+	//Create string to be sent with all the vtx information
+	std::string vtxArrayString;
+	int vtxCount = vtxByTriangleSorted.length();
+	vtxArrayString.append(to_string(vtxCount) + " ");
+	for (int u = 0; u < vtxByTriangleSorted.length(); u++) {
+		for (int v = 0; v < 3; v++) {
+			vtxArrayString.append(std::to_string(vtxByTriangleSorted[u][v]) + " ");
+		}
+	}
+
+
+	//////////////////////////
+	//						//
+	//		NORMALS			//
+	//						//
+	//////////////////////////
+
+	//get normals in worldspace
+	MFloatVectorArray normals;
+	mesh.getNormals(normals, MSpace::kWorld);
+
+	//get IDs per face
+	MIntArray normalIds;
+	MIntArray tempNormalIds;
+	int nrOfFaces = triCount.length();
+	for (int faceCnt = 0; faceCnt < nrOfFaces; faceCnt++) {
+		mesh.getFaceNormalIds(faceCnt, tempNormalIds);
+		normalIds.append(tempNormalIds[0]);
+	}
+
+	//get nomral per vtx and sort the normals
+	MVectorArray orderedNormals;
+	for (int i = 0; i < nrOfFaces; i++) {
+		for (int j = 0; j < 3; j++) {
+			orderedNormals.append(normals[normalIds[i]]);
+		}
+	}
+
+	//create string with normals to be sent
+	std::string NormArrayString;
+	size_t nrOfNormals = orderedNormals.length();
+	NormArrayString.append(to_string(nrOfNormals) + " ");
+	for (int u = 0; u < orderedNormals.length(); u++) {
+		for (int v = 0; v < 3; v++) {
+			NormArrayString.append(to_string(orderedNormals[u][v]) + " ");
+		}
+	}
+
+
+	//////////////////////////
+	//						//
+	//			UVS 		//
+	//						//
+	//////////////////////////
+
+	//get active name for UVset, only supports one UV set (the first one)
+	MString UVName;
+	mesh.getCurrentUVSetName(UVName, -1);
+
+	//get all UVs
+	MFloatArray uArr;
+	MFloatArray vArr;
+	MString* UVSetNamePointer = new MString[1];
+	UVSetNamePointer[0] = UVName;
+	mesh.getUVs(uArr, vArr, UVSetNamePointer);
+
+	//get UVs IDs for UVsetname
+	MIntArray uvCounts;
+	MIntArray uvIds;
+	mesh.getAssignedUVs(uvCounts, uvIds, &UVSetNamePointer[0]);
+
+	//sort the UVs per vtx
+	MFloatArray orderedUVs;
+	size_t totalUVCount = uvIds.length();
+	for (int i = 0; i < totalUVCount; i++) {
+		orderedUVs.append(uArr[uvIds[i]]);
+		orderedUVs.append(vArr[uvIds[i]]);
+	}
+
+	//create the string message to be sent
+	std::string UVArrayString;
+	UVArrayString.append(to_string(totalUVCount) + " ");
+	for (int i = 0; i < orderedUVs.length(); i++) {
+		UVArrayString.append(to_string(orderedUVs[i]) + " ");
+	}
+
+	std::string masterTransformString;
+	masterTransformString.append(vtxArrayString + " ");
+	masterTransformString.append(NormArrayString + " ");
+	masterTransformString.append(UVArrayString);
+
+	//MStreamUtils::stdOutStream() << "masterTransformString: " << masterTransformString << "_" << endl;
+
+	if (oldContent != masterTransformString)
+	{
+		//pass to send
+		bool msgToSend = false;
+		if (vtxCount > 0)
+			msgToSend = true;
+
+		if (msgToSend) {
+			//sendMsg(CMDTYPE::UPDATE_NODE, NODE_TYPE::MESH, nrElements, totalTrisCount, objName, masterTransformString);
+		}
+	}
+	*/
+
+}
+
+//Callback function for when the matrix is changed for a mesh object (when rotated) 
+void nodeWorldMatrixChanged(MObject &node, MDagMessage::MatrixModifiedFlags &modified, void *clientData) {
+
+	// Get mesh through dag path
+	MDagPath path;
+	MFnDagNode(node).getPath(path);
+	MFnMesh mesh(path);
+
+	// get name of object 
+	std::string objName = mesh.name().asChar();
+
+	//get local and world matrix using the path
+	MMatrix localMatrix = MMatrix(path.exclusiveMatrix());
+	MMatrix worldMatrix = MMatrix(path.inclusiveMatrix());
+
+	// fill matrix struct to send 
+	// matrix is transposed before sending to raylib
+	Matrix matrixInfo = {}; 
+
+	//row 1
+	matrixInfo.a11 = worldMatrix(0, 0); 
+	matrixInfo.a12 = worldMatrix(1, 0);
+	matrixInfo.a13 = worldMatrix(2, 0);
+	matrixInfo.a14 = worldMatrix(3, 0);
+
+	//row 2
+	matrixInfo.a21 = worldMatrix(0, 1);
+	matrixInfo.a22 = worldMatrix(1, 1);
+	matrixInfo.a23 = worldMatrix(2, 1);
+	matrixInfo.a24 = worldMatrix(3, 1);
+
+	//row 3
+	matrixInfo.a31 = worldMatrix(0, 2);
+	matrixInfo.a32 = worldMatrix(1, 2);
+	matrixInfo.a33 = worldMatrix(2, 2);
+	matrixInfo.a34 = worldMatrix(3, 2);
+
+	//row 4
+	matrixInfo.a41 = worldMatrix(0, 3);
+	matrixInfo.a42 = worldMatrix(1, 3);
+	matrixInfo.a43 = worldMatrix(2, 3);
+	matrixInfo.a44 = worldMatrix(3, 3);
+
+	/* 
+	MStreamUtils::stdOutStream() <<  "\n";
+	MStreamUtils::stdOutStream() << "worldMatrix: " << worldMatrix << "\n";
+	MStreamUtils::stdOutStream() << "matrixInfo: " << matrixInfo.a11 << " : ";
+	MStreamUtils::stdOutStream() << matrixInfo.a12 << " : ";
+	MStreamUtils::stdOutStream() << matrixInfo.a13 << " : ";
+	MStreamUtils::stdOutStream() << matrixInfo.a14 << "\n";
+	*/
+
+
+	size_t totalMsgSize = (sizeof(MsgHeader) + sizeof(Matrix));
+	const char* msg = new char[totalMsgSize];
+
+	// Fill header ========
+	MsgHeader msgHeader;
+	msgHeader.msgSize = totalMsgSize;
+	msgHeader.nameLen = objName.length();
+	msgHeader.nodeType = NODE_TYPE::MESH;
+	msgHeader.cmdType = CMDTYPE::UPDATE_MATRIX;
+	memcpy(msgHeader.objName, objName.c_str(), objName.length());
+
+	// copy over msg ======
+	memcpy((char*)msg, &msgHeader, sizeof(MsgHeader));
+	memcpy((char*)msg + sizeof(MsgHeader), &matrixInfo, sizeof(Matrix));
+
+	//send it
+	if (comLib.send(msg, totalMsgSize)) {
+		MStreamUtils::stdOutStream() << "nodeWorldMatrixChanged: Message sent" << "\n";
+	}
+
+	oldContent = msg;
+	oldName = objName;
+
+	delete[] msg; 
+
+	
+	/* 
+	if (oldContent != msgString)
+	{
+		//pass to send
+		bool msgToSend = false;
+		if (msgString.length() > 0)
+			msgToSend = true;
+
+		if (msgToSend) {
+			//sendMsg(CMDTYPE::UPDATE_MATRIX, NODE_TYPE::MESH, 0, 0, objName, msgString);
+		}
+	}
+	*/
+	/* 
+	//creat string from all the vector rows
+	std::string row4;
+	row4.append(to_string(worldMatrix(0, 3)) + " ");
+	row4.append(to_string(worldMatrix(1, 3)) + " ");
+	row4.append(to_string(worldMatrix(2, 3)) + " ");
+	row4.append(to_string(worldMatrix(3, 3)) + " ");
+
+	std::string row2;
+	row2.append(to_string(worldMatrix(0, 1)) + " ");
+	row2.append(to_string(worldMatrix(1, 1)) + " ");
+	row2.append(to_string(worldMatrix(2, 1)) + " ");
+	row2.append(to_string(worldMatrix(3, 1)) + " ");
+
+	std::string row3;
+	row3.append(to_string(worldMatrix(0, 2)) + " ");
+	row3.append(to_string(worldMatrix(1, 2)) + " ");
+	row3.append(to_string(worldMatrix(2, 2)) + " ");
+	row3.append(to_string(worldMatrix(3, 2)) + " ");
+
+	std::string row1;
+	row1.append(to_string(worldMatrix(0, 0)) + " ");
+	row1.append(to_string(worldMatrix(1, 0)) + " ");
+	row1.append(to_string(worldMatrix(2, 0)) + " ");
+	row1.append(to_string(worldMatrix(3, 0)) + " ");
+
+	//create string to send to raylib
+	std::string objName = mesh.name().asChar();
+	std::string msgString;
+	msgString.append(row1);
+	msgString.append(row2);
+	msgString.append(row3);
+	msgString.append(row4);
+
+	if (oldContent != msgString)
+	{
+		//pass to send
+		bool msgToSend = false;
+		if (msgString.length() > 0)
+			msgToSend = true;
+
+		if (msgToSend) {
+			//sendMsg(CMDTYPE::UPDATE_MATRIX, NODE_TYPE::MESH, 0, 0, objName, msgString);
+		}
+	}
+	*/
+}
 
 // CAMERA =============================================================================
+// ==================================================================================
 
 // callback function for the active pannel in the viewport
 void activeCamera(const MString &panelName, void* cliendData) {
@@ -679,7 +1177,7 @@ void activeCamera(const MString &panelName, void* cliendData) {
 	cameraInfo.type = isOrtographic;
 	cameraInfo.fov = FOV;
 
-	MStreamUtils::stdOutStream() << "cameraInfo.type: " << cameraInfo.type << "\n";
+	//MStreamUtils::stdOutStream() << "cameraInfo.type: " << cameraInfo.type << "\n";
 
 	//pass to send
 	bool msgToSend = false;
@@ -709,7 +1207,7 @@ void activeCamera(const MString &panelName, void* cliendData) {
 
 		//send it
 		if (comLib.send(msg, totalMsgSize)) {
-			MStreamUtils::stdOutStream() << "activeCamera: Message sent" << "\n";
+			//MStreamUtils::stdOutStream() << "activeCamera: Message sent" << "\n";
 		}
 
 
@@ -721,23 +1219,6 @@ void activeCamera(const MString &panelName, void* cliendData) {
 	}
 
 
-	/*
-	if (msgToSend && oldName != objName) {
-
-
-
-					memcpy((char*)msg + sizeof(MsgHeader), &meshInfo, sizeof(Mesh));
-					memcpy((char*)msg + sizeof(MsgHeader) + sizeof(Mesh), meshVtx, (sizeof(float) * sortedVtxArray.length() * 3));
-					memcpy((char*)msg + sizeof(MsgHeader) + sizeof(Mesh) + (sizeof(float) * sortedVtxArray.length() * 3), meshNormals, (sizeof(float) * sortedNormals.length() * 3));
-					memcpy((char*)msg + sizeof(MsgHeader) + sizeof(Mesh) + (sizeof(float) * sortedVtxArray.length() * 3) + (sizeof(float) * sortedNormals.length() * 3), meshUVs, sortedUVs.length() * 2);
-
-
-
-
-
-
-				}
-	*/
 
 	//OLD CODE
 	/*
@@ -759,7 +1240,6 @@ msgString.append(std::to_string(FOV));
 // ==================================================================================
 // ==================================================================================
 // ==================================================================================
-
 
 
 bool sendMsg(CMDTYPE msgType, NODE_TYPE nodeT, int nrOfElements, int trisCount, std::string objName, std::string &msgString) {
@@ -952,174 +1432,6 @@ void nodeMaterialAttributeChanged(MNodeMessage::AttributeMessage msg, MPlug &plu
 	}
 }
 
-//sending 
-void nodeAttributeChanged(MNodeMessage::AttributeMessage msg, MPlug &plug, MPlug &otherPlug, void* x)
-{
-	MDagPath path;
-	MFnDagNode(plug.node()).getPath(path);
-	MFnTransform transform(path);
-	MFnMesh mesh(path);
-
-	//////////////////////////
-	//						//
-	//			VTX			//
-	//						//
-	//////////////////////////
-
-				//get all vertecies
-	MPlug vtxArray = mesh.findPlug("controlPoints");
-	size_t nrElements = vtxArray.numElements();
-
-	//get vtx in array
-	MVectorArray vtxArrayMessy;
-	for (int i = 0; i < nrElements; i++)
-	{
-		//get plug for i array item (gives: shape.vrts[x]) 
-		MPlug currentVtx = vtxArray.elementByLogicalIndex(i);
-
-		float x = 0;
-		float y = 0;
-		float z = 0;
-		//if its has attributes == vertex
-		if (currentVtx.isCompound())
-		{
-			//we have control points [0] but in Maya the values are one hierarchy down so we acces them by getting the child
-			MPlug plugX = currentVtx.child(0);
-			MPlug plugY = currentVtx.child(1);
-			MPlug plugZ = currentVtx.child(2);
-
-			//get value and story them in our xyz
-			plugX.getValue(x);
-			plugY.getValue(y);
-			plugZ.getValue(z);
-
-			//add vtx to array
-			MVector tempPoint = { x, y, z };
-			vtxArrayMessy.append(tempPoint);
-		}
-	}
-
-	//sort vtx correctly by index with the triangles in mind
-	MIntArray triCount;
-	MIntArray triVertsIndex;
-	mesh.getTriangles(triCount, triVertsIndex);
-	MVectorArray vtxByTriangleSorted;
-	for (int i = 0; i < triVertsIndex.length(); i++) {
-		vtxByTriangleSorted.append(vtxArrayMessy[triVertsIndex[i]]);
-	}
-
-	//old variables DELETE
-	int totalTrisCount = triCount.length() * 2;
-
-	//get object name to send
-	std::string objName = mesh.name().asChar();
-
-	//Create string to be sent with all the vtx information
-	std::string vtxArrayString;
-	int vtxCount = vtxByTriangleSorted.length();
-	vtxArrayString.append(to_string(vtxCount) + " ");
-	for (int u = 0; u < vtxByTriangleSorted.length(); u++) {
-		for (int v = 0; v < 3; v++) {
-			vtxArrayString.append(std::to_string(vtxByTriangleSorted[u][v]) + " ");
-		}
-	}
-
-
-	//////////////////////////
-	//						//
-	//		NORMALS			//
-	//						//
-	//////////////////////////
-
-	//get normals in worldspace
-	MFloatVectorArray normals;
-	mesh.getNormals(normals, MSpace::kWorld);
-
-	//get IDs per face
-	MIntArray normalIds;
-	MIntArray tempNormalIds;
-	int nrOfFaces = triCount.length();
-	for (int faceCnt = 0; faceCnt < nrOfFaces; faceCnt++) {
-		mesh.getFaceNormalIds(faceCnt, tempNormalIds);
-		normalIds.append(tempNormalIds[0]);
-	}
-
-	//get nomral per vtx and sort the normals
-	MVectorArray orderedNormals;
-	for (int i = 0; i < nrOfFaces; i++) {
-		for (int j = 0; j < 3; j++) {
-			orderedNormals.append(normals[normalIds[i]]);
-		}
-	}
-
-	//create string with normals to be sent
-	std::string NormArrayString;
-	size_t nrOfNormals = orderedNormals.length();
-	NormArrayString.append(to_string(nrOfNormals) + " ");
-	for (int u = 0; u < orderedNormals.length(); u++) {
-		for (int v = 0; v < 3; v++) {
-			NormArrayString.append(to_string(orderedNormals[u][v]) + " ");
-		}
-	}
-
-
-	//////////////////////////
-	//						//
-	//			UVS 		//
-	//						//
-	//////////////////////////
-
-	//get active name for UVset, only supports one UV set (the first one)
-	MString UVName;
-	mesh.getCurrentUVSetName(UVName, -1);
-
-	//get all UVs
-	MFloatArray uArr;
-	MFloatArray vArr;
-	MString* UVSetNamePointer = new MString[1];
-	UVSetNamePointer[0] = UVName;
-	mesh.getUVs(uArr, vArr, UVSetNamePointer);
-
-	//get UVs IDs for UVsetname
-	MIntArray uvCounts;
-	MIntArray uvIds;
-	mesh.getAssignedUVs(uvCounts, uvIds, &UVSetNamePointer[0]);
-
-	//sort the UVs per vtx
-	MFloatArray orderedUVs;
-	size_t totalUVCount = uvIds.length();
-	for (int i = 0; i < totalUVCount; i++) {
-		orderedUVs.append(uArr[uvIds[i]]);
-		orderedUVs.append(vArr[uvIds[i]]);
-	}
-
-	//create the string message to be sent
-	std::string UVArrayString;
-	UVArrayString.append(to_string(totalUVCount) + " ");
-	for (int i = 0; i < orderedUVs.length(); i++) {
-		UVArrayString.append(to_string(orderedUVs[i]) + " ");
-	}
-
-	std::string masterTransformString;
-	masterTransformString.append(vtxArrayString + " ");
-	masterTransformString.append(NormArrayString + " ");
-	masterTransformString.append(UVArrayString);
-
-	//MStreamUtils::stdOutStream() << "masterTransformString: " << masterTransformString << "_" << endl;
-
-	if (oldContent != masterTransformString)
-	{
-		//pass to send
-		bool msgToSend = false;
-		if (vtxCount > 0)
-			msgToSend = true;
-
-		if (msgToSend) {
-			//sendMsg(CMDTYPE::UPDATE_NODE, NODE_TYPE::MESH, nrElements, totalTrisCount, objName, masterTransformString);
-		}
-	}
-
-}
 
 //sending 
 void nodeNameChangedMaterial(MObject &node, const MString &str, void*clientData) {
@@ -1138,64 +1450,6 @@ void nodeNameChangedMaterial(MObject &node, const MString &str, void*clientData)
 
 	if (msgToSend) {
 		//sendMsg(CMDTYPE::UPDATE_NAME, NODE_TYPE::MESH, 0, 0, objName, msgString);
-	}
-}
-
-//sending 
-void nodeWorldMatrixChanged(MObject &node, MDagMessage::MatrixModifiedFlags &modified, void *clientData)
-{
-
-	MDagPath path;
-	MFnDagNode(node).getPath(path);
-	MFnMesh mesh(path);
-
-	//get local and world matrix
-	MMatrix localMatrix = MMatrix(path.exclusiveMatrix());
-	MMatrix worldMatrix = MMatrix(path.inclusiveMatrix());
-
-	//creat string from all the vector rows
-	std::string row4;
-	row4.append(to_string(worldMatrix(0, 3)) + " ");
-	row4.append(to_string(worldMatrix(1, 3)) + " ");
-	row4.append(to_string(worldMatrix(2, 3)) + " ");
-	row4.append(to_string(worldMatrix(3, 3)) + " ");
-
-	std::string row2;
-	row2.append(to_string(worldMatrix(0, 1)) + " ");
-	row2.append(to_string(worldMatrix(1, 1)) + " ");
-	row2.append(to_string(worldMatrix(2, 1)) + " ");
-	row2.append(to_string(worldMatrix(3, 1)) + " ");
-
-	std::string row3;
-	row3.append(to_string(worldMatrix(0, 2)) + " ");
-	row3.append(to_string(worldMatrix(1, 2)) + " ");
-	row3.append(to_string(worldMatrix(2, 2)) + " ");
-	row3.append(to_string(worldMatrix(3, 2)) + " ");
-
-	std::string row1;
-	row1.append(to_string(worldMatrix(0, 0)) + " ");
-	row1.append(to_string(worldMatrix(1, 0)) + " ");
-	row1.append(to_string(worldMatrix(2, 0)) + " ");
-	row1.append(to_string(worldMatrix(3, 0)) + " ");
-
-	//create string to send to raylib
-	std::string objName = mesh.name().asChar();
-	std::string msgString;
-	msgString.append(row1);
-	msgString.append(row2);
-	msgString.append(row3);
-	msgString.append(row4);
-
-	if (oldContent != msgString)
-	{
-		//pass to send
-		bool msgToSend = false;
-		if (msgString.length() > 0)
-			msgToSend = true;
-
-		if (msgToSend) {
-			//sendMsg(CMDTYPE::UPDATE_MATRIX, NODE_TYPE::MESH, 0, 0, objName, msgString);
-		}
 	}
 }
 
