@@ -24,6 +24,7 @@ enum NODE_TYPE {
 	CAMERA
 };
 
+
 enum CMDTYPE {
 	DEFAULT				= 1000,
 	NEW_NODE			= 1001,
