@@ -689,6 +689,7 @@ void updateNode(std::vector<modelFromMaya>& modelArray, std::vector<lightFromMay
 		delete[] meshUVs;
 	}
 
+
 	if (msgHeader.nodeType == NODE_TYPE::CAMERA) {
 		
 		cameraFromMaya tempCam = {}; 
