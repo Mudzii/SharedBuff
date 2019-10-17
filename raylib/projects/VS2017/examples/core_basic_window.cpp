@@ -31,7 +31,8 @@ enum CMDTYPE {
 	UPDATE_MATRIX		= 1003,
 	UPDATE_NAME			= 1004,
 	UPDATE_MATERIAL		= 1005,
-	UPDATE_MATERIALNAME = 1006
+	UPDATE_MATERIALNAME = 1006,
+	DELETE_NODE			= 1007
 };
 
 struct MsgHeader {
@@ -101,6 +102,8 @@ struct modelPos {
 // Functions ========================
 void addNode(std::vector<modelFromMaya>& modelArray, std::vector<lightFromMaya>& lightsArray, std::vector<cameraFromMaya>& cameraArray, std::vector<materialMaya>& materialArray, char* buffer, int bufferSize, Shader shader, int* nrObjs, int* index, int* nrMaterials);
 void updateNode(std::vector<modelFromMaya>& modelArray, std::vector<lightFromMaya>& lightsArray, std::vector<cameraFromMaya>& cameraArray, std::vector<materialMaya>& materialArray, char* buffer, int bufferSize, Shader shader, int* nrObjs, int* index, int* nrMaterials);
+void deleteNode(std::vector<modelFromMaya>& modelArray, std::vector<lightFromMaya>& lightsArray, std::vector<cameraFromMaya>& cameraArray, std::vector<materialMaya>& materialArray, char* buffer, int bufferSize, Shader shader, int* nrObjs, int* index, int* nrMaterials);
+
 void updateNodeName(std::vector<modelFromMaya>& modelArray, std::vector<lightFromMaya>& lightsArray, std::vector<cameraFromMaya>& cameraArray, std::vector<materialMaya>& materialArray, char* buffer, int bufferSize, Shader shader, int* nrObjs, int* index, int* nrMaterials);
 void updateNodeMatrix(std::vector<modelFromMaya>& modelArray, std::vector<lightFromMaya>& lightsArray, std::vector<cameraFromMaya>& cameraArray, std::vector<materialMaya>& materialArray, char* buffer, int bufferSize, Shader shader, int* nrObjs, int* index, int* nrMaterials);
 
@@ -139,6 +142,7 @@ int main() {
 	funcMap[UPDATE_NAME]		 = updateNodeName;
 	funcMap[UPDATE_MATERIAL]	 = updateMaterial;
 	funcMap[UPDATE_MATERIALNAME] = updateMaterialName;
+	funcMap[DELETE_NODE]		 = deleteNode;
 
 
 	// create a simple cube
@@ -409,11 +413,12 @@ void addNode(std::vector<modelFromMaya>& modelArray, std::vector<lightFromMaya>&
 		std::string texturePath = tempMat.fileTextureName;
 		texturePath = texturePath.substr(0, tempMat.textureNameLen);
 
-
+		/* 
 		std::cout << "UV: " << std::endl;
 		for (int i = 0; i < (vtxCount * 2); i++)
 			std::cout << meshUVs[i] << " : ";
 		std::cout << "=======================" << std::endl;
+		*/
 
 		std::cout << "textureName: " << texturePath << std::endl;
 		std::cout << "materialName: " << materialName << std::endl;
@@ -513,6 +518,35 @@ void addNode(std::vector<modelFromMaya>& modelArray, std::vector<lightFromMaya>&
 	}
 
 	if (msgHeader.nodeType == NODE_TYPE::LIGHT) {
+
+	}
+
+}
+
+void deleteNode(std::vector<modelFromMaya>& modelArray, std::vector<lightFromMaya>& lightsArray, std::vector<cameraFromMaya>& cameraArray, std::vector<materialMaya>& materialArray, char* buffer, int bufferSize, Shader shader, int* nrObjs, int* index, int* nrMaterials) {
+
+	std::cout << std::endl;
+	std::cout << "=======================================" << std::endl;
+	std::cout << "DELETE NODE FUNCTION" << std::endl;
+
+	MsgHeader msgHeader = {};
+	memcpy((char*)&msgHeader, buffer, sizeof(MsgHeader));
+
+	std::string objectName = msgHeader.objName;
+	objectName = objectName.substr(0, msgHeader.nameLen);
+
+	if (msgHeader.nodeType == NODE_TYPE::MESH) {
+
+		for (int i = 0; i < *nrObjs; i++) {
+			if (modelArray[i].name == objectName) {
+				std::cout << "Mesh found " << std::endl;
+
+				int tempIndex = modelArray[i].index;
+				modelArray.erase(modelArray.begin() + i);
+				*nrObjs = *nrObjs - 1;
+				*index = *index - 1;
+			}
+		}
 
 	}
 

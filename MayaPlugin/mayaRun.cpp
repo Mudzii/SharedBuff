@@ -51,14 +51,14 @@ enum NODE_TYPE {
 
 // what kind of command is sent 
 enum CMDTYPE {
-	DEFAULT = 1000,
-	NEW_NODE = 1001,
-	UPDATE_NODE = 1002,
-	UPDATE_MATRIX = 1003,
-	UPDATE_NAME = 1004,
-	UPDATE_MATERIAL = 1005,
-	UPDATE_MATERIALNAME = 1006
-
+	DEFAULT				= 1000,
+	NEW_NODE			= 1001,
+	UPDATE_NODE			= 1002,
+	UPDATE_MATRIX		= 1003,
+	UPDATE_NAME			= 1004,
+	UPDATE_MATERIAL		= 1005,
+	UPDATE_MATERIALNAME = 1006,
+	DELETE_NODE			= 1007
 };
 
 // header for message that are sent
@@ -2014,7 +2014,7 @@ void nodeWorldMatrixChangedLight(MObject &node, MDagMessage::MatrixModifiedFlags
 // ================================= OTHER ==========================================
 // ==================================================================================
 
-// NEEDS UPDATE
+// callback that goes through nodes that have been created and attatches callbacks
 void nodeAdded(MObject &node, void * clientData) {
 
 	//we register callbacks for both the new mesh kTransform and kMesh. the KTransform is in charge of the rotationg, scaling, transltion on a mesh or vrts. The kMesh is in charge of ex. subdividing or adding more vrts on the mesh.
@@ -2027,15 +2027,12 @@ void nodeAdded(MObject &node, void * clientData) {
 	if (node.hasFn(MFn::kMesh)) {
 
 		MStreamUtils::stdOutStream() << "nodeAdded: MESH was added " << endl;
-
 		meshQueue.push(node);
-
 		
 		tempID = MDGMessage::addConnectionCallback(vtxPlugConnected, NULL, &status);
 		if (Result == MS::kSuccess) {
 			callbackIdArray.append(tempID);
 		}
-
 		
 		tempID = MDGMessage::addConnectionCallback(meshConnectionChanged, NULL, &Result);
 		if (Result == MS::kSuccess) {
@@ -2060,10 +2057,46 @@ void nodeAdded(MObject &node, void * clientData) {
 	//this function is called whenever a node is added. should pass to appropriate funtions(?)
 }
 
+// callback that goes through nodes that have been deleted
+void nodeDeleted(MObject &node, void *clientData) {
+
+	MStreamUtils::stdOutStream() << "\n";
+	MStreamUtils::stdOutStream() << "NODE DELETED";
+
+	if (node.hasFn(MFn::kMesh)) {
+
+		MFnMesh mesh(node);
+
+		MStreamUtils::stdOutStream() << "node name: " << mesh.name();
+		std::string meshName = mesh.name().asChar(); 
+
+		size_t totalMsgSize = (sizeof(MsgHeader));
+		const char* msg = new char[totalMsgSize];
+
+		// Fill header ========
+		MsgHeader msgHeader;
+		msgHeader.msgSize = totalMsgSize;
+		msgHeader.nodeType = NODE_TYPE::MESH;
+		msgHeader.nameLen = meshName.length();
+		msgHeader.cmdType = CMDTYPE::DELETE_NODE;
+		memcpy(msgHeader.objName, meshName.c_str(), meshName.length());
+
+		// copy over msg ======
+		memcpy((char*)msg, &msgHeader, sizeof(MsgHeader));
+		
+		if (comLib.send(msg, totalMsgSize)) {
+			MStreamUtils::stdOutStream() << "nodeDeleted: Message sent" << "\n";
+		}
+
+
+	}
+
+}
+
 // NEEDS UPDATE
 void timerCallback(float elapsedTime, float lastTime, void* clientData) {
-	globalTime += (elapsedTime - lastTime);
-	lastTime = elapsedTime;
+	
+	globalTime += elapsedTime;
 
 	MCallbackId tempID;
 	MStatus Result = MS::kSuccess;
@@ -2165,6 +2198,7 @@ void timerCallback(float elapsedTime, float lastTime, void* clientData) {
 
 }
 
+
 // Function to Load plugin Load
 EXPORT MStatus initializePlugin(MObject obj) {
 
@@ -2183,17 +2217,15 @@ EXPORT MStatus initializePlugin(MObject obj) {
 	MStreamUtils::stdOutStream() << "Plugin loaded ===========================\n";
 
 
-	
-	
 	// register callbacks here for
 	tempID = MDGMessage::addNodeAddedCallback(nodeAdded);
 	callbackIdArray.append(tempID);
-	
 
-	//MDGMessage::addNodeRemovedCallback(nodeRemoved, "dependNode", NULL, &status);
-	tempID = MTimerMessage::addTimerCallback(timerPeriod, timerCallback, NULL, &status);
+	tempID = MDGMessage::addNodeRemovedCallback(nodeDeleted);
 	callbackIdArray.append(tempID);
 
+	tempID = MTimerMessage::addTimerCallback(timerPeriod, timerCallback, NULL, &status);
+	callbackIdArray.append(tempID);
 
 	/////////////////////////////////////////////////
 	//											   //
