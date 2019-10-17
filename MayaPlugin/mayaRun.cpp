@@ -88,9 +88,9 @@ struct Camera {
 	float fov;
 };
 
-struct Lights {
+struct Light {
 	Vec3 lightPos; 
-	float radius; 
+	float intensity;
 	Color color; 
 };
 
@@ -261,7 +261,7 @@ void nodeMaterialAttributeChanged(MNodeMessage::AttributeMessage msg, MPlug &plu
 			attr = lambertItem.findPlug("colorB");
 			attr.getValue(color.b);
 
-			
+
 			// convert from 0-1 to 0-255
 			Color tempColor = {}; 
 			int red = color.r * 255;
@@ -270,6 +270,7 @@ void nodeMaterialAttributeChanged(MNodeMessage::AttributeMessage msg, MPlug &plu
 			int alpha = color.a * 255;
 			tempColor = { (unsigned char)red, (unsigned char)blue, (unsigned char)green, (unsigned char)alpha };
 
+			MStreamUtils::stdOutStream() << "COLOR: " << red << " : " << green << " : " << blue << " : " << alpha << endl;
 
 			// fill material struct
 			materialInfo.type = 0;
@@ -336,7 +337,7 @@ void meshConnectionChanged(MPlug &plug, MPlug &otherPlug, bool made, void *clien
 
 	// a connection was made
 	//if (made == true) {
-	if (plug.partialName() != "out") {
+	
 
 
 		MStreamUtils::stdOutStream() << endl;
@@ -359,13 +360,13 @@ void meshConnectionChanged(MPlug &plug, MPlug &otherPlug, bool made, void *clien
 		Material materialInfo = {};
 		MCallbackId tempID;
 
-	}
+	
 		//////////////////////////////////
 		//								//
 		//	 MATERIALS AND TEXTURES 	//
 		//								//
 		//////////////////////////////////
-		/* 
+		
 		//find the meshShape the connection was connected to.
 		// OBS when connecting material to obj the material is connected to both a shaderball and well
 		std::string meshName = mesh.name().asChar();
@@ -557,7 +558,7 @@ void meshConnectionChanged(MPlug &plug, MPlug &otherPlug, bool made, void *clien
 			}
 		}
 
-		*/
+	
 
 
 	//}
@@ -990,10 +991,6 @@ void vtxPlugConnected(MPlug & srcPlug, MPlug & destPlug, bool made, void* client
 				delete[] meshVtx;
 				delete[] meshNormals;
 				delete[] meshUVs;
-
-
-
-
 
 
 			}
@@ -1933,41 +1930,112 @@ msgString.append(std::to_string(FOV));
 // ================================= LIGHT ==========================================
 // ==================================================================================
 
-//sending NEEDS UPDATE
+//not sending 
 void nodeLightAttributeChanged(MNodeMessage::AttributeMessage msg, MPlug &plug, MPlug &otherPlug, void* x) {
 	
-	//MStreamUtils::stdOutStream() << "nodeLightAttributeChanged " << endl;
-	//only supports one light
+	// only do this if the msg is a change of attributes (pos, color etc)
+	if (msg & MNodeMessage::kAttributeSet) {
+		
+		MStreamUtils::stdOutStream() << "nodeLightAttributeChanged" << "\n";
 
-	// get path of the light
-	MDagPath path;
-	MFnDagNode(plug.node()).getPath(path);
-	MFnLight sceneLight(path);
+		// get light through dagpath
+		MDagPath path;
+		MFnDagNode(plug.node()).getPath(path);
+		MFnLight lightNode(path);
 
-	//get light color and intensity, OBS raylib doesnt have light ish so intensityn is not used. 
-	MPlug colorPlug = sceneLight.findPlug("color");
-	MPlug intensityPlug = sceneLight.findPlug("intensity");
+		// variables
+		MStatus status;
+		float intensity;
+		MVector lightPos;
+		MColor lightColor;
+
+		// fill variables 
+		lightColor = lightNode.color();
+		intensity = lightNode.intensity();
+
+		MObject parent = lightNode.parent(0);
+		if (parent.hasFn(MFn::kTransform)) {
+			MFnTransform lightPoint(parent);
+			lightPos = lightPoint.getTranslation(MSpace::kObject, &status);
+		}
+
+		// convert from 0-1 to 0-255
+		Color tempColor = {};
+		int red = lightColor.r * 255;
+		int blue = lightColor.b * 255;
+		int green = lightColor.g * 255;
+		int alpha = lightColor.a * 255;
+		tempColor = { (unsigned char)red, (unsigned char)blue, (unsigned char)green, (unsigned char)alpha };
+
+		// fill light struct 
+		Light lightInfo = {};
+		lightInfo.color = tempColor;
+		lightInfo.intensity = intensity;
+		lightInfo.lightPos = { (float)lightPos.x, (float)lightPos.y, (float)lightPos.z };
+
+		// create message ptr
+		size_t totalMsgSize = (sizeof(MsgHeader) + sizeof(Light));
+		const char* msg = new char[totalMsgSize];
+
+		// Fill header ========
+		MsgHeader msgHeader;
+		msgHeader.msgSize = totalMsgSize;
+		msgHeader.nodeType = NODE_TYPE::LIGHT;
+		msgHeader.nameLen = lightNode.name().length();
+		msgHeader.cmdType = CMDTYPE::UPDATE_NODE;
+		memcpy(msgHeader.objName, lightNode.name().asChar(), lightNode.name().length());
+
+		// copy over msg ======
+		memcpy((char*)msg, &msgHeader, sizeof(MsgHeader));
+		memcpy((char*)msg + sizeof(MsgHeader), &lightInfo, sizeof(Light));
+
+		
+		//send it
+		//if (comLib.send(msg, totalMsgSize)) {
+			//MStreamUtils::stdOutStream() << "nodeLightAttributeChanged: Message sent" << "\n";
+		//}
+		
+
+		
+		delete[] msg;
+
+
+		/* 
+		MStreamUtils::stdOutStream() << endl;
+		MStreamUtils::stdOutStream() << "nodeLightAttributeChanged " << endl;
+		//only supports one light
+
+		// get path of the light
+		MDagPath path;
+		MFnDagNode(plug.node()).getPath(path);
+		MFnLight sceneLight(path);
+
+		//get light color and intensity, OBS raylib doesnt have light ish so intensityn is not used. 
+		MPlug colorPlug = sceneLight.findPlug("color");
+		MPlug intensityPlug = sceneLight.findPlug("intensity");
 
 
 
-	//create string to send
-	std::string msgString = "";
-	msgString.append(to_string(sceneLight.color().r) + " ");
-	msgString.append(to_string(sceneLight.color().g) + " ");
-	msgString.append(to_string(sceneLight.color().b) + " ");
-	msgString.append(to_string(sceneLight.color().a) + " ");
+		//create string to send
+		std::string msgString = "";
+		msgString.append(to_string(sceneLight.color().r) + " ");
+		msgString.append(to_string(sceneLight.color().g) + " ");
+		msgString.append(to_string(sceneLight.color().b) + " ");
+		msgString.append(to_string(sceneLight.color().a) + " ");
 
-	//pass to send
-	bool msgToSend = false;
-	if (msgString.length() > 0)
-		msgToSend = true;
+		//pass to send
+		bool msgToSend = false;
+		if (msgString.length() > 0)
+			msgToSend = true;
 
-	if (msgToSend) {
-		//sendMsg(CMDTYPE::UPDATE_NODE, NODE_TYPE::LIGHT, 0, 0, "light", msgString);
+		if (msgToSend) {
+			//sendMsg(CMDTYPE::UPDATE_NODE, NODE_TYPE::LIGHT, 0, 0, "light", msgString);
+		}
+		*/
 	}
 }
 
-// TEST NEEDS UPDATE
+//not sending 
 void vtxPlugConnectedLight(MPlug & srcPlug, MPlug & destPlug, bool made, void* clientData) {
 	
 	MStreamUtils::stdOutStream() << "in vtxPlugConnectedLight " << endl;
@@ -1975,27 +2043,139 @@ void vtxPlugConnectedLight(MPlug & srcPlug, MPlug & destPlug, bool made, void* c
 
 }
 
-//sending NEEDS UPDATE
-void nodeWorldMatrixChangedLight(MObject &node, MDagMessage::MatrixModifiedFlags &modified, void *clientData)
-{
+//not sending 
+void nodeWorldMatrixChangedLight(MObject &node, MDagMessage::MatrixModifiedFlags &modified, void *clientData) {
 	//MStreamUtils::stdOutStream() << "nodeWorldMatrixChangedLight " << endl;
-
+	/* 
+	// get light node path
 	MDagPath path;
 	MFnDagNode(node).getPath(path);
+	MFnLight sceneLight(path);
+
 	MFnTransform transform(path);
-	MFnMesh mesh(path);
+	//MFnMesh mesh(path);
 
 	MMatrix localMatrix = MMatrix(path.exclusiveMatrix());
 	MMatrix worldMatrix = MMatrix(path.inclusiveMatrix());
 
-	std::string translateVector;
-	translateVector.append(to_string(worldMatrix(3, 0)) + " ");
-	translateVector.append(to_string(worldMatrix(3, 1)) + " ");
-	translateVector.append(to_string(worldMatrix(3, 2)) + " ");
 
-	std::string objName = mesh.name().asChar();
-	std::string msgString = translateVector;
+	std::string objName = sceneLight.name().asChar();
 
+	// fill matrix struct to send 
+	// matrix is transposed before sending to raylib
+	Matrix matrixInfo = {};
+
+	//row 1
+	matrixInfo.a11 = worldMatrix(0, 0);
+	matrixInfo.a12 = worldMatrix(1, 0);
+	matrixInfo.a13 = worldMatrix(2, 0);
+	matrixInfo.a14 = worldMatrix(3, 0);
+
+	//row 2
+	matrixInfo.a21 = worldMatrix(0, 1);
+	matrixInfo.a22 = worldMatrix(1, 1);
+	matrixInfo.a23 = worldMatrix(2, 1);
+	matrixInfo.a24 = worldMatrix(3, 1);
+
+	//row 3
+	matrixInfo.a31 = worldMatrix(0, 2);
+	matrixInfo.a32 = worldMatrix(1, 2);
+	matrixInfo.a33 = worldMatrix(2, 2);
+	matrixInfo.a34 = worldMatrix(3, 2);
+
+	//row 4
+	matrixInfo.a41 = worldMatrix(0, 3);
+	matrixInfo.a42 = worldMatrix(1, 3);
+	matrixInfo.a43 = worldMatrix(2, 3);
+	matrixInfo.a44 = worldMatrix(3, 3);
+
+
+	size_t totalMsgSize = (sizeof(MsgHeader) + sizeof(Matrix));
+	const char* msg = new char[totalMsgSize];
+
+	// Fill header ========
+	MsgHeader msgHeader;
+	msgHeader.msgSize = totalMsgSize;
+	msgHeader.nameLen = objName.length();
+	msgHeader.nodeType = NODE_TYPE::LIGHT;
+	msgHeader.cmdType = CMDTYPE::UPDATE_MATRIX;
+	memcpy(msgHeader.objName, objName.c_str(), objName.length());
+
+	// copy over msg ======
+	memcpy((char*)msg, &msgHeader, sizeof(MsgHeader));
+	memcpy((char*)msg + sizeof(MsgHeader), &matrixInfo, sizeof(Matrix));
+
+	//send it
+	
+	if (oldContent != msg) {
+		if (comLib.send(msg, totalMsgSize)) {
+			MStreamUtils::stdOutStream() << "nodeWorldMatrixChangedLight: Message sent" << "\n";
+		}
+	}
+
+
+	oldContent = msg;
+	oldName = objName;
+
+	delete[] msg;
+
+	*/
+
+
+
+
+
+
+	/* 
+	// fill camInfo struct
+	cameraInfo.pos = { (float)camPos.x, (float)camPos.y, (float)camPos.z };
+	cameraInfo.up = { (float)upDir.x, (float)upDir.y, (float)upDir.z };
+	cameraInfo.forward = { (float)COI.x, (float)COI.y, (float)COI.z };
+	cameraInfo.type = isOrtographic;
+	cameraInfo.fov = FOV;
+
+	//MStreamUtils::stdOutStream() << "cameraInfo.type: " << cameraInfo.type << "\n";
+
+	//pass to send
+	bool msgToSend = false;
+	if (objName.length() > 0) {
+		msgToSend = true;
+	}
+
+	if (msgToSend) {
+
+		size_t totalMsgSize = (sizeof(MsgHeader) + sizeof(Camera));
+		const char* msg = new char[totalMsgSize];
+
+		// Fill header ========
+		MsgHeader msgHeader;
+		msgHeader.msgSize = totalMsgSize;
+		msgHeader.nameLen = objName.length();
+		msgHeader.nodeType = NODE_TYPE::CAMERA;
+		msgHeader.cmdType = CMDTYPE::UPDATE_NODE;
+		memcpy(msgHeader.objName, objName.c_str(), objName.length());
+
+
+		// copy over msg ======
+		memcpy((char*)msg, &msgHeader, sizeof(MsgHeader));
+		memcpy((char*)msg + sizeof(MsgHeader), &cameraInfo, sizeof(Camera));
+
+
+
+		//send it
+		if (comLib.send(msg, totalMsgSize)) {
+			//MStreamUtils::stdOutStream() << "activeCamera: Message sent" << "\n";
+		}
+
+
+		oldContent = msg;
+		oldName = objName;
+
+		delete[]msg;
+
+	
+	*/
+	/* 
 	if (oldContent != msgString)
 	{
 		//pass to send
@@ -2007,6 +2187,71 @@ void nodeWorldMatrixChangedLight(MObject &node, MDagMessage::MatrixModifiedFlags
 			//sendMsg(CMDTYPE::UPDATE_MATRIX, NODE_TYPE::LIGHT, 0, 0, objName, msgString);
 		}
 	}
+	*/
+}
+
+void GetLightInfo(MFnLight& lightNode) {
+
+	float intensity; 
+	MStatus status;
+	MColor lightColor;
+	MVector lightPos; 
+
+	lightColor = lightNode.color();
+	intensity  = lightNode.intensity(); 
+	MObject parent = lightNode.parent(0); 
+
+	if (parent.hasFn(MFn::kTransform)) {
+		MFnTransform lightPoint(parent);
+		lightPos = lightPoint.getTranslation(MSpace::kObject, &status);
+	}
+
+	// convert from 0-1 to 0-255
+	Color tempColor = {};
+	int red   = lightColor.r * 255;
+	int blue  = lightColor.b * 255;
+	int green = lightColor.g * 255;
+	int alpha = lightColor.a * 255;
+	tempColor = { (unsigned char)red, (unsigned char)blue, (unsigned char)green, (unsigned char)alpha};
+
+	// fill light struct 
+	Light lightInfo = {}; 
+	lightInfo.color = tempColor; 
+	lightInfo.intensity = intensity; 
+	lightInfo.lightPos = { (float)lightPos.x, (float)lightPos.y, (float)lightPos.z };
+
+	MStreamUtils::stdOutStream() << "Light Color: " << lightColor << endl;
+	MStreamUtils::stdOutStream() << "Light intensity: " << intensity << endl;
+	MStreamUtils::stdOutStream() << "name: " << lightNode.name() << endl;
+
+	// create message ptr
+	size_t totalMsgSize = (sizeof(MsgHeader) + sizeof(Light));
+	const char* msg = new char[totalMsgSize];
+	
+	// Fill header ========
+	MsgHeader msgHeader;
+	msgHeader.msgSize = totalMsgSize;
+	msgHeader.nodeType = NODE_TYPE::LIGHT;
+	msgHeader.nameLen = lightNode.name().length();
+	msgHeader.cmdType = CMDTYPE::NEW_NODE;
+	memcpy(msgHeader.objName, lightNode.name().asChar(), lightNode.name().length());
+	
+	// copy over msg ======
+	memcpy((char*)msg, &msgHeader, sizeof(MsgHeader));
+	memcpy((char*)msg + sizeof(MsgHeader), &lightInfo, sizeof(Light));
+	
+				
+
+	if (oldContent != msg) {
+		//send it
+		if (comLib.send(msg, totalMsgSize)) {
+			MStreamUtils::stdOutStream() << "GetLightInfo: Message sent" << "\n";
+			}
+		}
+
+	oldContent = msg;
+	delete[] msg; 
+	
 }
 
 
@@ -2091,6 +2336,10 @@ void nodeDeleted(MObject &node, void *clientData) {
 
 	}
 
+	if (node.hasFn(MFn::kLight)) {
+		MStreamUtils::stdOutStream() << "light to delete";
+
+	}
 }
 
 // NEEDS UPDATE
@@ -2131,19 +2380,42 @@ void timerCallback(float elapsedTime, float lastTime, void* clientData) {
 				callbackIdArray.append(tempID);
 			}
 		}
+
 		meshQueue.pop();
 	}
 
 	for (int i = 0; i < lightQueue.size(); i++) {
 
 		MObject currenNode = lightQueue.back();
-		
 		if (currenNode.hasFn(MFn::kLight)) {
 
 			//MStreamUtils::stdOutStream() << "LIGHT NODE " << endl;
+			MDagPath path;
+			MFnLight sceneLight(currenNode);
+			MFnDagNode(currenNode).getPath(path);
+			
+			tempID = MNodeMessage::addAttributeChangedCallback(currenNode, nodeLightAttributeChanged, NULL, &Result);
+			if (Result == MS::kSuccess) {
+				callbackIdArray.append(tempID);
+			}
+
+			MObject parentNode = sceneLight.parent(0); 
+			tempID = MNodeMessage::addAttributeChangedCallback(parentNode, nodeLightAttributeChanged, NULL, &Result);
+			if (Result == MS::kSuccess) {
+				callbackIdArray.append(tempID);
+			}
 
 			/* 
-			MFnLight sceneLight(currenNode);
+			tempID = MDagMessage::addWorldMatrixModifiedCallback(path, nodeWorldMatrixChangedLight, NULL, &Result);
+			if (Result == MS::kSuccess) {
+				callbackIdArray.append(tempID);
+			}
+			*/
+			
+
+			//GetLightInfo(sceneLight);
+
+			/*
 			MColor lightColor;
 			lightColor = sceneLight.color();
 			MStreamUtils::stdOutStream() << "Light Color: " << lightColor << endl;
@@ -2154,18 +2426,16 @@ void timerCallback(float elapsedTime, float lastTime, void* clientData) {
 				callbackIdArray.append(tempID);
 			}
 
-			MDagPath path;
-			MFnDagNode(currenNode).getPath(path);
 
 
 			MMatrix worldMatrix = MMatrix(path.inclusiveMatrix());
 
 			MStreamUtils::stdOutStream() << "Transform World2 Matrix: " << worldMatrix << endl;
 
-			tempID = MDagMessage::addWorldMatrixModifiedCallback(path, nodeWorldMatrixChangedLight, NULL, &Result);
-			if (Result == MS::kSuccess) {
-				callbackIdArray.append(tempID);
-			}
+			*/
+
+
+			/* 
 
 			std::string translateVector;
 			translateVector.append(to_string(worldMatrix(3, 0)) + " ");
@@ -2193,6 +2463,7 @@ void timerCallback(float elapsedTime, float lastTime, void* clientData) {
 			}
 			*/
 		}
+
 		lightQueue.pop();
 	}
 

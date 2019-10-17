@@ -16,7 +16,10 @@
 ComLib comLib("shaderMemory", 50, CONSUMER);
 
 
-// Message structs and ENUMs ========
+// ===========================================================
+// ================ Structs and ENUMs ========================
+// ===========================================================
+
 enum NODE_TYPE {
 	TRANSFORM,
 	MESH,
@@ -99,7 +102,10 @@ struct modelPos {
 };
 
 
-// Functions ========================
+// ===========================================================
+// =============== FUNCTION DECLARATIONS =====================
+// ===========================================================
+
 void addNode(std::vector<modelFromMaya>& modelArray, std::vector<lightFromMaya>& lightsArray, std::vector<cameraFromMaya>& cameraArray, std::vector<materialMaya>& materialArray, char* buffer, int bufferSize, Shader shader, int* nrObjs, int* index, int* nrMaterials);
 void updateNode(std::vector<modelFromMaya>& modelArray, std::vector<lightFromMaya>& lightsArray, std::vector<cameraFromMaya>& cameraArray, std::vector<materialMaya>& materialArray, char* buffer, int bufferSize, Shader shader, int* nrObjs, int* index, int* nrMaterials);
 void deleteNode(std::vector<modelFromMaya>& modelArray, std::vector<lightFromMaya>& lightsArray, std::vector<cameraFromMaya>& cameraArray, std::vector<materialMaya>& materialArray, char* buffer, int bufferSize, Shader shader, int* nrObjs, int* index, int* nrMaterials);
@@ -115,7 +121,12 @@ typedef void(*FnPtr)(std::vector<modelFromMaya>&, std::vector<lightFromMaya>&, s
 
 void recvFromMaya(char* buffer, std::map<CMDTYPE, FnPtr> functionMap, std::vector<modelFromMaya>& modelArray, std::vector<lightFromMaya>& lightsArray, std::vector<cameraFromMaya>& cameraArray, std::vector<materialMaya>& materialArray, int bufferSize, Shader shader, int* nrObjs, int* index, int* nrMaterials);
 
-// MAIN ==================================================================
+// ==================================================================================
+// ==================================================================================
+// ================================= MAIN ===========================================
+// ==================================================================================
+// ==================================================================================
+
 int main() {
 	SetTraceLog(LOG_WARNING);
 
@@ -236,18 +247,21 @@ int main() {
 		}
 		
 
-
 		/* 
 		float *test = Vector3ToFloat(lightsFromMaya[0].lightPos);
 		SetShaderValueMatrix(shader1, viewLoc, GetCameraMatrix(camera));
 		*/
 
-		//std::cout << "Before: " << lightsFromMaya[0].lightPos.x << " " << lightsFromMaya[0].lightPos.y << " " << lightsFromMaya[0].lightPos.z << std::endl;
+		// draw lights from maya
+		for (int i = 0; i < lightsArray.size(); i++) {
+			lightPos = lightsArray[0].lightPos; 
+			lightLoc = GetShaderLocation(shader1, "lightPos");
+			DrawSphere(lightsArray[0].lightPos, 0.1, lightsArray[0].color);
+		}
+
 		SetShaderValue(shader1, lightLoc, Vector3ToFloat(lightsArray[0].lightPos), 1);
-		//std::cout << "After: " << lightsFromMaya[0].lightPos.x << " " << lightsFromMaya[0].lightPos.y << " " << lightsFromMaya[0].lightPos.z << std::endl;
 
 		ClearBackground(RAYWHITE);
-
 		/* 
 		if (IsKeyPressed(KEY_D))
 		{
@@ -270,11 +284,6 @@ int main() {
 		*/
 
 		BeginMode3D(camera);
-
-		// draw lights from maya
-		for (int i = 0; i < lightsArray.size(); i++) {
-			DrawSphere(lightsArray[0].lightPos, 0.1, lightsArray[0].color);
-		}
 
 		// draw models from maya
 		for (int i = 0; i < modelArray.size(); i++) {
@@ -324,9 +333,17 @@ int main() {
 }
 
 
-// =======================================================================
-// FUNCTION TO REVIECE MSG FROM MAYA =====================================
-// =======================================================================
+// ==================================================================================
+// ==================================================================================
+// ================================= FUNCTIONS ======================================
+// ==================================================================================
+// ==================================================================================
+
+
+
+// ==================================================================================
+// ================= FUNCTION TO REVIECE MSG FROM MAYA ==============================
+// ==================================================================================
 
 void recvFromMaya(char* buffer, std::map<CMDTYPE, FnPtr> functionMap, std::vector<modelFromMaya>& modelArray, std::vector<lightFromMaya>& lightsArray, std::vector<cameraFromMaya>& cameraArray, std::vector<materialMaya>& materialArray, int bufferSize, Shader shader, int* nrObjs, int* index, int* nrMaterials) {
 
@@ -360,10 +377,12 @@ void recvFromMaya(char* buffer, std::map<CMDTYPE, FnPtr> functionMap, std::vecto
 
 		}
 
+		/* 
 		if (msgHeader.nodeType == NODE_TYPE::LIGHT) {
 			std::cout << "RCV LIGHT" << std::endl;
 			functionMap[msgHeader.cmdType](modelArray, lightsArray, cameraArray, materialArray, buffer, bufferSize, shader, nrObjs, index, nrMaterials);
 		}
+		*/
 
 	}
 
@@ -371,9 +390,9 @@ void recvFromMaya(char* buffer, std::map<CMDTYPE, FnPtr> functionMap, std::vecto
 	
 }
 
-// =======================================================================
-// FUNCTIONS =============================================================
-// =======================================================================
+// ==================================================================================
+// ================================= OTHER ==========================================
+// ==================================================================================
 
 //add node adds a new node to the rayLib
 void addNode(std::vector<modelFromMaya>& modelArray, std::vector<lightFromMaya>& lightsArray, std::vector<cameraFromMaya>& cameraArray, std::vector<materialMaya>& materialArray, char* buffer, int bufferSize, Shader shader, int* nrObjs, int* index, int* nrMaterials) {
@@ -425,6 +444,10 @@ void addNode(std::vector<modelFromMaya>& modelArray, std::vector<lightFromMaya>&
 		std::cout << "materialName: " << materialName << std::endl;
 		std::cout << "tempColor: " << (int)tempColor.r << " : " << (int)tempColor.g << " : " << (int)tempColor.b << " : " << (int)tempColor.a << " : " << std::endl;
 
+
+		// get mesh material 
+		Texture2D texture; 
+		Color newColor; 
 		materialMaya newMaterial = {}; 
 		newMaterial.type = tempMat.type; 
 		newMaterial.color = tempColor; 
@@ -439,10 +462,13 @@ void addNode(std::vector<modelFromMaya>& modelArray, std::vector<lightFromMaya>&
 
 				// if it exists, remove it and replace it
 				materialExists = true;
-
 				materialArray.erase(materialArray.begin() + i);
-				materialArray.insert(materialArray.begin() + i, {newMaterial});
-				//materialArray.insert(materialArray.begin() + i, { texturePath, tempColor, tempMat.type, materialName });
+
+				
+				materialArray.insert(materialArray.begin() + i, { newMaterial});
+				
+
+				
 			}
 		}
 
@@ -519,7 +545,16 @@ void addNode(std::vector<modelFromMaya>& modelArray, std::vector<lightFromMaya>&
 	}
 
 	if (msgHeader.nodeType == NODE_TYPE::LIGHT) {
+		std::cout << "Light node to add" << std::endl;
 
+		lightFromMaya lightInfo = {}; 
+		memcpy((char*)&lightInfo, buffer + sizeof(MsgHeader), sizeof(lightFromMaya));
+
+		std::cout << "LIGHT POS: " << lightInfo.lightPos.x << " : " << lightInfo.lightPos.y << " : " << lightInfo.lightPos.z << std::endl;
+		std::cout << "LIGHT INS: " << lightInfo.radius << std::endl;
+
+		lightsArray.erase(lightsArray.begin());
+		lightsArray.insert(lightsArray.begin(), { lightInfo });
 	}
 
 }
@@ -553,7 +588,6 @@ void deleteNode(std::vector<modelFromMaya>& modelArray, std::vector<lightFromMay
 
 }
 
-
 //update node "updates" an already existing node by removing it and replacing it with a new one
 void updateNode(std::vector<modelFromMaya>& modelArray, std::vector<lightFromMaya>& lightsArray, std::vector<cameraFromMaya>& cameraArray, std::vector<materialMaya>& materialArray, char* buffer, int bufferSize, Shader shader, int* nrObjs, int* index, int* nrMaterials) {
 
@@ -575,7 +609,7 @@ void updateNode(std::vector<modelFromMaya>& modelArray, std::vector<lightFromMay
 
 		int vtxCount = meshInfo.trisCount * 3;
 		int uvCount = meshInfo.UVcount; 
-		std::cout << "uvCount" << uvCount << std::endl;
+		//std::cout << "uvCount" << uvCount << std::endl;
 
 		float* meshVtx	   = new float[vtxCount * 3];
 		float* meshNormals = new float[vtxCount * 3];
@@ -592,8 +626,8 @@ void updateNode(std::vector<modelFromMaya>& modelArray, std::vector<lightFromMay
 		for (int i = 0; i < *nrObjs; i++) {
 			if (modelArray[i].name == objectName) {
 				
-				int tempIndex = modelArray[i].index;
 				Mesh tempMesh = {};
+				int tempIndex = modelArray[i].index;
 
 				// vtx
 				tempMesh.vertexCount = vtxCount;
@@ -612,34 +646,34 @@ void updateNode(std::vector<modelFromMaya>& modelArray, std::vector<lightFromMay
 				Model tempModel = LoadModelFromMesh(tempMesh);
 				tempModel.material.shader = shader;
 				
-				
-
+				Texture2D tempTexture; 
 				Color tempColor = modelArray[i].color;
 				std::string tempMaterialName = modelArray[i].materialName;		
 				Matrix tempMatrix = modelArray[i].modelMatrix;
 
 				std::cout << "tempColor: " << (int)tempColor.r << " : " << (int)tempColor.g << " : " << (int)tempColor.b << " : " << (int)tempColor.a << " : " << std::endl;
 
-				// erase old model and replace with new
-				modelArray.erase(modelArray.begin() + i);
 
 				for (int i = 0; i < materialArray.size(); i++) {
 					if (materialArray[i].materialName == tempMaterialName) {
 
 						if (materialArray[i].type == 0) {
 							//modelArray.insert(modelArray.begin() + i, { tempModel, tempIndex, objectName, tempMatrix, tempColor, tempMaterialName });
-							//tempColor = materialArray[i].color;
+							
 						}
 
 						else if (materialArray[i].type == 1) {
-							Texture2D tempTexture = LoadTexture(materialArray[i].fileTextureName); 
+							tempTexture = LoadTexture(materialArray[i].fileTextureName); 
 							tempModel.material.maps[MAP_DIFFUSE].texture = tempTexture;
-							//modelArray.insert(modelArray.begin() + i, { tempModel, tempIndex, objectName, tempMatrix, {255,255,255,255}, tempMaterialName });
+							//modelArray.insert(modelArray.begin() + i, { tempModel, tempIndex, objectName, tempMatrix, tempColor, tempMaterialName });
 
 						}
 
 					}
 				}
+
+				// erase old model and replace with new
+				modelArray.erase(modelArray.begin() + i);
 
 				// replace with new			
 				modelArray.insert(modelArray.begin() + i, {tempModel, tempIndex, objectName, tempMatrix, tempColor, tempMaterialName});
@@ -647,9 +681,6 @@ void updateNode(std::vector<modelFromMaya>& modelArray, std::vector<lightFromMay
 			}
 
 		}
-
-
-
 
 
 		// delete the arrays
@@ -683,6 +714,15 @@ void updateNode(std::vector<modelFromMaya>& modelArray, std::vector<lightFromMay
 	}
 
 	if (msgHeader.nodeType == NODE_TYPE::LIGHT) {
+
+		std::cout << "UPDATE LIGHT!" << std::endl; 
+		lightFromMaya tempLight = {};
+		memcpy((char*)&tempLight, buffer + sizeof(MsgHeader), sizeof(lightFromMaya));
+
+		//erase the old camera and set the new one
+		lightsArray.erase(lightsArray.begin());
+		lightsArray.insert(lightsArray.begin(), {tempLight});
+
 
 	}
 
@@ -773,6 +813,7 @@ void updateNodeMatrix(std::vector<modelFromMaya>& modelArray, std::vector<lightF
 			
 		}
 	}
+
 
 }
 
@@ -995,6 +1036,7 @@ void updateMaterialName(std::vector<modelFromMaya>& modelArray, std::vector<ligh
 
 
 
+// OLD CODE
 
 //CMDTYPE recvFromMaya(char* buffer)
 //{
@@ -2069,9 +2111,6 @@ void updateMaterialName(std::vector<modelFromMaya>& modelArray, std::vector<ligh
 //
 //
 
-
-
-// OLD CODE
 
 ///////////////////////////
 ////					   //
