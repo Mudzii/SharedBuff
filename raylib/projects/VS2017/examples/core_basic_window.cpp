@@ -1009,6 +1009,7 @@ void updateMaterialName(std::vector<modelFromMaya>& modelArray, std::vector<ligh
 		}
 
 
+
 		materialMaya newMaterial = {};
 		newMaterial.type  = tempMat.type;
 		newMaterial.color = tempColor;
