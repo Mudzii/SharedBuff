@@ -401,6 +401,7 @@ void recvFromMaya(char* buffer, std::map<CMDTYPE, FnPtr> functionMap, std::vecto
 // ================================= OTHER ==========================================
 // ==================================================================================
 
+
 //add node adds a new node to the rayLib
 void addNode(std::vector<modelFromMaya>& modelArray, std::vector<lightFromMaya>& lightsArray, std::vector<cameraFromMaya>& cameraArray, std::vector<materialMaya>& materialArray, char* buffer, int bufferSize, Shader shader, int* nrObjs, int* index, int* nrMaterials) {
 
