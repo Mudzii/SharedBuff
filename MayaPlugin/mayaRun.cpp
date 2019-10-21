@@ -13,7 +13,6 @@ ComLib comLib("shaderMemory", 50, PRODUCER);
 
 using namespace std;
 
-
 // ===========================================================
 // ================ Structs and ENUMs ========================
 // ===========================================================
@@ -58,7 +57,8 @@ enum CMDTYPE {
 	UPDATE_NAME			= 1004,
 	UPDATE_MATERIAL		= 1005,
 	UPDATE_MATERIALNAME = 1006,
-	DELETE_NODE			= 1007
+	DELETE_NODE			= 1007,
+	TRANSFORM_UPDATE	= 1008
 };
 
 // header for message that are sent
@@ -103,6 +103,11 @@ struct Material {
 	Color color;
 };
 
+struct Transf {
+	char childName[64]; 
+	int childNameLen; 
+};
+
 // ===========================================================
 // ==================== Variables ============================
 // ===========================================================
@@ -113,12 +118,13 @@ MCallbackIdArray callbackIdArray;
 bool initBool = false;
 
 MTimer gTimer;
-float globalTime = 0.0f;
-float timerPeriod = 5.0f; 
+float globalTime  = 0.0f;
+float timerPeriod = 3.0f; 
 
 // keep track of created meshes/ lights to maintain them
 queue<MObject> meshQueue;
 queue<MObject> lightQueue;
+queue<MObject> transformQueue; 
 
 string oldContent = "";
 string oldName	  = "";
@@ -171,7 +177,9 @@ void nodeTextureAttributeChanged(MNodeMessage::AttributeMessage msg, MPlug &plug
 			std::string fileNameString = fileName.asChar();
 
 			if (fileNameString.length() > 0) {
-			
+				
+				//MStreamUtils::stdOutStream() << "texture" << "\n";
+
 				// fill struct with information
 				materialInfo.type = 1; 
 				materialInfo.color = {255, 255, 255, 255};
@@ -224,44 +232,42 @@ void nodeTextureAttributeChanged(MNodeMessage::AttributeMessage msg, MPlug &plug
 // callback function for when a material attribute (ex color) changes
 void nodeMaterialAttributeChanged(MNodeMessage::AttributeMessage msg, MPlug &plug, MPlug &otherPlug, void* x) {
 
-	MStreamUtils::stdOutStream() << endl;
-	MStreamUtils::stdOutStream() << " ===================================" << endl;
+	if ((msg & MNodeMessage::kAttributeSet) || (msg & MNodeMessage::kConnectionMade)) {
+		
+		MStreamUtils::stdOutStream() <<  endl;
+		MStreamUtils::stdOutStream() << " =======================================" << endl;
+		MStreamUtils::stdOutStream() << " node Material Attribute Changed" << endl;
+		MStreamUtils::stdOutStream() << endl;
 
-	MStreamUtils::stdOutStream() << "NODE MAT ATTR CHANGED" << endl;
+		Material materialInfo = {}; 
+		bool hasTexture = false; 
+		Color tempColor = {};
 
-	MCallbackId tempID; 
-	Material materialInfo = {}; 
+		// mesh variables
+		MColor color;
+		MObject lamObj(plug.node());
+		MFnLambertShader lambertShader;
+		MFnDependencyNode lambertItem; 
+		// texture 
+		MString fileName;
+		MPlug texturePlug;
+		MObjectArray Files;
+		MPlug fileTexturePlug;
+		std::string fileNameString; 
+		MPlugArray textureConnections;
+		MFnDependencyNode materialNamer(plug.node());
 
-	MObject lamObj(plug.node());
-	MFnDependencyNode lambertDepNode(lamObj);
+		// find the material and color of lambert
+		if (plug.node().hasFn(MFn::kLambert)) {
 
-	//check if callback lamert has texture or color
-	bool hasTexture = false;
-	MPlugArray connetionsColor;
-	MPlug colorPlug = lambertDepNode.findPlug("color");
-	colorPlug.connectedTo(connetionsColor, true, false);
+			MFnDependencyNode lambertDepNode(lamObj);
 
-	
-	// if node has a texture
-	for (int x = 0; x < connetionsColor.length(); x++) {
-		if (connetionsColor[x].node().apiType() == MFn::kFileTexture)
-		{
-			//if a texture node found, create a callback for the texture
-			MObject textureObj(connetionsColor[x].node());
-			tempID = MNodeMessage::addAttributeChangedCallback(textureObj, nodeTextureAttributeChanged);
-			callbackIdArray.append(tempID);
-
-			hasTexture = true;
-		}
-	}
-
-	//else node has color
-	if (hasTexture == false) {
-		if (plug.name() == colorPlug.name()) {
+			lambertShader.setObject(plug.node());
+			MGlobal::displayInfo(lambertShader.name());
+			color = lambertShader.color();
 
 			//get material color
-			MFnDependencyNode lambertItem(lamObj);
-			MColor color;
+			lambertItem.setObject(lamObj);
 			MPlug attr;
 
 			attr = lambertItem.findPlug("colorR");
@@ -273,60 +279,210 @@ void nodeMaterialAttributeChanged(MNodeMessage::AttributeMessage msg, MPlug &plu
 
 
 			// convert from 0-1 to 0-255
-			Color tempColor = {}; 
-			int red = color.r * 256;
-			int blue = color.b * 256;
+			int red   = color.r * 256;
+			int blue  = color.b * 256;
 			int green = color.g * 256;
 			int alpha = color.a * 256;
 
 			tempColor = { (unsigned char)red, (unsigned char)green, (unsigned char)blue, (unsigned char)alpha };
-
 			MStreamUtils::stdOutStream() << "COLOR: " << red << " : " << green << " : " << blue << " : " << alpha << endl;
 
-			// fill material struct
+			texturePlug = lambertShader.findPlug("color");
+		}
+		
+		MStreamUtils::stdOutStream() << endl;
+
+		MStreamUtils::stdOutStream() << "TEX PLUG: " << texturePlug.name() << endl;
+		texturePlug.connectedTo(textureConnections, true, false);
+
+		MStreamUtils::stdOutStream() << "textureConnections.length() " << textureConnections.length() << endl;
+
+		if (textureConnections.length() > 0) {
+
+			//if plug exists split to get material name
+			std::string splitElement = ".";
+			std::string materialNamePlug = textureConnections[0].name().asChar();
+			std::string materialName = materialNamePlug.substr(0, materialNamePlug.find(splitElement));
+
+			MObject textureObj(textureConnections[0].node());
+
+			//get filepath
+			MFnDependencyNode textureNode(textureObj);
+			fileTexturePlug = textureNode.findPlug("ftn");
+
+			fileTexturePlug.getValue(fileName);
+			fileNameString = fileName.asChar();
+			
+			MStreamUtils::stdOutStream() << "TEX CONNECTION NAME: " << textureConnections[0].name() << endl;
+			MStreamUtils::stdOutStream() << "fileNameString " << fileNameString << endl;
+			if(fileNameString.length() > 0)
+				hasTexture = true; 
+		}
+
+
+		// fill material struct
+		materialInfo.matNameLen = lambertItem.name().length();
+		memcpy(materialInfo.materialName, lambertItem.name().asChar(), materialInfo.matNameLen);
+
+		if (hasTexture == true) {
 			materialInfo.type = 0;
 			materialInfo.color = tempColor;
-			
+
 			materialInfo.textureNameLen = 2;
 			memcpy(materialInfo.fileTextureName, "NA", materialInfo.textureNameLen);
+		}
 
-			materialInfo.matNameLen = lambertItem.name().length();
-			memcpy(materialInfo.materialName, lambertItem.name().asChar(), materialInfo.matNameLen);
+		else if (hasTexture == false) {
+			materialInfo.type = 1;
+			materialInfo.color = {255,255,255,255};
 
-			// create message ptr
-			size_t totalMsgSize = (sizeof(MsgHeader) + sizeof(Material));
-			const char* msg = new char[totalMsgSize];
+			materialInfo.textureNameLen = fileNameString.length();
+			memcpy(materialInfo.fileTextureName, fileNameString.c_str(), materialInfo.textureNameLen);
+		}
 
-			// Fill header ========
-			MsgHeader msgHeader;
-			msgHeader.msgSize = totalMsgSize;
-			msgHeader.nodeType = NODE_TYPE::MESH;
-			msgHeader.nameLen = 2;
-			msgHeader.cmdType = CMDTYPE::UPDATE_MATERIAL;
-			memcpy(msgHeader.objName, "NA", msgHeader.nameLen);
+		// create message ptr
+		size_t totalMsgSize = (sizeof(MsgHeader) + sizeof(Material));
+		const char* msg = new char[totalMsgSize];
 
-			// copy over msg ======
-			memcpy((char*)msg, &msgHeader, sizeof(MsgHeader));
-			memcpy((char*)msg + sizeof(MsgHeader), &materialInfo, sizeof(Material));
+		// Fill header ========
+		MsgHeader msgHeader;
+		msgHeader.msgSize = totalMsgSize;
+		msgHeader.nodeType = NODE_TYPE::MESH;
+		msgHeader.nameLen = 2;
+		msgHeader.cmdType = CMDTYPE::UPDATE_MATERIAL;
+		memcpy(msgHeader.objName, "NA", msgHeader.nameLen);
+
+		// copy over msg ======
+		memcpy((char*)msg, &msgHeader, sizeof(MsgHeader));
+		memcpy((char*)msg + sizeof(MsgHeader), &materialInfo, sizeof(Material));
 
 
-			if (oldContent != msg) {
-				//send it
-				if (comLib.send(msg, totalMsgSize)) {
-					MStreamUtils::stdOutStream() << "nodeMaterialAttributeChanged: Message sent" << "\n";
-				
-				}
-			}
-
-			oldContent = msg;
+		//send it
+		if (comLib.send(msg, totalMsgSize)) {
+			MStreamUtils::stdOutStream() << "nodeMaterialAttributeChanged: Message sent" << "\n";
 
 		}
-	}
-	
-	
 
-	MStreamUtils::stdOutStream() << " ===================================" << endl;
-	MStreamUtils::stdOutStream() << endl;
+		delete[] msg;
+
+
+		/* 
+		
+		MStreamUtils::stdOutStream() << endl;
+		MStreamUtils::stdOutStream() << " ===================================" << endl;
+
+		MStreamUtils::stdOutStream() << "NODE MAT ATTR CHANGED" << endl;
+		MStreamUtils::stdOutStream() << "msg " << msg << endl;
+		MStreamUtils::stdOutStream() << "plug " << plug.name() << endl;
+		MStreamUtils::stdOutStream() << "other plug " << otherPlug.name() << endl;
+
+
+		MCallbackId tempID;
+		Material materialInfo = {};
+
+		MObject lamObj(plug.node());
+		MFnDependencyNode lambertDepNode(lamObj);
+
+		//check if callback lamert has texture or color
+		MPlugArray connections;
+		bool hasTexture = false;
+		MPlug colorPlug = lambertDepNode.findPlug("color");
+		colorPlug.connectedTo(connections, true, false);
+
+		
+		// if node has a texture
+		for (int x = 0; x < connections.length(); x++) {
+			if (connections[x].node().apiType() == MFn::kFileTexture) {
+
+				//MStreamUtils::stdOutStream() << "TEXTURE" << endl;
+
+				//if a texture node found, create a callback for the texture
+				MObject textureObj(connections[x].node());
+				tempID = MNodeMessage::addAttributeChangedCallback(textureObj, nodeTextureAttributeChanged);
+				callbackIdArray.append(tempID);
+
+				hasTexture = true;
+			}
+		}
+		
+
+		MStreamUtils::stdOutStream() << "HAS TEX: " << hasTexture << endl;
+
+
+		//else node has color
+		if (hasTexture == false) {
+			MStreamUtils::stdOutStream() << "NO TEXTURE, getting color" << endl;
+			if (plug.name() == colorPlug.name()) {
+				MStreamUtils::stdOutStream() << "found color" << endl;
+
+				//get material color
+				MFnDependencyNode lambertItem(lamObj);
+				MColor color;
+				MPlug attr;
+
+				attr = lambertItem.findPlug("colorR");
+				attr.getValue(color.r);
+				attr = lambertItem.findPlug("colorG");
+				attr.getValue(color.g);
+				attr = lambertItem.findPlug("colorB");
+				attr.getValue(color.b);
+
+
+				// convert from 0-1 to 0-255
+				Color tempColor = {};
+				int red = color.r * 256;
+				int blue = color.b * 256;
+				int green = color.g * 256;
+				int alpha = color.a * 256;
+
+				tempColor = { (unsigned char)red, (unsigned char)green, (unsigned char)blue, (unsigned char)alpha };
+
+				//MStreamUtils::stdOutStream() << "COLOR: " << red << " : " << green << " : " << blue << " : " << alpha << endl;
+
+				// fill material struct
+				materialInfo.type = 0;
+				materialInfo.color = tempColor;
+
+				materialInfo.textureNameLen = 2;
+				memcpy(materialInfo.fileTextureName, "NA", materialInfo.textureNameLen);
+
+				materialInfo.matNameLen = lambertItem.name().length();
+				memcpy(materialInfo.materialName, lambertItem.name().asChar(), materialInfo.matNameLen);
+
+				// create message ptr
+				size_t totalMsgSize = (sizeof(MsgHeader) + sizeof(Material));
+				const char* msg = new char[totalMsgSize];
+
+				// Fill header ========
+				MsgHeader msgHeader;
+				msgHeader.msgSize = totalMsgSize;
+				msgHeader.nodeType = NODE_TYPE::MESH;
+				msgHeader.nameLen = 2;
+				msgHeader.cmdType = CMDTYPE::UPDATE_MATERIAL;
+				memcpy(msgHeader.objName, "NA", msgHeader.nameLen);
+
+				// copy over msg ======
+				memcpy((char*)msg, &msgHeader, sizeof(MsgHeader));
+				memcpy((char*)msg + sizeof(MsgHeader), &materialInfo, sizeof(Material));
+
+
+				//send it
+				if (comLib.send(msg, totalMsgSize)) {
+					MStreamUtils::stdOutStream() << "nodeMaterialAttributeChanged (color): Message sent" << "\n";
+
+				}
+				
+				delete[] msg; 
+
+
+			}
+		}
+		*/
+
+
+	}
+	//MStreamUtils::stdOutStream() << " ===================================" << endl;
+	//MStreamUtils::stdOutStream() << endl;
 
 
 	// OLD CODE
@@ -356,195 +512,124 @@ void meshConnectionChanged(MPlug &plug, MPlug &otherPlug, bool made, void *clien
 
 	// a connection was made
 	//if (made == true) {
+	MStreamUtils::stdOutStream() << endl;
+	MStreamUtils::stdOutStream() << " ===================================" << endl;
+	MStreamUtils::stdOutStream() << "MESH CONNECTION CHANGED (TEXTURE)" << endl;
+	//MStreamUtils::stdOutStream() << "plug name: " << plug.name() << endl;
+	//MStreamUtils::stdOutStream() << endl;
+	//MStreamUtils::stdOutStream() << "partaial name: " << plug.partialName() << endl;
+	//MStreamUtils::stdOutStream() << endl;
+	//MStreamUtils::stdOutStream() << "otherPlug name: " << otherPlug.name() << endl;
+	//MStreamUtils::stdOutStream() << endl;
 
-		MStreamUtils::stdOutStream() << endl;
-		MStreamUtils::stdOutStream() << " ===================================" << endl;
+	// get mesh through path
+	MDagPath path;
+	MFnDagNode(plug.node()).getPath(path);
+	MFnTransform transform(path);
+	MFnMesh mesh(path);
 
-		MStreamUtils::stdOutStream() << "MESH CONNECTION CHANGED" << endl;
-		MStreamUtils::stdOutStream() << "plug name: " << plug.name() << endl;
-		MStreamUtils::stdOutStream() << endl;
-		MStreamUtils::stdOutStream() << "partaial name: " << plug.partialName() << endl;
-		MStreamUtils::stdOutStream() << endl;
-		MStreamUtils::stdOutStream() << "otherPlug name: " << otherPlug.name() << endl;
-		MStreamUtils::stdOutStream() << endl;
-
-		// if texture connected
-
-			MStreamUtils::stdOutStream() << " ----------------------------- " << "\n";
-			MStreamUtils::stdOutStream() << "Texture stuff changed" << endl;
-			MStreamUtils::stdOutStream() << " ----------------------------- " << "\n";
-
-			// get mesh through path
-			MDagPath path;
-			MFnDagNode(plug.node()).getPath(path);
-			MFnTransform transform(path);
-			MFnMesh mesh(path);
-
-			Material materialInfo = {};
-			MCallbackId tempID;
+	Material materialInfo = {};
+	MCallbackId tempID;
 
 
-			//////////////////////////////////
-			//								//
-			//	 MATERIALS AND TEXTURES 	//
-			//								//
-			//////////////////////////////////
+	//////////////////////////////////
+	//								//
+	//	 MATERIALS AND TEXTURES 	//
+	//								//
+	//////////////////////////////////
 
-			//find the meshShape the connection was connected to.
-			// OBS when connecting material to obj the material is connected to both a shaderball and well
-
-			
-			std::string meshName = mesh.name().asChar();
-			std::string testString = "shaderBallGeomShape";
-
-			bool shaderBall = false;
-			if (meshName.find(testString) == std::string::npos) {
-				shaderBall = false;
-			}
-			else {
-				shaderBall = true;
-			}
-
-			// if it's not shaderBall, the connection was madeto the mesh shape
-			bool hasTexture = false;
-			if (!shaderBall) {
-
-				//get shader groups (only one shading group is supported) 
-				MObjectArray shaderGroups;
-				MIntArray shaderGroupsIndecies;
-				mesh.getConnectedShaders(0, shaderGroups, shaderGroupsIndecies);
-
-				MStreamUtils::stdOutStream() << "shaderGroups.length() " << shaderGroups.length() << endl;
-
-				if (shaderGroups.length() > 0) {
-
-					MStreamUtils::stdOutStream() << "Found shader grp" << endl;
-
-					//after shader group is found, find surface shader (connected to attributes)
-					MFnDependencyNode shaderNode(shaderGroups[0]);
-					MPlug surfaceShader = shaderNode.findPlug("surfaceShader");
-
-					// Get the connections to find material
-					MPlugArray shaderNodeconnections;
-					surfaceShader.connectedTo(shaderNodeconnections, true, false);
-
-					for (int j = 0; j < shaderNodeconnections.length(); j++) {
-
-						//go though connection and find lambert material
-						if (shaderNodeconnections[j].node().apiType() == MFn::kLambert) {
-
-							//create callback for the material found
-							MObject lambertObj(shaderNodeconnections[j].node());
-							//tempID = MNodeMessage::addAttributeChangedCallback(lambertObj, nodeMaterialAttributeChanged);
-							//callbackIdArray.append(tempID);
-
-							// get color plug to check if its has a connection or not. 
-							// If connection there is a texture, else just get the color
-							MFnDependencyNode lambertDepNode(lambertObj);
-							MPlugArray connetionsColor;
-
-							MPlug colorPlug = lambertDepNode.findPlug("color");
-							colorPlug.connectedTo(connetionsColor, true, false);
-
-							//if connectionsColor > 0 there is a texutre
-							for (int x = 0; x < connetionsColor.length(); x++) {
-
-								// found fileTexture node
-								if (connetionsColor[x].node().apiType() == MFn::kFileTexture) {
-
-									MStreamUtils::stdOutStream() << "Texture was found" << endl;
+	//find the meshShape the connection was connected to.
+	// OBS when connecting material to obj the material is connected to both a shaderball and well
 
 
-									//create callback for node
-									MObject textureObj(connetionsColor[x].node());
-									//tempID = MNodeMessage::addAttributeChangedCallback(textureObj, nodeTextureAttributeChanged);
-									//callbackIdArray.append(tempID);
+	std::string meshName = mesh.name().asChar();
+	std::string testString = "shaderBallGeomShape";
 
-									//get the filepath, search for plug name 
-									MFnDependencyNode textureNode(textureObj);
-									MPlug fileTextureName = textureNode.findPlug("ftn");
+	bool shaderBall = false;
+	if (meshName.find(testString) == std::string::npos) {
+		shaderBall = false;
+	}
+	else {
+		shaderBall = true;
+	}
 
-									MString fileName;
-									fileTextureName.getValue(fileName);
-									std::string fileNameString = fileName.asChar();
+	// if it's not shaderBall, the connection was madeto the mesh shape
+	bool hasTexture = false;
+	if (!shaderBall) {
 
-									if (fileNameString.length() > 0) {
+		//get shader groups (only one shading group is supported) 
+		MObjectArray shaderGroups;
+		MIntArray shaderGroupsIndecies;
+		mesh.getConnectedShaders(0, shaderGroups, shaderGroupsIndecies);
 
-										// fill struct with information
-										materialInfo.type = 1;
-										materialInfo.color = { 255, 255, 255, 255 };
+		//MStreamUtils::stdOutStream() << "shaderGroups.length() " << shaderGroups.length() << endl;
 
-										materialInfo.textureNameLen = fileNameString.length();
-										memcpy(materialInfo.fileTextureName, fileNameString.c_str(), materialInfo.textureNameLen);
+		if (shaderGroups.length() > 0) {
 
-										materialInfo.matNameLen = lambertDepNode.name().length();
-										memcpy(materialInfo.materialName, lambertDepNode.name().asChar(), materialInfo.matNameLen);
+			//MStreamUtils::stdOutStream() << "Found shader grp" << endl;
 
-										// create message ptr
-										size_t totalMsgSize = (sizeof(MsgHeader) + sizeof(Material));
-										const char* msg = new char[totalMsgSize];
+			//after shader group is found, find surface shader (connected to attributes)
+			MFnDependencyNode shaderNode(shaderGroups[0]);
+			MPlug surfaceShader = shaderNode.findPlug("surfaceShader");
 
-										// Fill header ========
-										MsgHeader msgHeader;
-										msgHeader.msgSize = totalMsgSize;
-										msgHeader.nodeType = NODE_TYPE::MESH;
-										msgHeader.nameLen = mesh.name().length();
-										msgHeader.cmdType = CMDTYPE::UPDATE_MATERIALNAME;
-										memcpy(msgHeader.objName, mesh.name().asChar(), msgHeader.nameLen);
+			// Get the connections to find material
+			MPlugArray shaderNodeconnections;
+			surfaceShader.connectedTo(shaderNodeconnections, true, false);
 
+			for (int j = 0; j < shaderNodeconnections.length(); j++) {
 
-										// copy over msg ======
-										memcpy((char*)msg, &msgHeader, sizeof(MsgHeader));
-										memcpy((char*)msg + sizeof(MsgHeader), &materialInfo, sizeof(Material));
+				//go though connection and find lambert material
+				if (shaderNodeconnections[j].node().apiType() == MFn::kLambert) {
 
-										if (oldContent != msg) {
-											//send it
-											if (comLib.send(msg, totalMsgSize)) {
-												MStreamUtils::stdOutStream() << "meshConnectionChanged: Message sent" << "\n";
-											}
-										}
+					//create callback for the material found
+					MObject lambertObj(shaderNodeconnections[j].node());
+					tempID = MNodeMessage::addAttributeChangedCallback(lambertObj, nodeMaterialAttributeChanged);
+					callbackIdArray.append(tempID);
 
-										oldContent = msg;
-										delete[]msg;
+					// get color plug to check if its has a connection or not. 
+					// If connection there is a texture, else just get the color
+					MFnDependencyNode lambertDepNode(lambertObj);
+					MPlugArray connetionsColor;
 
+					MPlug colorPlug = lambertDepNode.findPlug("color");
+					colorPlug.connectedTo(connetionsColor, true, false);
 
+					//if connectionsColor > 0 there is a texutre
+					for (int x = 0; x < connetionsColor.length(); x++) {
 
-									}
+						// found fileTexture node
+						if (connetionsColor[x].node().apiType() == MFn::kFileTexture) {
 
-									hasTexture = true;
-								}
-							}
+							//MStreamUtils::stdOutStream() << "Texture was found" << endl;
 
-							if (hasTexture == false) {
+							
+							MObject textureObj(connetionsColor[x].node());
+							tempID = MNodeMessage::addAttributeChangedCallback(textureObj, nodeMaterialAttributeChanged);
+							callbackIdArray.append(tempID);
 
-								MStreamUtils::stdOutStream() << "No texture, getting color" << endl;
+							/* 
+							//create callback for node
+							MObject textureObj(connetionsColor[x].node());
+							tempID = MNodeMessage::addAttributeChangedCallback(textureObj, nodeTextureAttributeChanged);
+							callbackIdArray.append(tempID);
+							*/
 
-								//get all the rgb values for the color plug if no texture was found
-								MColor color;
-								MPlug attr;
+							//get the filepath, search for plug name 
+							MFnDependencyNode textureNode(textureObj);
+							MPlug fileTextureName = textureNode.findPlug("ftn");
 
-								attr = lambertDepNode.findPlug("colorR");
-								attr.getValue(color.r);
-								attr = lambertDepNode.findPlug("colorG");
-								attr.getValue(color.g);
-								attr = lambertDepNode.findPlug("colorB");
-								attr.getValue(color.b);
+							MString fileName;
+							fileTextureName.getValue(fileName);
+							std::string fileNameString = fileName.asChar();
 
-								// convert from 0-1 to 0-255
-								Color tempColor = {};
-								int red = color.r * 256;
-								int blue = color.b * 256;
-								int green = color.g * 256;
-								int alpha = color.a * 256;
+							if (fileNameString.length() > 0) {
 
-								tempColor = { (unsigned char)red, (unsigned char)green, (unsigned char)blue, (unsigned char)alpha };
+								// fill struct with information
+								materialInfo.type = 1;
+								materialInfo.color = { 255, 255, 255, 255 };
 
-								// fill material struct
-								materialInfo.type = 0;
-								materialInfo.color = tempColor;
-
-								materialInfo.textureNameLen = 2;
-								memcpy(materialInfo.fileTextureName, "NA", materialInfo.textureNameLen);
+								materialInfo.textureNameLen = fileNameString.length();
+								memcpy(materialInfo.fileTextureName, fileNameString.c_str(), materialInfo.textureNameLen);
 
 								materialInfo.matNameLen = lambertDepNode.name().length();
 								memcpy(materialInfo.materialName, lambertDepNode.name().asChar(), materialInfo.matNameLen);
@@ -561,12 +646,12 @@ void meshConnectionChanged(MPlug &plug, MPlug &otherPlug, bool made, void *clien
 								msgHeader.cmdType = CMDTYPE::UPDATE_MATERIALNAME;
 								memcpy(msgHeader.objName, mesh.name().asChar(), msgHeader.nameLen);
 
+
 								// copy over msg ======
 								memcpy((char*)msg, &msgHeader, sizeof(MsgHeader));
 								memcpy((char*)msg + sizeof(MsgHeader), &materialInfo, sizeof(Material));
 
 								if (oldContent != msg) {
-
 									//send it
 									if (comLib.send(msg, totalMsgSize)) {
 										MStreamUtils::stdOutStream() << "meshConnectionChanged: Message sent" << "\n";
@@ -574,73 +659,149 @@ void meshConnectionChanged(MPlug &plug, MPlug &otherPlug, bool made, void *clien
 								}
 
 								oldContent = msg;
-								delete[] msg;
+								delete[]msg;
+
 
 
 							}
 
+							hasTexture = true;
 						}
+					}
+
+					if (hasTexture == false) {
+
+						//MStreamUtils::stdOutStream() << "No texture, getting color" << endl;
+
+						//get all the rgb values for the color plug if no texture was found
+						MColor color;
+						MPlug attr;
+
+						attr = lambertDepNode.findPlug("colorR");
+						attr.getValue(color.r);
+						attr = lambertDepNode.findPlug("colorG");
+						attr.getValue(color.g);
+						attr = lambertDepNode.findPlug("colorB");
+						attr.getValue(color.b);
+
+						// convert from 0-1 to 0-255
+						Color tempColor = {};
+						int red = color.r * 256;
+						int blue = color.b * 256;
+						int green = color.g * 256;
+						int alpha = color.a * 256;
+
+						tempColor = { (unsigned char)red, (unsigned char)green, (unsigned char)blue, (unsigned char)alpha };
+
+						// fill material struct
+						materialInfo.type = 0;
+						materialInfo.color = tempColor;
+
+						materialInfo.textureNameLen = 2;
+						memcpy(materialInfo.fileTextureName, "NA", materialInfo.textureNameLen);
+
+						materialInfo.matNameLen = lambertDepNode.name().length();
+						memcpy(materialInfo.materialName, lambertDepNode.name().asChar(), materialInfo.matNameLen);
+
+						// create message ptr
+						size_t totalMsgSize = (sizeof(MsgHeader) + sizeof(Material));
+						const char* msg = new char[totalMsgSize];
+
+						// Fill header ========
+						MsgHeader msgHeader;
+						msgHeader.msgSize = totalMsgSize;
+						msgHeader.nodeType = NODE_TYPE::MESH;
+						msgHeader.nameLen = mesh.name().length();
+						msgHeader.cmdType = CMDTYPE::UPDATE_MATERIALNAME;
+						memcpy(msgHeader.objName, mesh.name().asChar(), msgHeader.nameLen);
+
+						// copy over msg ======
+						memcpy((char*)msg, &msgHeader, sizeof(MsgHeader));
+						memcpy((char*)msg + sizeof(MsgHeader), &materialInfo, sizeof(Material));
+
+						if (oldContent != msg) {
+
+							//send it
+							if (comLib.send(msg, totalMsgSize)) {
+								MStreamUtils::stdOutStream() << "meshConnectionChanged: Message sent" << "\n";
+							}
+						}
+
+						oldContent = msg;
+						delete[] msg;
+
 
 					}
 
 				}
 
 			}
-			
 
-		MStreamUtils::stdOutStream() << " ===================================" << endl;
+		}
+
+	}
 
 
-			// OLD CODE
-			/*
+	//MStreamUtils::stdOutStream() << " ===================================" << endl;
 
-									//create the string with the stuff
-									std::string materialString = "";
-									materialString.append(lambertDepNode.name().asChar());
-									materialString.append(" texture ");
-									materialString.append(fileNameString);
 
-									bool msgToSend = false;
-									if (materialString.length() > 0)
-										msgToSend = true;
+	// OLD CODE
+	/*
 
-									if (msgToSend) {
-										//sendMsg(CMDTYPE::UPDATE_MATERIALNAME, NODE_TYPE::MESH, materialString.length(), 0, mesh.name().asChar(), materialString);
-									}
-									*/
+							//create the string with the stuff
+							std::string materialString = "";
+							materialString.append(lambertDepNode.name().asChar());
+							materialString.append(" texture ");
+							materialString.append(fileNameString);
 
-			// OLD CODE
-			/*
-																//create final string to be sent to the rayli with information
-																std::string colors = "";
-																colors.append(lambertDepNode.name().asChar());
-																colors.append(" color ");
-																colors.append(to_string(color.r) + " ");
-																colors.append(to_string(color.g) + " ");
-																colors.append(to_string(color.b));
+							bool msgToSend = false;
+							if (materialString.length() > 0)
+								msgToSend = true;
 
-																//pass to send
-																bool msgToSend = false;
-																if (colors.length() > 0)
-																	msgToSend = true;
+							if (msgToSend) {
+								//sendMsg(CMDTYPE::UPDATE_MATERIALNAME, NODE_TYPE::MESH, materialString.length(), 0, mesh.name().asChar(), materialString);
+							}
+							*/
 
-																if (msgToSend) {
-																	//sendMsg(CMDTYPE::UPDATE_MATERIALNAME, NODE_TYPE::MESH, colors.length(), 0, mesh.name().asChar(), colors);
-																}
-																*/
+	// OLD CODE
+	/*
+																				//create final string to be sent to the rayli with information
+																				std::string colors = "";
+																				colors.append(lambertDepNode.name().asChar());
+																				colors.append(" color ");
+																				colors.append(to_string(color.r) + " ");
+																				colors.append(to_string(color.g) + " ");
+																				colors.append(to_string(color.b));
+
+																				//pass to send
+																				bool msgToSend = false;
+																				if (colors.length() > 0)
+																					msgToSend = true;
+
+																				if (msgToSend) {
+																					//sendMsg(CMDTYPE::UPDATE_MATERIALNAME, NODE_TYPE::MESH, colors.length(), 0, mesh.name().asChar(), colors);
+																				}
+																				*/
 }
 
-//sending 
+//	Callback used for when a new material is created and connected to a mesh
 void nodeNameChangedMaterial(MObject &node, const MString &str, void*clientData) {
+
+	MStreamUtils::stdOutStream() << "\n";
+	MStreamUtils::stdOutStream() << " ===================================" << endl;
+	MStreamUtils::stdOutStream() << "NODE NAME CHANGED MATERIAL" << "\n";
+	/* 
+	MStreamUtils::stdOutStream() << "str " << str.asChar() << "\n";
+	*/
 
 	// Get the new name of the node, and use it from now on.
 	MString oldName = str;
 	MString newName = MFnDagNode(node).name();
 
-	std::string objName = oldName.asChar();
+	std::string objName	   = oldName.asChar();
 	std::string newObjName = newName.asChar();
 
-	int newNameLen = newObjName.length(); 
+	int newNameLen    = newObjName.length(); 
 	char* newNameChar = new char[newNameLen];
 	memcpy(newNameChar, newObjName.c_str(), newNameLen);
 
@@ -651,10 +812,10 @@ void nodeNameChangedMaterial(MObject &node, const MString &str, void*clientData)
 
 	// Fill header ========
 	MsgHeader msgHeader;
-	msgHeader.msgSize = totalMsgSize;
+	msgHeader.msgSize  = totalMsgSize;
 	msgHeader.nodeType = NODE_TYPE::MESH;
-	msgHeader.nameLen = objName.length();
-	msgHeader.cmdType = CMDTYPE::UPDATE_NAME;
+	msgHeader.nameLen  = objName.length();
+	msgHeader.cmdType  = CMDTYPE::UPDATE_NAME;
 	memcpy(msgHeader.objName, objName.c_str(), msgHeader.nameLen);
 	
 	// copy over msg ======
@@ -662,10 +823,8 @@ void nodeNameChangedMaterial(MObject &node, const MString &str, void*clientData)
 	memcpy((char*)msg + sizeof(MsgHeader), &newNameLen, sizeof(int));
 	memcpy((char*)msg + sizeof(MsgHeader) + sizeof(int), newNameChar, (sizeof(char) * newNameLen));
 
-	 
-
+	
 	if (oldContent != msg) {
-		//send it
 		if (comLib.send(msg, totalMsgSize)) {
 			MStreamUtils::stdOutStream() << "nodeNameChangedMaterial: Message sent" << "\n";
 		}
@@ -676,6 +835,8 @@ void nodeNameChangedMaterial(MObject &node, const MString &str, void*clientData)
 	delete[]msg;
 	delete[]newNameChar; 
 	
+	//MStreamUtils::stdOutStream() << " ===================================" << endl;
+	//MStreamUtils::stdOutStream() << "\n";
 
 	/* 
 	//pass to send
@@ -690,20 +851,195 @@ void nodeNameChangedMaterial(MObject &node, const MString &str, void*clientData)
 }
 
 // ==================================================================================
+// =============================== TRANSFORM ========================================
+// ==================================================================================
+
+// callback for attribute change of transform (matrix)
+void nodeTransformAttributeChanged(MNodeMessage::AttributeMessage msg, MPlug& plug, MPlug& otherPlug, void* clientData) {
+
+	if (msg & MNodeMessage::kAttributeSet) {
+
+		//MStreamUtils::stdOutStream() << "nodeTransformAttributeChanged " << endl;
+
+		//MStreamUtils::stdOutStream() << "msg " << msg << endl;
+		//MStreamUtils::stdOutStream() << "plug  " << plug.name() << endl;
+		//MStreamUtils::stdOutStream() << "plug part " << plug.partialName() << endl;
+		//MStreamUtils::stdOutStream() << "other plug " << otherPlug.name() << endl;
+		
+		MDagPath path;
+		MFnDagNode(plug.node()).getPath(path);
+		MFnTransform transf(path);
+
+		Transf transformInfo = {}; 
+		MFnTransform transform(plug.node());
+
+		std::string transfName = transform.name().asChar(); 
+		//MStreamUtils::stdOutStream() << "transfName " << transfName << endl;
+
+
+		if (transform.child(0).hasFn(MFn::kMesh)) {
+			MFnMesh mesh(transform.child(0));
+			//MStreamUtils::stdOutStream() << "Mesh child " << mesh.name() << endl;
+
+			transformInfo.childNameLen = mesh.name().length(); 
+			memcpy(transformInfo.childName, mesh.name().asChar(), transformInfo.childNameLen);
+
+		}
+
+		else {
+			transformInfo.childNameLen = 2;
+			memcpy(transformInfo.childName, "NA", transformInfo.childNameLen);
+		}
+
+		MMatrix worldMatrix = MMatrix(path.inclusiveMatrix());
+
+		// fill matrix struct to send 
+		// matrix is transposed before sending to raylib
+		Matrix matrixInfo = {};
+
+		//row 1
+		matrixInfo.a11 = worldMatrix(0, 0);
+		matrixInfo.a12 = worldMatrix(1, 0);
+		matrixInfo.a13 = worldMatrix(2, 0);
+		matrixInfo.a14 = worldMatrix(3, 0);
+
+		//row 2
+		matrixInfo.a21 = worldMatrix(0, 1);
+		matrixInfo.a22 = worldMatrix(1, 1);
+		matrixInfo.a23 = worldMatrix(2, 1);
+		matrixInfo.a24 = worldMatrix(3, 1);
+
+		//row 3
+		matrixInfo.a31 = worldMatrix(0, 2);
+		matrixInfo.a32 = worldMatrix(1, 2);
+		matrixInfo.a33 = worldMatrix(2, 2);
+		matrixInfo.a34 = worldMatrix(3, 2);
+
+		//row 4
+		matrixInfo.a41 = worldMatrix(0, 3);
+		matrixInfo.a42 = worldMatrix(1, 3);
+		matrixInfo.a43 = worldMatrix(2, 3);
+		matrixInfo.a44 = worldMatrix(3, 3);
+
+		size_t totalMsgSize = (sizeof(MsgHeader) + sizeof(Transf) + sizeof(Matrix));
+		const char* msg = new char[totalMsgSize];
+
+		// Fill header ========
+		MsgHeader msgHeader;
+		msgHeader.msgSize = totalMsgSize;
+		msgHeader.nodeType = NODE_TYPE::TRANSFORM;
+		msgHeader.nameLen = transfName.length();
+		msgHeader.cmdType = CMDTYPE::UPDATE_NODE;
+		memcpy(msgHeader.objName, transfName.c_str(), transfName.length());
+
+		// copy over msg ======
+		memcpy((char*)msg, &msgHeader, sizeof(MsgHeader));
+		memcpy((char*)msg + sizeof(MsgHeader), &transformInfo, sizeof(Transf));
+		memcpy((char*)msg + sizeof(MsgHeader) + sizeof(Transf), &matrixInfo, sizeof(Matrix));
+
+		if (oldContent != msg) {
+			//send it
+			if (comLib.send(msg, totalMsgSize)) {
+				MStreamUtils::stdOutStream() << "nodeTransformAttributeChanged: Message sent" << "\n";
+			}
+		}
+
+		oldContent = msg; 
+		delete[] msg; 
+	
+
+	}
+}
+
+// callback for if names was changed for mesh or transform 
+void NodeNameChanged(MObject& node, const MString& str, void* clientData) {
+
+	std::string oldName;
+	std::string newName;
+
+	bool sendMsg = false; 
+	NODE_TYPE nodeType; 
+
+	if (node.hasFn(MFn::kMesh)) {
+		//MStreamUtils::stdOutStream() << "NameChangedMesh " << endl;
+		MFnMesh mesh(node);
+
+		oldName = str.asChar();
+		newName = mesh.fullPathName().asChar();
+
+		//MStreamUtils::stdOutStream() << "Name changed from " << oldName << " to " << newName << endl;
+		nodeType = NODE_TYPE::MESH; 
+		sendMsg = true; 
+	}
+
+	else if (node.hasFn(MFn::kTransform)) {
+
+		//MStreamUtils::stdOutStream() << "NameChangedTransform " << endl;
+		MFnTransform transform(node);
+
+		oldName = str.asChar(); 
+		newName = transform.fullPathName().asChar(); 
+
+		//MStreamUtils::stdOutStream() << "Name changed from " << oldName << " to " << newName << endl;
+		nodeType = NODE_TYPE::TRANSFORM;
+		sendMsg = true; 
+
+	}
+
+	if (sendMsg == true) {
+
+		int newNameLen = newName.length();
+		char* newNameChar = new char[newNameLen];
+		memcpy(newNameChar, newName.c_str(), newNameLen);
+
+
+		// create message ptr
+		size_t totalMsgSize = (sizeof(MsgHeader) + sizeof(int) + (sizeof(char) * newNameLen));
+		const char* msg = new char[totalMsgSize];
+
+		// Fill header ========
+		MsgHeader msgHeader;
+		msgHeader.msgSize = totalMsgSize;
+		msgHeader.nodeType = nodeType;
+		msgHeader.nameLen = oldName.length();
+		msgHeader.cmdType = CMDTYPE::UPDATE_NAME;
+		memcpy(msgHeader.objName, oldName.c_str(), oldName.length());
+
+
+		// copy over msg ======
+		memcpy((char*)msg, &msgHeader, sizeof(MsgHeader));
+		memcpy((char*)msg + sizeof(MsgHeader), &newNameLen, sizeof(int));
+		memcpy((char*)msg + sizeof(MsgHeader) + sizeof(int), newNameChar, sizeof(char) * newNameLen);
+
+		
+			//send it
+		if (comLib.send(msg, totalMsgSize)) {
+			//MStreamUtils::stdOutStream() << "nodeType: " << nodeType << "\n";
+			MStreamUtils::stdOutStream() << "NodeNameChanged: Message sent" << "\n";
+		}
+		
+
+		
+		delete[] msg;
+	}
+
+}
+
+// ==================================================================================
 // ================================= MESH ===========================================
 // ==================================================================================
 
 // Callback function for when a vtx connection is made to the dependency graph (such as triangulated, topology is changed, a new mesh is added)
 void vtxPlugConnected(MPlug & srcPlug, MPlug & destPlug, bool made, void* clientData) {
 	
-	MStreamUtils::stdOutStream() << "\n";
-	MStreamUtils::stdOutStream() << " ===================================" << endl;
-	MStreamUtils::stdOutStream() << "VTX PLUG CONNECTED" << "\n";
-	MStreamUtils::stdOutStream() << "srcPlug.partialName() " << srcPlug.partialName() << "\n";
-	MStreamUtils::stdOutStream() << "destPlug.partialName() " << destPlug.partialName() << "\n";
+	//MStreamUtils::stdOutStream() << "\n";
+	//MStreamUtils::stdOutStream() << " ===================================" << endl;
+	//MStreamUtils::stdOutStream() << "VTX PLUG CONNECTED" << "\n";
+	//MStreamUtils::stdOutStream() << "srcPlug.partialName() " << srcPlug.partialName() << "\n";
+	//MStreamUtils::stdOutStream() << "destPlug.partialName() " << destPlug.partialName() << "\n";
 
 	MCallbackId tempID;
-
+	/* 
 	// If new material was connected
 	if (srcPlug.partialName() == "iog") {
 
@@ -759,6 +1095,7 @@ void vtxPlugConnected(MPlug & srcPlug, MPlug & destPlug, bool made, void* client
 
 
 	}
+	*/
 
 	//if statement checking if it's otput mesh that has been connected 
 	if (srcPlug.partialName() == "out" && destPlug.partialName() == "i") {
@@ -766,9 +1103,9 @@ void vtxPlugConnected(MPlug & srcPlug, MPlug & destPlug, bool made, void* client
 		//if connection made
 		if (made == true) {
 
-			MStreamUtils::stdOutStream() << "\n";
-			MStreamUtils::stdOutStream() << " ======================================= " << "\n";
-			MStreamUtils::stdOutStream() << "vtxPlugConnected: Connection made " << "\n";
+			//MStreamUtils::stdOutStream() << "\n";
+			//MStreamUtils::stdOutStream() << " ======================================= " << "\n";
+			//MStreamUtils::stdOutStream() << "vtxPlugConnected: Connection made " << "\n";
 
 			// variables
 			Mesh meshInfo = {};
@@ -790,7 +1127,7 @@ void vtxPlugConnected(MPlug & srcPlug, MPlug & destPlug, bool made, void* client
 			if (name.find(polyTriangulateStr) == std::string::npos)
 			{
 				status = MGlobal::executeCommand("polyTriangulate " + mesh.name(), true, true);
-				MStreamUtils::stdOutStream() << "TRANGULATING" << endl;
+				//MStreamUtils::stdOutStream() << "TRANGULATING" << endl;
 				triangulated = true;
 			}
 
@@ -832,8 +1169,6 @@ void vtxPlugConnected(MPlug & srcPlug, MPlug & destPlug, bool made, void* client
 					mesh.getFaceNormalIds(faceCnt, tempNormalIds);
 					normalIds.append(tempNormalIds[0]);
 				}
-
-
 
 				// UVs ================
 
@@ -935,6 +1270,9 @@ void vtxPlugConnected(MPlug & srcPlug, MPlug & destPlug, bool made, void* client
 						MPlugArray connetionsColor;
 						colorPlug.connectedTo(connetionsColor, true, false);
 
+						//MStreamUtils::stdOutStream() << "Has lambert" << "\n";
+
+
 						//if connectionsColor.length() > 0, material has texture connected
 						for (int x = 0; x < connetionsColor.length(); x++) {
 
@@ -942,10 +1280,13 @@ void vtxPlugConnected(MPlug & srcPlug, MPlug & destPlug, bool made, void* client
 							if (connetionsColor[x].node().apiType() == MFn::kFileTexture) {
 
 								//if texture was found, create callback for texture plug
+								
 								MObject textureObj(connetionsColor[x].node());
+								/* 
 								tempID = MNodeMessage::addAttributeChangedCallback(textureObj, nodeTextureAttributeChanged);
 								callbackIdArray.append(tempID);
-
+								*/
+								
 								//get texture path to send, search for filetextuename plug
 								MFnDependencyNode textureNode(textureObj);
 								MPlug fileTextureName = textureNode.findPlug("ftn");
@@ -964,7 +1305,7 @@ void vtxPlugConnected(MPlug & srcPlug, MPlug & destPlug, bool made, void* client
 								memcpy(materialInfo.materialName, fnLambertShader.name().asChar(), materialInfo.matNameLen);
 
 
-								MStreamUtils::stdOutStream() << "Tex name: " << fileName.asChar() << "\n";
+								//MStreamUtils::stdOutStream() << "Tex name: " << fileName.asChar() << "\n";
 
 
 								break;
@@ -1009,6 +1350,7 @@ void vtxPlugConnected(MPlug & srcPlug, MPlug & destPlug, bool made, void* client
 							materialInfo.matNameLen = fnLambertShader.name().length();
 							memcpy(materialInfo.materialName, fnLambertShader.name().asChar(), materialInfo.matNameLen);
 
+							//MStreamUtils::stdOutStream() << "CLR: " << tempColor.a << "\n";
 
 						}
 
@@ -1052,14 +1394,16 @@ void vtxPlugConnected(MPlug & srcPlug, MPlug & destPlug, bool made, void* client
 					memcpy((char*)msg + sizeof(MsgHeader) + sizeof(Mesh) + (sizeof(float) * sortedVtxArray.length() * 3) + (sizeof(float) * sortedNormals.length() * 3), meshUVs, sizeof(float) * sortedUVs.length());
 					memcpy((char*)msg + sizeof(MsgHeader) + sizeof(Mesh) + (sizeof(float) * sortedVtxArray.length() * 3) + (sizeof(float) * sortedNormals.length() * 3) + (sizeof(float) * sortedUVs.length()), &materialInfo, sizeof(Material));
 
-					MStreamUtils::stdOutStream() << "meshInfo.UVcount: " << meshInfo.UVcount << "\n";
+					//MStreamUtils::stdOutStream() << "meshInfo.UVcount: " << meshInfo.UVcount << "\n";
 
-					MStreamUtils::stdOutStream() << "sortedUVs.length(): " << sortedUVs.length() << "\n";
+					//MStreamUtils::stdOutStream() << "sortedUVs.length(): " << sortedUVs.length() << "\n";
 
+					/* 
 					MStreamUtils::stdOutStream() << "meshUV: " << "\n";
 					for (int i = 0; i < (sortedUVs.length()); i++)
 						MStreamUtils::stdOutStream() << meshUVs[i] << " : ";
 					MStreamUtils::stdOutStream() << "================================" << "\n";
+					*/
 
 					//send it
 					if (comLib.send(msg, totalMsgSize)) {
@@ -1424,9 +1768,9 @@ void vtxPlugConnected(MPlug & srcPlug, MPlug & destPlug, bool made, void* client
 // Callback function for when an attribute is changed for a node
 void nodeAttributeChanged(MNodeMessage::AttributeMessage msg, MPlug &plug, MPlug &otherPlug, void* x) {
 
-	MStreamUtils::stdOutStream() << "\n";
-	MStreamUtils::stdOutStream() << " ===================================" << endl;
-	MStreamUtils::stdOutStream() << "NODE ATTRIBUTE CHANGED" << "\n";
+	//MStreamUtils::stdOutStream() << "\n";
+	//MStreamUtils::stdOutStream() << " ===================================" << endl;
+	//MStreamUtils::stdOutStream() << "NODE ATTRIBUTE CHANGED" << "\n";
 
 
 
@@ -1503,7 +1847,7 @@ void nodeAttributeChanged(MNodeMessage::AttributeMessage msg, MPlug &plug, MPlug
 	MFloatArray sortedUVs;
 	for (int i = 0; i < uvIds.length(); i++) {
 		sortedUVs.append(uArray[uvIds[i]]);
-		float v = 1.0f - vArray[uvIds[i]]; 
+		float v = 1.0f - vArray[uvIds[i]];
 		sortedUVs.append(v);
 	}
 
@@ -1824,7 +2168,7 @@ void nodeWorldMatrixChanged(MObject &node, MDagMessage::MatrixModifiedFlags &mod
 
 	//send it
 	if (comLib.send(msg, totalMsgSize)) {
-		MStreamUtils::stdOutStream() << "nodeWorldMatrixChanged: Message sent" << "\n";
+		//MStreamUtils::stdOutStream() << "nodeWorldMatrixChanged: Message sent" << "\n";
 	}
 
 	oldContent = msg;
@@ -2023,7 +2367,7 @@ void nodeLightAttributeChanged(MNodeMessage::AttributeMessage msg, MPlug &plug, 
 	// only do this if the msg is a change of attributes (pos, color etc)
 	if (msg & MNodeMessage::kAttributeSet) {
 		
-		MStreamUtils::stdOutStream() << "nodeLightAttributeChanged" << "\n";
+		//MStreamUtils::stdOutStream() << "nodeLightAttributeChanged" << "\n";
 
 		// get light through dagpath
 		MDagPath path;
@@ -2307,9 +2651,9 @@ void GetLightInfo(MFnLight& lightNode) {
 	lightInfo.intensity = intensity; 
 	lightInfo.lightPos = { (float)lightPos.x, (float)lightPos.y, (float)lightPos.z };
 
-	MStreamUtils::stdOutStream() << "Light Color: " << lightColor << endl;
-	MStreamUtils::stdOutStream() << "Light intensity: " << intensity << endl;
-	MStreamUtils::stdOutStream() << "name: " << lightNode.name() << endl;
+	//MStreamUtils::stdOutStream() << "Light Color: " << lightColor << endl;
+	//MStreamUtils::stdOutStream() << "Light intensity: " << intensity << endl;
+	//MStreamUtils::stdOutStream() << "name: " << lightNode.name() << endl;
 
 	// create message ptr
 	size_t totalMsgSize = (sizeof(MsgHeader) + sizeof(Light));
@@ -2358,7 +2702,7 @@ void nodeAdded(MObject &node, void * clientData) {
 	// if the node has kMesh attributes it is a mesh
 	if (node.hasFn(MFn::kMesh)) {
 
-		MStreamUtils::stdOutStream() << "nodeAdded: MESH was added " << endl;
+		//MStreamUtils::stdOutStream() << "nodeAdded: MESH was added " << endl;
 		meshQueue.push(node);
 		
 		tempID = MDGMessage::addConnectionCallback(vtxPlugConnected, NULL, &status);
@@ -2366,16 +2710,28 @@ void nodeAdded(MObject &node, void * clientData) {
 			callbackIdArray.append(tempID);
 		}
 		
+		
 		tempID = MDGMessage::addConnectionCallback(meshConnectionChanged, NULL, &Result);
 		if (Result == MS::kSuccess) {
 			callbackIdArray.append(tempID);
 		}
+		
 	}
+
+	// if the node has kTransform attributes it is a transform
+	if (node.hasFn(MFn::kTransform)) {
+
+		//MStreamUtils::stdOutStream() << "nodeAdded: TRANSFORM was added " << endl;
+		transformQueue.push(node);
+
+		
+	}
+
 
 	// if the node has kLight attributes it is a light
 	if (node.hasFn(MFn::kLight)) {
 
-		MStreamUtils::stdOutStream() << "nodeAdded: LIGHT was added " << endl;
+		//MStreamUtils::stdOutStream() << "nodeAdded: LIGHT was added " << endl;
 		lightQueue.push(node);
 		
 		tempID = MDGMessage::addConnectionCallback(vtxPlugConnectedLight, NULL, &status);
@@ -2392,14 +2748,14 @@ void nodeAdded(MObject &node, void * clientData) {
 // callback that goes through nodes that have been deleted
 void nodeDeleted(MObject &node, void *clientData) {
 
-	MStreamUtils::stdOutStream() << "\n";
-	MStreamUtils::stdOutStream() << "NODE DELETED";
+	//MStreamUtils::stdOutStream() << "\n";
+	//MStreamUtils::stdOutStream() << "NODE DELETED";
 
 	if (node.hasFn(MFn::kMesh)) {
 
 		MFnMesh mesh(node);
 
-		MStreamUtils::stdOutStream() << "node name: " << mesh.name();
+		//MStreamUtils::stdOutStream() << "node name: " << mesh.name();
 		std::string meshName = mesh.name().asChar(); 
 
 		size_t totalMsgSize = (sizeof(MsgHeader));
@@ -2424,12 +2780,12 @@ void nodeDeleted(MObject &node, void *clientData) {
 	}
 
 	if (node.hasFn(MFn::kLight)) {
-		MStreamUtils::stdOutStream() << "light to delete";
+		//MStreamUtils::stdOutStream() << "light to delete";
 
 	}
 }
 
-// NEEDS UPDATE
+// callback called every x seconds and goes through existing nodes
 void timerCallback(float elapsedTime, float lastTime, void* clientData) {
 	
 	globalTime += elapsedTime;
@@ -2457,12 +2813,19 @@ void timerCallback(float elapsedTime, float lastTime, void* clientData) {
 				callbackIdArray.append(tempID);
 			}
 
+			/* 
 			tempID = MNodeMessage::addNameChangedCallback(currenNode, nodeNameChangedMaterial, NULL, &Result);
 			if (Result == MS::kSuccess) {
 				callbackIdArray.append(tempID);
 			}
+			*/
 
 			tempID = MNodeMessage::addAttributeChangedCallback(currenNode, nodeAttributeChanged, NULL, &Result);
+			if (Result == MS::kSuccess) {
+				callbackIdArray.append(tempID);
+			}
+
+			tempID = MNodeMessage::addNameChangedCallback(currenNode, NodeNameChanged, &Result);
 			if (Result == MS::kSuccess) {
 				callbackIdArray.append(tempID);
 			}
@@ -2470,6 +2833,42 @@ void timerCallback(float elapsedTime, float lastTime, void* clientData) {
 
 		meshQueue.pop();
 	}
+
+	for (int i = 0; i < transformQueue.size(); i++) {
+
+		MObject currentNode = transformQueue.back();
+		if (currentNode.hasFn(MFn::kTransform)) {
+
+			MFnTransform currentTransform = currentNode;
+
+			tempID = MNodeMessage::addAttributeChangedCallback(currentNode, nodeTransformAttributeChanged, NULL, &Result);
+			if (Result == MS::kSuccess) {
+				callbackIdArray.append(tempID);
+			}
+
+			tempID = MNodeMessage::addNameChangedCallback(currentNode, NodeNameChanged, &Result);
+			if (Result == MS::kSuccess) {
+				callbackIdArray.append(tempID);
+			}
+
+
+			/*
+			MDagPath path;
+			MFnDagNode(currentNode).getPath(path);
+			MFnDagNode currentDagNode = currentNode;
+			MFnTransform transform(path);
+
+			//unsigned int nrOfPrnts = currentDagNode.parentCount();
+			MObject parentTransf = currentDagNode.parent(0);
+
+			tempID = MDagMessage::addWorldMatrixModifiedCallback(path, nodeWorldMatrixChanged, NULL, &Result);
+			if (Result == MS::kSuccess) {
+				callbackIdArray.append(tempID);
+			}
+			*/
+		}
+	}
+
 
 	for (int i = 0; i < lightQueue.size(); i++) {
 
@@ -2548,7 +2947,6 @@ void timerCallback(float elapsedTime, float lastTime, void* clientData) {
 	}
 
 }
-
 
 
 // Function to Load plugin Load
