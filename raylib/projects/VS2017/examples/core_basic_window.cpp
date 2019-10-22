@@ -76,6 +76,7 @@ struct modelFromMaya {
 	Matrix modelMatrix;
 	Color color;
 	std::string materialName;
+	Mesh mesh; 
 };
 
 struct materialMaya {
@@ -327,7 +328,7 @@ int main() {
 		UnloadModel(modelArray[i].model);
 	}
 	
-
+	
 	//UnloadModel(tri);
 	//UnloadModel(cubeMod);
 	//UnloadModel(cube);
@@ -441,12 +442,6 @@ void addNode(std::vector<modelFromMaya>& modelArray, std::vector<lightFromMaya>&
 		std::string texturePath = tempMat.fileTextureName;
 		texturePath = texturePath.substr(0, tempMat.textureNameLen);
 
-		/* 
-		std::cout << "UV: " << std::endl;
-		for (int i = 0; i < (vtxCount * 2); i++)
-			std::cout << meshUVs[i] << " : ";
-		std::cout << "=======================" << std::endl;
-		*/
 
 		std::cout << "textureName: " << texturePath << std::endl;
 		std::cout << "materialName: " << materialName << std::endl;
@@ -543,7 +538,7 @@ void addNode(std::vector<modelFromMaya>& modelArray, std::vector<lightFromMaya>&
 			if (tempMat.type == 0) {
 
 				std::cout << "New node: adding color" << std::endl;
-				modelArray.push_back({ tempModel, *index, objectName, MatrixTranslate(0,0,0), newColor, materialName });
+				modelArray.push_back({ tempModel, *index, objectName, MatrixTranslate(0,0,0), newColor, materialName, tempMesh });
 
 			}
 
@@ -553,7 +548,7 @@ void addNode(std::vector<modelFromMaya>& modelArray, std::vector<lightFromMaya>&
 				newColor = { 255, 255, 255, 255 };
 				texture = LoadTexture(texturePath.c_str());
 				tempModel.material.maps[MAP_DIFFUSE].texture = texture;
-				modelArray.push_back({ tempModel, *index, objectName, MatrixTranslate(0,0,0), newColor, materialName });
+				modelArray.push_back({ tempModel, *index, objectName, MatrixTranslate(0,0,0), newColor, materialName, tempMesh });
 			}
 
 
@@ -714,7 +709,7 @@ void updateNode(std::vector<modelFromMaya>& modelArray, std::vector<lightFromMay
 			
 
 				// replace with new			
-				modelArray.insert(modelArray.begin() + i, {tempModel, tempIndex, objectName, tempMatrix, tempColor, tempMaterialName});
+				modelArray.insert(modelArray.begin() + i, {tempModel, tempIndex, objectName, tempMatrix, tempColor, tempMaterialName, tempMesh });
 
 			}
 
@@ -870,14 +865,13 @@ void updateNodeMatrix(std::vector<modelFromMaya>& modelArray, std::vector<lightF
 				// copy the existing mesh
 				int tempIndex = modelArray[i].index;
 				Model tempModel = modelArray[i].model;
-
-				//Matrix newModelMatrix = newMatrix;
+				Mesh tempMesh = modelArray[i].mesh; 
 				Color tempColor = modelArray[i].color;
 				std::string tempMaterialName = modelArray[i].materialName;
 
 				// erase object and replace with new one
 				modelArray.erase(modelArray.begin() + i);
-				modelArray.insert(modelArray.begin() + i, { tempModel, tempIndex, objectName, newMatrix, tempColor ,tempMaterialName });
+				modelArray.insert(modelArray.begin() + i, { tempModel, tempIndex, objectName, newMatrix, tempColor ,tempMaterialName , tempMesh });
 				
 			}
 
@@ -985,17 +979,20 @@ void updateMaterial(std::vector<modelFromMaya>& modelArray, std::vector<lightFro
 				std::string tempModelName = modelArray[i].name;
 				Matrix tempModelMatrix = modelArray[i].modelMatrix;
 				std::string tempModelMaterialName = modelArray[i].materialName;
+				Mesh tempMesh = modelArray[i].mesh; 
 
 				std::cout << "tempModelColor A: " << tempModelColor.a << std::endl;
 				std::cout << "tempModelMaterialName: " << tempModelMaterialName << std::endl;
 
-
+				rlLoadMesh(&tempMesh, false);
+				tempModel = LoadModelFromMesh(tempMesh);
+				tempModel.material.shader = shader;
 
 				modelArray.erase(modelArray.begin() + i);
 
 				if (tempMat.type == 0) {
 					std::cout << "Updating model w color " << std::endl;
-					modelArray.insert(modelArray.begin() + i, { tempModel, tempModelIndex, tempModelName, tempModelMatrix, tempModelColor, tempModelMaterialName });
+					modelArray.insert(modelArray.begin() + i, { tempModel, tempModelIndex, tempModelName, tempModelMatrix, tempModelColor, tempModelMaterialName, tempMesh });
 
 				}
 
@@ -1003,7 +1000,7 @@ void updateMaterial(std::vector<modelFromMaya>& modelArray, std::vector<lightFro
 					std::cout << "Updating model w texture " << std::endl;
 					std::cout << "texture height: " << texture.height << std::endl;
 					tempModel.material.maps[MAP_DIFFUSE].texture = texture;
-					modelArray.insert(modelArray.begin() + i, { tempModel, tempModelIndex, tempModelName, tempModelMatrix, tempModelColor, tempModelMaterialName });
+					modelArray.insert(modelArray.begin() + i, { tempModel, tempModelIndex, tempModelName, tempModelMatrix, tempModelColor, tempModelMaterialName, tempMesh });
 
 				}
 
@@ -1071,6 +1068,7 @@ void updateMaterialName(std::vector<modelFromMaya>& modelArray, std::vector<ligh
 		memcpy(newMaterial.materialName, materialName.c_str(), tempMat.matNameLen);
 		memcpy(newMaterial.fileTextureName, texturePath.c_str(), tempMat.textureNameLen);
 
+		int matIndex = -1; 
 		// check if material exists
 		bool matExists = false;
 		for (int i = 0; i < *nrMaterials; i++) {
@@ -1083,7 +1081,7 @@ void updateMaterialName(std::vector<modelFromMaya>& modelArray, std::vector<ligh
 				materialArray.erase(materialArray.begin() + i);
 				materialArray.insert(materialArray.begin() + i, { newMaterial });
 
-				
+				matIndex = i; 
 				
 			}
 		}
@@ -1095,6 +1093,7 @@ void updateMaterialName(std::vector<modelFromMaya>& modelArray, std::vector<ligh
 
 			materialArray.push_back({newMaterial });
 			*nrMaterials = *nrMaterials + 1;
+			matIndex = *nrMaterials; 
 		}
 
 		
@@ -1111,21 +1110,30 @@ void updateMaterialName(std::vector<modelFromMaya>& modelArray, std::vector<ligh
 				std::string modelName = modelArray[i].name;
 				Matrix newModelMatrix = modelArray[i].modelMatrix;
 				std::string tempMaterialName = materialName;
+				Mesh tempMesh = modelArray[i].mesh;
 				
+				rlLoadMesh(&tempMesh, false);
+				tempModel = LoadModelFromMesh(tempMesh);
+				tempModel.material.shader = shader;
+			
 
 				modelArray.erase(modelArray.begin() + i);
 
 				if (tempMat.type == 0) {
-					modelArray.insert(modelArray.begin() + i, { tempModel, tempIndex, modelName, newModelMatrix, newColor, tempMaterialName });
+					modelArray.insert(modelArray.begin() + i, { tempModel, tempIndex, modelName, newModelMatrix, newColor, tempMaterialName, tempMesh });
+					std::cout << "NEW MODEL MAT: " << modelArray[i].materialName << std::endl;
 
 				}
 
 				else if (tempMat.type == 1) {
 					std::cout << "is texture" << std::endl;
 					tempModel.material.maps[MAP_DIFFUSE].texture = texture;
-					modelArray.insert(modelArray.begin() + i, { tempModel, tempIndex, modelName, newModelMatrix, newColor, tempMaterialName });
+					modelArray.insert(modelArray.begin() + i, { tempModel, tempIndex, modelName, newModelMatrix, newColor, tempMaterialName, tempMesh });
+					std::cout << "NEW MODEL MAT: " << modelArray[i].materialName << std::endl;
 			
 				}
+
+
 
 			}
 
