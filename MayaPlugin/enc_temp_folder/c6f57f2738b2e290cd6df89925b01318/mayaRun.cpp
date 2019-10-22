@@ -1223,7 +1223,6 @@ void vtxPlugConnected(MPlug & srcPlug, MPlug & destPlug, bool made, void* client
 
 				size_t nrOfTris = trisCount.length();
 
-
 				// NORMALS ============
 				MFloatVectorArray normalArray;
 				mesh.getNormals(normalArray, MSpace::kWorld);
