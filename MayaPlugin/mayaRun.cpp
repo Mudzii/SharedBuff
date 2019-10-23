@@ -6,7 +6,8 @@
 #include <queue>
 #include <string>
 
-#include <C:\Users\Mudzi\source\repos\SharedBuff\shared\Project1\ComLib.h>
+#include "comLib.h"
+//#include <C:\Users\Mudzi\source\repos\SharedBuff\shared\Project1\ComLib.h>
 #pragma comment(lib, "Project1.lib")
 
 ComLib comLib("shaderMemory", 50, PRODUCER);

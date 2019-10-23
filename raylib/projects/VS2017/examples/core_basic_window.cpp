@@ -5,9 +5,11 @@
 #include <rlgl.h>
 #include <sstream>
 
-#include <C:\Users\Mudzi\source\repos\SharedBuff\shared\Project1\ComLib.h>
-#pragma comment(lib, "Project1.lib")
+#include "comLib.h"
 
+//#include <C:\Users\Mudzi\source\repos\SharedBuff\shared\Project1\ComLib.h>
+#pragma comment(lib, "Project1.lib")
+#pragma comment(lib, "MayaAPI.lib")
 
 #include <map>
 #include <functional>

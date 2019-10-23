@@ -79,6 +79,8 @@
     <PreBuildEventUseInBuild>true</PreBuildEventUseInBuild>
     <PreLinkEventUseInBuild>
     </PreLinkEventUseInBuild>
+    <IncludePath>C:\Users\Mudzi\source\repos\SharedBuff\MayaPlugin\Lib;$(IncludePath)</IncludePath>
+    <LibraryPath>C:\Users\Mudzi\source\repos\SharedBuff\MayaPlugin\Lib;$(LibraryPath)</LibraryPath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
     <LinkIncremental>false</LinkIncremental>
