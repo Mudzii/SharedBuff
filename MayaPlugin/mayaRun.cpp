@@ -1202,6 +1202,7 @@ void vtxPlugConnected(MPlug & srcPlug, MPlug & destPlug, bool made, void* client
 			}
 
 
+
 			
 			// if triangulated, continue ================================
 			if (triangulated == true) {
