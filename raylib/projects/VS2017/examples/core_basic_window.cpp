@@ -613,6 +613,7 @@ void deleteNode(std::vector<modelFromMaya>& modelArray, std::vector<lightFromMay
 void updateNode(std::vector<modelFromMaya>& modelArray, std::vector<lightFromMaya>& lightsArray, std::vector<cameraFromMaya>& cameraArray, std::vector<materialMaya>& materialArray, char* buffer, int bufferSize, Shader shader, int* nrObjs, int* index, int* nrMaterials) {
 
 
+
 	MsgHeader msgHeader = {};
 	memcpy((char*)&msgHeader, buffer, sizeof(MsgHeader));
 
