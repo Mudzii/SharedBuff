@@ -4,10 +4,8 @@
 #include <raymath.h>
 #include <rlgl.h>
 #include <sstream>
-
 #include "comLib.h"
 
-//#include <C:\Users\Mudzi\source\repos\SharedBuff\shared\Project1\ComLib.h>
 #pragma comment(lib, "Project1.lib")
 #pragma comment(lib, "MayaAPI.lib")
 
@@ -16,7 +14,6 @@
 
 #include <Windows.h>
 ComLib comLib("shaderMemory", 50, CONSUMER);
-
 
 // ===========================================================
 // ================ Structs and ENUMs ========================
