@@ -1022,6 +1022,7 @@ void updateMaterialName(std::vector<modelFromMaya>& modelArray, std::vector<ligh
 			}
 		}
 
+
 		//if it doesn't exist, add it
 		if (matExists == false) {
 
