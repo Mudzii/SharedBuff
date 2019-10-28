@@ -850,7 +850,7 @@ void vtxPlugConnected(MPlug & srcPlug, MPlug & destPlug, bool made, void* client
 
 				// NORMALS ============
 				MFloatVectorArray normalArray;
-				mesh.getNormals(normalArray, MSpace::kWorld);
+				mesh.getNormals(normalArray, MSpace::kPreTransform);
 
 				//get IDs per face
 				MIntArray normalIds;
@@ -1151,7 +1151,7 @@ void nodeAttributeChanged(MNodeMessage::AttributeMessage msg, MPlug &plug, MPlug
 
 	// NORMALS ============
 	MFloatVectorArray normalArray;
-	mesh.getNormals(normalArray, MSpace::kWorld);
+	mesh.getNormals(normalArray, MSpace::kPreTransform);
 
 	//get IDs per face
 	MIntArray normalIds;
@@ -1228,7 +1228,7 @@ void nodeAttributeChanged(MNodeMessage::AttributeMessage msg, MPlug &plug, MPlug
 
 	int uvPos = 0;
 	for (int j = 0; j < sortedUVs.length(); j++) {
-		meshUVs[j] = 1.0f - sortedUVs[j];
+		meshUVs[j] = sortedUVs[j];
 		uvPos += 2;
 	}
 
