@@ -955,6 +955,7 @@ void meshAttributeChanged(MNodeMessage::AttributeMessage msg, MPlug& plug, MPlug
 
 	}
 
+
 	// finished extruding mesh
 	if (otherPlugName.find("polyExtrude") != std::string::npos && otherPlugName.find("manipMatrix") != std::string::npos) {
 
@@ -969,6 +970,7 @@ void meshAttributeChanged(MNodeMessage::AttributeMessage msg, MPlug& plug, MPlug
 
 	}
 
+	
 	else if (plugPartName.find("pt[") != std::string::npos) {
 
 		MStatus result;
@@ -981,6 +983,7 @@ void meshAttributeChanged(MNodeMessage::AttributeMessage msg, MPlug& plug, MPlug
 
 	}
 	
+
 	else if (plugPartName.find("NONAME") != std::string::npos) {
 
 		MStatus result;
@@ -1017,11 +1020,7 @@ void meshAttributeChanged(MNodeMessage::AttributeMessage msg, MPlug& plug, MPlug
 
 	}
 	
-	if (otherPlug.node().apiType() == MFn::Type::kShadingEngine)
-	{
-		MStreamUtils::stdOutStream() << "Shader node replaced" << endl;
 
-	}
 	 /*
 	else {
 		MStreamUtils::stdOutStream()  << endl; 

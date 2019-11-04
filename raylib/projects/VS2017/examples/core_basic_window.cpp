@@ -6,11 +6,9 @@
 #include <sstream>
 #include "comLib.h"
 
-#pragma comment(lib, "Project1.lib")
-#pragma comment(lib, "MayaAPI.lib")
-
 #include <map>
 #include <functional>
+#pragma comment(lib, "Project1.lib")
 
 #include <Windows.h>
 ComLib comLib("shaderMemory", 50, CONSUMER);
@@ -28,14 +26,15 @@ enum NODE_TYPE {
 
 enum CMDTYPE {
 	DEFAULT				= 1000,
-	NEW_NODE			= 1001,
-	UPDATE_NODE			= 1002,
-	UPDATE_MATRIX		= 1003,
-	UPDATE_NAME			= 1004,
-	UPDATE_MATERIAL		= 1005,
-	UPDATE_MATERIALNAME = 1006,
-	DELETE_NODE			= 1007, 
-	TRANSFORM_UPDATE	= 1008
+
+	NEW_NODE = 1001,
+	UPDATE_NODE = 1002,
+	UPDATE_MATRIX = 1003,
+	UPDATE_NAME = 1004,
+	NEW_MATERIAL = 1005,
+	UPDATE_MATERIAL = 1006,
+	DELETE_NODE = 1007,
+	TRANSFORM_UPDATE = 1008
 };
 
 struct MsgHeader {
@@ -146,8 +145,8 @@ int main() {
 	funcMap[UPDATE_NODE]		 = updateNode;
 	funcMap[UPDATE_MATRIX]		 = updateNodeMatrix;
 	funcMap[UPDATE_NAME]		 = updateNodeName;
-	funcMap[UPDATE_MATERIAL]	 = updateMaterial;
-	funcMap[UPDATE_MATERIALNAME] = updateMaterialName;
+	funcMap[NEW_MATERIAL]	     = updateMaterial;
+	funcMap[UPDATE_MATERIAL]     = updateMaterialName;
 	funcMap[DELETE_NODE]		 = deleteNode;
 
 
