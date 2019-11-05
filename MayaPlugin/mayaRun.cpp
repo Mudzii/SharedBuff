@@ -136,11 +136,6 @@ string oldName	  = "";
 // Output messages in output window
 //MStreamUtils::stdOutStream() << "...: " << ... << "_" << endl;
 
-// ==================================================================================
-// ==================================================================================
-// ================================= FUNCTIONS ======================================
-// ==================================================================================
-// ==================================================================================
 
 // ==================================================================================
 // ============================== MATERIAL ==========================================
@@ -610,6 +605,76 @@ void nodeNameChangedMaterial(MObject &node, const MString &str, void*clientData)
 }
  */
 
+void materialAttributeChanged(MNodeMessage::AttributeMessage msg, MPlug& plug, MPlug& otherPlug, void* clientData) {
+
+	//MStreamUtils::stdOutStream() << endl;
+
+	//MStreamUtils::stdOutStream() << "==================================" << endl;
+	//MStreamUtils::stdOutStream() << "MATERILA ATTR CHANGED" << endl;
+	//MStreamUtils::stdOutStream() << endl;
+
+	if ((msg & MNodeMessage::kAttributeSet) && (plug.node().hasFn(MFn::kLambert))){ // && (msg != 2052)) {
+		
+		//MStreamUtils::stdOutStream() << "Connection made or attr set" << endl;
+		
+		//MStreamUtils::stdOutStream() << "plug " << plug.name() << endl;
+		//MStreamUtils::stdOutStream() << "otherPlug " << otherPlug.name() << endl;
+		// plug: lambert1.message || otherP: swatchShadingGroup.surfaceShader - clr?
+		//MStreamUtils::stdOutStream() << "msg " << msg << endl;
+
+	
+		MStatus result;
+
+		// lambert material 
+		MColor color;
+		MPlug colorPlug;
+		MFnLambertShader lambertShader;
+
+		// texture 
+		bool hasTexture = false;
+		std::string fileNameString;
+		MPlugArray textureConnections;
+		
+
+		lambertShader.setObject(plug.node()); 
+
+		// get lambert color through Color plug
+		colorPlug = lambertShader.findPlug("color", &result);
+
+		if (result) {
+
+			MPlug colorAttr;
+			colorAttr = lambertShader.findPlug("colorR");
+			colorAttr.getValue(color.r);
+			colorAttr = lambertShader.findPlug("colorG");
+			colorAttr.getValue(color.g);
+			colorAttr = lambertShader.findPlug("colorB");
+			colorAttr.getValue(color.b);
+			//MStreamUtils::stdOutStream() << endl;
+			//MStreamUtils::stdOutStream() << "COLOR: " << color << endl;
+
+			// to check for textures, check if color plug is dest for another plug
+			colorPlug.connectedTo(textureConnections, true, false);
+			if (textureConnections.length() > 0) {
+
+				//get filepath
+				MFnDependencyNode textureNode(textureConnections[0].node());
+				MPlug fileTextureName = textureNode.findPlug("ftn");
+
+				MString fileName;
+				fileTextureName.getValue(fileName);
+				fileNameString = fileName.asChar();
+
+				//MStreamUtils::stdOutStream() << "fileName: " << fileNameString << endl;
+				hasTexture = true;
+			}
+		}
+
+	}
+
+
+
+}
 // ==================================================================================
 // =============================== TRANSFORM ========================================
 // ==================================================================================
@@ -786,14 +851,15 @@ void NodeNameChanged(MObject& node, const MString& str, void* clientData) {
 
 void GetMeshInfo(MFnMesh &mesh) {
 
+	MStreamUtils::stdOutStream() << endl;
+
+	MStreamUtils::stdOutStream() << "==================================" << endl;
+	MStreamUtils::stdOutStream() << "GET MESH INFO" << endl;
+	MStreamUtils::stdOutStream() << endl;
 	MStatus result;
+
+	// mesh information (vtx, UV, norm) ===========
 	MItMeshPolygon polyIterator(mesh.object(), &result);
-
-	MStreamUtils::stdOutStream() << "ITTERATOR: " << polyIterator.className()  <<"\n";
-	MStreamUtils::stdOutStream() << "result: " << result << "\n";
-	MStreamUtils::stdOutStream() << "\n";
-
-	int faceCnt = 0; 
 	int totalTrisCnt = 0; 
 	int trisCurrentFace = 0; 
 
@@ -843,10 +909,287 @@ void GetMeshInfo(MFnMesh &mesh) {
 	MStreamUtils::stdOutStream() << "normalArray len: " << normalArray.length() << endl;
 	MStreamUtils::stdOutStream() << "uvArray len: " << uvArray.length() << endl;
 	MStreamUtils::stdOutStream() << "totalTrisCnt: " << totalTrisCnt << endl;
+	
+	// transform matrix ===========================
+	MFnTransform parentTransform(mesh.parent(0), &result); 
+
+	if (result) {
+
+		MStreamUtils::stdOutStream() << "parentTransform: " << parentTransform.name() << endl;
+		MMatrix transformationMatrix = parentTransform.transformationMatrix(); 
+	
+		MStreamUtils::stdOutStream() << "transformationMatrix: " << transformationMatrix << endl;
+	}
+
+	// material ===================================
+	
+	// lambert material 
+	MColor color;
+	MPlug colorPlug;
+	MFnLambertShader lambertShader;
+
+	MIntArray indices;
+	MPlugArray shaderConnections;
+	MObjectArray connectedShaders;
+
+	// texture 
+	bool hasTexture = false; 
+	std::string fileNameString; 
+	MPlugArray textureConnections;
+
+	// get the connected shaders to the mesh
+	mesh.getConnectedShaders(0, connectedShaders, indices);
+
+	if(connectedShaders.length() > 0) {
+		
+		// if there are any connected shaders, get first one
+		MFnDependencyNode initialShadingGroup(connectedShaders[0]);
+		MStreamUtils::stdOutStream() << "Shader: " << initialShadingGroup.name() << endl;
+
+		MPlug surfaceShader = initialShadingGroup.findPlug("surfaceShader", &result); 
+
+		if (result) {
+			MStreamUtils::stdOutStream() << "Found plug!" << endl;
+
+			// to find material, find the destination connections for surficeShader plug
+			// (AKA plugs that have surface shader as destination)
+			surfaceShader.connectedTo(shaderConnections, true, false); 
+
+			MStreamUtils::stdOutStream() << "shaderConnections: " << shaderConnections.length() << endl;
+
+			if (shaderConnections.length() > 0) {
+
+				//Only support 1 material per mesh + lambert. Check if first connection is lambert
+				if (shaderConnections[0].node().apiType() == MFn::kLambert) {
+
+					lambertShader.setObject(shaderConnections[0].node()); 
+					std::string materialNamePlug = lambertShader.name().asChar(); 
+					MStreamUtils::stdOutStream() << "materialNamePlug: " << materialNamePlug << endl;
+					
+					// get lambert color through Color plug
+					colorPlug = lambertShader.findPlug("color", &result);
+
+					if (result) {
+
+						MPlug colorAttr; 
+						colorAttr = lambertShader.findPlug("colorR");
+						colorAttr.getValue(color.r);
+						colorAttr = lambertShader.findPlug("colorG");
+						colorAttr.getValue(color.g);
+						colorAttr = lambertShader.findPlug("colorB");
+						colorAttr.getValue(color.b);
+
+						MStreamUtils::stdOutStream() << "COLOR: " << color << endl;
+
+						// to check for textures, check if color plug is dest for another plug
+						colorPlug.connectedTo(textureConnections, true, false);
+						if (textureConnections.length() > 0) {
+
+							//get filepath
+							MFnDependencyNode textureNode(textureConnections[0].node());
+							MPlug fileTextureName = textureNode.findPlug("ftn");
+
+							MString fileName;
+							fileTextureName.getValue(fileName);
+							fileNameString = fileName.asChar();
+
+							MStreamUtils::stdOutStream() << "fileName: " << fileNameString << endl;
+							hasTexture = true; 
+						}
+
+					}
+					
+				}	
+			}
+
+
+		
+
+
+		}
+	}
 
 
 }
 
+void GeometryUpdate(MFnMesh &mesh) {
+
+	MStreamUtils::stdOutStream() << endl;
+
+	MStreamUtils::stdOutStream() << "==================================" << endl;
+	MStreamUtils::stdOutStream() << "GEOMETRY INFO" << endl;
+	MStreamUtils::stdOutStream() << endl;
+
+	MStatus result;
+
+	// mesh information (vtx, UV, norm) ===========
+	MItMeshPolygon polyIterator(mesh.object(), &result);
+	int totalTrisCnt = 0;
+	int trisCurrentFace = 0;
+
+	MPointArray points;
+	MIntArray vertexList;
+
+	MFloatArray uvArray;
+	MPointArray vtxArray;
+	MFloatVectorArray normalArray;
+
+	// Checks if the mesh has a valid triangulation. If it doesn't, then the mesh was bad geometry
+	if (polyIterator.hasValidTriangulation()) {
+		while (!polyIterator.isDone()) {
+
+			MStreamUtils::stdOutStream() << endl;
+
+			// get the tris count for the face that it's currently iterating through
+			polyIterator.numTriangles(trisCurrentFace);
+
+			// get vtx and vtx positions of all the triangles in the current face
+			polyIterator.getTriangles(points, vertexList);
+
+			// get points, normals and UVs 
+			for (int i = 0; i < points.length(); i++) {
+
+				vtxArray.append(points[i]);
+
+				float2 tempUV;
+				polyIterator.getUVAtPoint(points[i], tempUV);
+				uvArray.append(tempUV[0]);
+				uvArray.append(1.0 - tempUV[1]);
+
+				MVector tempNormal;
+				polyIterator.getNormal(tempNormal);
+				normalArray.append(tempNormal);
+
+			}
+
+
+			MStreamUtils::stdOutStream() << "trisCurrentFace: " << trisCurrentFace << endl;
+			totalTrisCnt += trisCurrentFace;
+			polyIterator.next();
+		}
+	}
+
+	MStreamUtils::stdOutStream() << "vtxArray len: " << vtxArray.length() << endl;
+	MStreamUtils::stdOutStream() << "normalArray len: " << normalArray.length() << endl;
+	MStreamUtils::stdOutStream() << "uvArray len: " << uvArray.length() << endl;
+	MStreamUtils::stdOutStream() << "totalTrisCnt: " << totalTrisCnt << endl;
+
+}
+
+void MaterialChanged(MFnMesh &mesh) {
+
+	MStreamUtils::stdOutStream() << endl;
+
+	MStreamUtils::stdOutStream() << "==================================" << endl;
+	MStreamUtils::stdOutStream() << "MATERIAL CHANGED" << endl;
+	MStreamUtils::stdOutStream() << endl;
+
+	MStatus result;
+
+	// lambert material 
+	MColor color;
+	MPlug colorPlug;
+	MFnLambertShader lambertShader;
+
+	MIntArray indices;
+	MPlugArray shaderConnections;
+	MObjectArray connectedShaders;
+
+	// texture 
+	bool hasTexture = false;
+	std::string fileNameString;
+	MPlugArray textureConnections;
+
+	// get the connected shaders to the mesh
+	mesh.getConnectedShaders(0, connectedShaders, indices);
+
+	if (connectedShaders.length() > 0) {
+
+		// if there are any connected shaders, get first one
+		MFnDependencyNode initialShadingGroup(connectedShaders[0]);
+		MStreamUtils::stdOutStream() << "Shader: " << initialShadingGroup.name() << endl;
+
+		MPlug surfaceShader = initialShadingGroup.findPlug("surfaceShader", &result);
+
+		if (result) {
+			MStreamUtils::stdOutStream() << "Found plug!" << endl;
+
+			// to find material, find the destination connections for surficeShader plug
+			// (AKA plugs that have surface shader as destination)
+			surfaceShader.connectedTo(shaderConnections, true, false);
+
+			MStreamUtils::stdOutStream() << "shaderConnections: " << shaderConnections.length() << endl;
+
+			if (shaderConnections.length() > 0) {
+
+				//Only support 1 material per mesh + lambert. Check if first connection is lambert
+				if (shaderConnections[0].node().apiType() == MFn::kLambert) {
+
+					lambertShader.setObject(shaderConnections[0].node());
+					std::string materialNamePlug = lambertShader.name().asChar();
+					MStreamUtils::stdOutStream() << "materialNamePlug: " << materialNamePlug << endl;
+
+					// get lambert color through Color plug
+					colorPlug = lambertShader.findPlug("color", &result);
+
+					if (result) {
+
+						MPlug colorAttr;
+						colorAttr = lambertShader.findPlug("colorR");
+						colorAttr.getValue(color.r);
+						colorAttr = lambertShader.findPlug("colorG");
+						colorAttr.getValue(color.g);
+						colorAttr = lambertShader.findPlug("colorB");
+						colorAttr.getValue(color.b);
+
+						MStreamUtils::stdOutStream() << "COLOR: " << color << endl;
+
+						// to check for textures, check if color plug is dest for another plug
+						colorPlug.connectedTo(textureConnections, true, false);
+						if (textureConnections.length() > 0) {
+
+							//get filepath
+							MFnDependencyNode textureNode(textureConnections[0].node());
+							MPlug fileTextureName = textureNode.findPlug("ftn");
+
+							MString fileName;
+							fileTextureName.getValue(fileName);
+							fileNameString = fileName.asChar();
+
+							MStreamUtils::stdOutStream() << "fileName: " << fileNameString << endl;
+							hasTexture = true;
+						}
+
+					}
+
+				}
+			}
+
+
+
+		}
+	}
+
+
+
+}
+
+void PolySplitMesh(MPlug &plug, MPlug &otherPlug) {
+
+	MStreamUtils::stdOutStream() << " =============================== " << endl;
+	MStreamUtils::stdOutStream() << "IN POLYSPLIT" << endl;
+
+	MStatus result;
+	MDagPath path;
+	MFnDagNode(plug.node()).getPath(path);
+	MFnMesh meshNode(path, &result);
+
+
+	MStreamUtils::stdOutStream() << "meshNode: " << meshNode.name() << endl;
+
+}
+
+// ============================== CALLBACKS ========================================
 void nodePlugConnected(MPlug & plug, MPlug & otherPlug, bool made, void* clientData) {
 	
 	if (plug.partialName() == "out" && otherPlug.partialName() == "i") {
@@ -923,22 +1266,56 @@ void nodePlugConnected(MPlug & plug, MPlug & otherPlug, bool made, void* clientD
 // callback for when an attribute is changed on a node
 void meshAttributeChanged(MNodeMessage::AttributeMessage msg, MPlug& plug, MPlug& otherPlug, void* clientData) {
 
+	/*
 	MStreamUtils::stdOutStream() << " =============================== " << endl;
+
+	MStreamUtils::stdOutStream() << "MSG TYPES: " << endl;
+	MStreamUtils::stdOutStream() << "kConnectionMade " << MNodeMessage::AttributeMessage::kConnectionMade << endl;
+	MStreamUtils::stdOutStream() << "kConnectionBroken " << MNodeMessage::AttributeMessage::kConnectionBroken << endl;
+	MStreamUtils::stdOutStream() << "kAttributeEval " << MNodeMessage::AttributeMessage::kAttributeEval<< endl;
+	MStreamUtils::stdOutStream() << "kAttributeSet " << MNodeMessage::AttributeMessage::kAttributeSet << endl;
+	MStreamUtils::stdOutStream() << "kAttributeLocked  " << MNodeMessage::AttributeMessage::kAttributeLocked << endl;
+	MStreamUtils::stdOutStream() << "kAttributeUnlocked  " << MNodeMessage::AttributeMessage::kAttributeUnlocked << endl;
+	MStreamUtils::stdOutStream() << "kAttributeAdded  " << MNodeMessage::AttributeMessage::kAttributeAdded << endl;
+	MStreamUtils::stdOutStream() << "kAttributeRemoved  " << MNodeMessage::AttributeMessage::kAttributeRemoved << endl;
+	MStreamUtils::stdOutStream() << "kAttributeRenamed  " << MNodeMessage::AttributeMessage::kAttributeRenamed << endl;
+	MStreamUtils::stdOutStream() << "kAttributeKeyable  " << MNodeMessage::AttributeMessage::kAttributeKeyable << endl;
+	MStreamUtils::stdOutStream() << "kAttributeUnkeyable  " << MNodeMessage::AttributeMessage::kAttributeUnkeyable << endl;
+	MStreamUtils::stdOutStream() << "kIncomingDirection  " << MNodeMessage::AttributeMessage::kIncomingDirection << endl;
+	MStreamUtils::stdOutStream() << "kAttributeArrayAdded  " << MNodeMessage::AttributeMessage::kAttributeArrayAdded << endl;
+	MStreamUtils::stdOutStream() << "kAttributeArrayRemoved  " << MNodeMessage::AttributeMessage::kAttributeArrayRemoved << endl;
+	MStreamUtils::stdOutStream() << "kOtherPlugSet  " << MNodeMessage::AttributeMessage::kOtherPlugSet << endl;
+	MStreamUtils::stdOutStream() << "kLast  " << MNodeMessage::AttributeMessage::kLast << endl;
+	MStreamUtils::stdOutStream() << " =============================== " << endl;
+	*/
+
+	/* 
+	MStreamUtils::stdOutStream() << endl;
+	MStreamUtils::stdOutStream() << " ------------ " << endl;
+
+	MStreamUtils::stdOutStream() << "OTHER: " << endl;
+
+	MStreamUtils::stdOutStream() << "PlugName: " << plug.name().asChar() << endl;
+	MStreamUtils::stdOutStream() << "oteher plug: " << otherPlug.name().asChar() << endl;
+	MStreamUtils::stdOutStream() << endl;
+	MStreamUtils::stdOutStream() << " ------------ " << endl;
+
+	*/
+
 	MStreamUtils::stdOutStream() << endl;
 
-	std::string plugName = plug.name().asChar();
-	std::string plugPartName = plug.partialName().asChar();
-
+	std::string plugName	  = plug.name().asChar();
+	std::string plugPartName  = plug.partialName().asChar();
 	std::string otherPlugName = otherPlug.name().asChar();
 
+	MStatus result;
+	MDagPath path;
+	MFnDagNode(plug.node()).getPath(path);
 
 	// check if the plug has in its name "doubleSided", which is an attribute that is set when the mesh is finally available
 	if (plugName.find("doubleSided") != std::string::npos && (msg & MNodeMessage::AttributeMessage::kAttributeSet)) {
 		
 		// get mesh through dag path
-		MStatus result;
-		MDagPath path;
-		MFnDagNode(plug.node()).getPath(path);
 		MFnMesh meshNode(path, &result);
 
 		MStreamUtils::stdOutStream() << "Mesh name: " << meshNode.name().asChar() << endl;
@@ -956,89 +1333,140 @@ void meshAttributeChanged(MNodeMessage::AttributeMessage msg, MPlug& plug, MPlug
 	}
 
 	// finished extruding mesh
-	if (otherPlugName.find("polyExtrude") != std::string::npos && otherPlugName.find("manipMatrix") != std::string::npos) {
+	else if (otherPlugName.find("polyExtrude") != std::string::npos && otherPlugName.find("manipMatrix") != std::string::npos) {
 
 		// get mesh through dag path
-		MStatus result;
-		MDagPath path;
-		MFnDagNode(plug.node()).getPath(path);
 		MFnMesh meshNode(path, &result);
 
 		MStreamUtils::stdOutStream() << "Mesh name: " << meshNode.name().asChar() << endl;
-		GetMeshInfo(meshNode);
+		// if result gives no error, get mesh information through the node
+		if (result) {
+			MStreamUtils::stdOutStream() << "In result statement" << endl;
+			GeometryUpdate(meshNode);
+		}
 
 	}
 
+	// if vtx is changed
 	else if (plugPartName.find("pt[") != std::string::npos) {
 
-		MStatus result;
-		MDagPath path;
-		MFnDagNode(plug.node()).getPath(path);
 		MFnMesh meshNode(path, &result);
 
 		MStreamUtils::stdOutStream() << "Vertex changed" << endl;
 		MStreamUtils::stdOutStream() << "mesh: " << meshNode.name().asChar() << endl;
 
+		if (result) {
+			MStreamUtils::stdOutStream() << "In result statement" << endl;
+			GeometryUpdate(meshNode);
+		}
 	}
 	
-	else if (plugPartName.find("NONAME") != std::string::npos) {
+	// if normal has changed
+	else if (otherPlugName.find("polyNormal") != std::string::npos || (otherPlugName.find("polySoftEdge") != std::string::npos && otherPlugName.find("manipMatrix") != std::string::npos)) {
 
-		MStatus result;
-		MDagPath path;
-		MFnDagNode(plug.node()).getPath(path);
 		MFnMesh meshNode(path, &result);
 
 		MStreamUtils::stdOutStream() << "normal changed" << endl;
 		MStreamUtils::stdOutStream() << "mesh: " << meshNode.name().asChar() << endl;
 
+		if (result) {
+			MStreamUtils::stdOutStream() << "In result statement" << endl;
+			GeometryUpdate(meshNode);
+		}
 	}
 
+	// if pivot changed, UV probably changed
 	else if (plugPartName.find("pv") != std::string::npos) {
 
-		MStatus result;
-		MDagPath path;
-		MFnDagNode(plug.node()).getPath(path);
 		MFnMesh meshNode(path, &result);
 
 		MStreamUtils::stdOutStream() << "UV changed" << endl;
 		MStreamUtils::stdOutStream() << "mesh: " << meshNode.name().asChar() << endl;
-
+		if (result) {
+			MStreamUtils::stdOutStream() << "In result statement" << endl;
+			GeometryUpdate(meshNode);
+		}
 	}
 	
-	else if (plugPartName.find("iog") != std::string::npos) {
+	// if material connection changed (i.e another material was assigned to the mesh)
+	else if (plugPartName.find("iog") != std::string::npos && otherPlug.node().apiType() == MFn::Type::kShadingEngine) {
 
-		MStatus result;
-		MDagPath path;
-		MFnDagNode(plug.node()).getPath(path);
 		MFnMesh meshNode(path, &result);
 
 		MStreamUtils::stdOutStream() << "material changed" << endl;
 		MStreamUtils::stdOutStream() << "mesh: " << meshNode.name().asChar() << endl;
-
+		if (result) {
+			MStreamUtils::stdOutStream() << "In result statement" << endl;
+			MaterialChanged(meshNode);
+		}
 	}
 	
-	if (otherPlug.node().apiType() == MFn::Type::kShadingEngine)
-	{
-		MStreamUtils::stdOutStream() << "Shader node replaced" << endl;
+	
+	//FIX !!!! 
+	// if multicut was performed 
+	/* 
+	else if (otherPlugName.find("polySplit") != std::string::npos && (msg & MNodeMessage::AttributeMessage::kConnectionMade)) {
 
-	}
-	 /*
-	else {
-		MStreamUtils::stdOutStream()  << endl; 
-		MStreamUtils::stdOutStream() << "OTHER: " << endl;
+		MFnMesh meshNode(path, &result);
 
 		MStreamUtils::stdOutStream() << "PlugName: " << plug.name().asChar() << endl;
 		MStreamUtils::stdOutStream() << "oteher plug: " << otherPlug.name().asChar() << endl;
 		MStreamUtils::stdOutStream() << endl;
 
+		MStreamUtils::stdOutStream() << "polySplit" << endl;
+		MStreamUtils::stdOutStream() << "MSG: " << msg << endl;
+
+		//MStreamUtils::stdOutStream() << "mesh: " << meshNode.name().asChar() << endl;
+		MStreamUtils::stdOutStream() << endl;
+
+		// if result gives no error, get mesh information through the node
+		if (result) {
+			MStreamUtils::stdOutStream() << "In result statement" << endl;
+			PolySplitMesh(plug, otherPlug);
+			//GetMeshInfo(meshNode);
+		}
 	}
-	 
-	 */
+	*/
+
+	/* 
+	if (plugName.find("outMesh") != std::string::npos) {
+
+
+		MFnMesh meshNode(path, &result);
+		
+
+		MStreamUtils::stdOutStream() << endl;
+		MStreamUtils::stdOutStream() << " ------------ " << endl;
+
+		MStreamUtils::stdOutStream() << "OUT MESH: " << endl;
+
+		if (result) {
+
+			MStreamUtils::stdOutStream() << "PlugName: " << plug.name().asChar() << endl;
+			MStreamUtils::stdOutStream() << "other plug: " << otherPlug.name().asChar() << endl;
+			MStreamUtils::stdOutStream() << "meshNode: " << meshNode.name() << endl;
+			
+			if (msg & MNodeMessage::kIncomingDirection) {
+
+				MStreamUtils::stdOutStream() << "MSG: " << msg << endl;
+				MStreamUtils::stdOutStream() << " <-- " << otherPlug.info().asChar() << endl;
+
+			}
+			
+		}
+
+		MStreamUtils::stdOutStream() << endl;
+		MStreamUtils::stdOutStream() << " ------------ " << endl;
+	}
+	*/
+  
 	
+	
+	
+ 
+	 
 
 }
-
-
 
 
 /* 
@@ -1622,6 +2050,49 @@ void nodeWorldMatrixChanged(MObject &node, MDagMessage::MatrixModifiedFlags &mod
 // ==================================================================================
 // ================================ CAMERA ==========================================
 // ==================================================================================
+void cameraWorldMatrixChanged(MObject &transformNode, MDagMessage::MatrixModifiedFlags &modified, void *clientData) {
+
+	MStreamUtils::stdOutStream() << "=================================\n";
+	MStreamUtils::stdOutStream() << "cameraWorldMatrixChanged\n";
+
+	M3dView activeView = M3dView::active3dView();
+
+	MDagPath path;
+	activeView.getCamera(path);
+	MFnCamera cameraNode(path);
+
+	std::string cameraName = cameraNode.name().asChar(); 
+	MStreamUtils::stdOutStream() << "camera: " << cameraName << endl;
+
+
+	// get height/width
+	int height = activeView.portHeight();
+	int width = activeView.portWidth();
+	double FOV = 0; 
+	//get relevant vectors for raylib
+
+	MPoint camPos = cameraNode.eyePoint(MSpace::kWorld, &status);
+	MVector upDir = cameraNode.upDirection(MSpace::kWorld, &status);
+	MVector rightDir = cameraNode.rightDirection(MSpace::kWorld, &status);
+	MPoint COI = cameraNode.centerOfInterestPoint(MSpace::kWorld, &status);
+
+	float vertFOV = cameraNode.verticalFieldOfView();
+
+
+	bool isOrtographic = cameraNode.isOrtho();
+	if (isOrtographic) {
+		double ortoWidth = cameraNode.orthoWidth(&status);
+		FOV = ortoWidth;
+	}
+	else {
+		double verticalFOV;
+		double horizontalFOV;
+		cameraNode.getPortFieldOfView(width, height, horizontalFOV, verticalFOV);
+		FOV = verticalFOV;
+	}
+
+}
+
 
 /* 
 // callback function for the active pannel in the viewport
@@ -2014,6 +2485,48 @@ void GetLightInfo(MFnLight& lightNode) {
 // ================================= OTHER ==========================================
 // ==================================================================================
 
+void InitializeScene() {
+
+	MCallbackId tempID;
+
+	// get the lamberts in scene at startup
+	MItDependencyNodes lambertIterator(MFn::kLambert);
+	while (!lambertIterator.isDone()) {
+
+		MStreamUtils::stdOutStream() << "LAMBERT FOUND\n";
+		MObject lambertShader(lambertIterator.thisNode());
+
+		tempID = MNodeMessage::addAttributeChangedCallback(lambertShader, materialAttributeChanged, NULL, &status);
+		if (status == MS::kSuccess)
+			callbackIdArray.append(tempID);
+
+		lambertIterator.next();
+	}
+
+
+	// get all the active cameras in scene at startup 
+	MStreamUtils::stdOutStream() << "\n";
+	MItDependencyNodes cameraIterator(MFn::kCamera);
+	while (!cameraIterator.isDone()) {
+
+		MFnCamera cameraNode(cameraIterator.item());
+		MStreamUtils::stdOutStream() << "CAMERA FOUND\n";
+		MStreamUtils::stdOutStream() << "CAM " << cameraNode.name().asChar() << endl;
+
+		MDagPath path;
+		MFnDagNode(cameraIterator.thisNode()).getPath(path);
+		MFnCamera cam(path);
+
+		tempID = MDagMessage::addWorldMatrixModifiedCallback(path, cameraWorldMatrixChanged, NULL, &status);
+		callbackIdArray.append(tempID);
+
+		cameraIterator.next();
+	}
+
+}
+
+// ============================== CALLBACKS ========================================
+
 // callback that goes through nodes that have been created and attatches callbacks
 void nodeAdded(MObject &node, void * clientData) {
 
@@ -2075,6 +2588,13 @@ void nodeAdded(MObject &node, void * clientData) {
 	if (node.hasFn(MFn::kLambert)) {
 
 		MStreamUtils::stdOutStream() << "nodeAdded: LAMBERT was added " << endl;
+	
+		MObject lambertShader(node);
+		tempID = MNodeMessage::addAttributeChangedCallback(lambertShader, materialAttributeChanged, NULL, &status);
+		if (Result == MS::kSuccess)
+			callbackIdArray.append(tempID);
+		
+
 		materialQueue.push(node);
 	}
 
@@ -2252,6 +2772,7 @@ void timerCallback(float elapsedTime, float lastTime, void* clientData) {
 }
 
 
+
 // Function to Load plugin Load
 EXPORT MStatus initializePlugin(MObject obj) {
 
@@ -2282,38 +2803,72 @@ EXPORT MStatus initializePlugin(MObject obj) {
 	tempID = MTimerMessage::addTimerCallback(timerPeriod, timerCallback, NULL, &status);
 	callbackIdArray.append(tempID);
 
-	/////////////////////////////////////////////////
-	//											   //
-	// Camera callbacks for all active view panels //
-	//											   //
-	/////////////////////////////////////////////////
+	/* 
+	// get the lamberts in scene at startup
+	MItDependencyNodes lambertIterator(MFn::kLambert);
+	while (!lambertIterator.isDone()) {
+
+		MStreamUtils::stdOutStream() << "LAMBERT FOUND\n";
+		MObject lambertShader(lambertIterator.thisNode());
+
+		tempID = MNodeMessage::addAttributeChangedCallback(lambertShader, materialAttributeChanged, NULL, &status);
+		if (status == MS::kSuccess)
+			callbackIdArray.append(tempID);
+
+		lambertIterator.next();
+	}
+
+	
+	// get all the active cameras in scene at startup 
+	MStreamUtils::stdOutStream() << "\n";
+	MItDependencyNodes cameraIterator(MFn::kCamera);
+	while (!cameraIterator.isDone()) {
+		
+		MFnCamera cameraNode(cameraIterator.item());
+		MStreamUtils::stdOutStream() << "CAMERA FOUND\n";
+		MStreamUtils::stdOutStream() << "CAM " << cameraNode.name().asChar() << endl;
+		
+		MDagPath path;
+		MFnDagNode(cameraIterator.thisNode()).getPath(path);
+		MFnCamera cam(path);
+
+		tempID = MDagMessage::addWorldMatrixModifiedCallback(path, cameraWorldMatrixChanged, NULL, &status);
+		callbackIdArray.append(tempID);
+
+		cameraIterator.next();
+	}
+	
+	*/
+
 
 	/* 
 	// camera callbacks initialized for all the view panels 
-	tempID = MUiMessage::add3dViewPreRenderMsgCallback("modelPanel1", activeCamera, NULL, &status);
+	tempID = MUiMessage::add3dViewPostRenderMsgCallback("modelPanel1", activeCamera, NULL, &status);
 	if (status == MS::kSuccess) {
 		callbackIdArray.append(tempID);
 	}
 
-	tempID = MUiMessage::add3dViewPreRenderMsgCallback("modelPanel2", activeCamera, NULL, &status);
+	tempID = MUiMessage::add3dViewPostRenderMsgCallback("modelPanel2", activeCamera, NULL, &status);
 	if (status == MS::kSuccess) {
 		callbackIdArray.append(tempID);
 
 	}
 
-	tempID = MUiMessage::add3dViewPreRenderMsgCallback("modelPanel3", activeCamera, NULL, &status);
+	tempID = MUiMessage::add3dViewPostRenderMsgCallback("modelPanel3", activeCamera, NULL, &status);
 	if (status == MS::kSuccess) {
 		callbackIdArray.append(tempID);
 	}
 
-	tempID = MUiMessage::add3dViewPreRenderMsgCallback("modelPanel4", activeCamera, NULL, &status);
+	tempID = MUiMessage::add3dViewPostRenderMsgCallback("modelPanel4", activeCamera, NULL, &status);
 	if (status == MS::kSuccess) {
 		callbackIdArray.append(tempID);
 	}
 	*/
+	
+	InitializeScene(); 
 
 
-	// a handy timer, courtesy of Maya
+	// Timer
 	gTimer.clear();
 	gTimer.beginTimer();
 
