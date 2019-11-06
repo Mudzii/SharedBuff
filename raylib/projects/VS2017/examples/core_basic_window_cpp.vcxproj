@@ -317,6 +317,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="core_basic_window.cpp" />
+    <ClCompile Include="NodeFunctions.cpp" />
   </ItemGroup>
   <ItemGroup>
     <Image Include="resources\angle_gauge.png">
@@ -366,6 +367,9 @@
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug.DLL|x64'">true</ExcludedFromBuild>
     </Object>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="NodeFunctions.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

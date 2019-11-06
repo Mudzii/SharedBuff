@@ -1,4 +1,4 @@
-#include "maya_includes.h"
+//#include "maya_includes.h"
 #include <maya/MTimer.h>
 #include <iostream>
 #include <algorithm>
@@ -6,110 +6,11 @@
 #include <queue>
 #include <string>
 
+
+#include "Header.h"
 #include "comLib.h"
 #pragma comment(lib, "Project1.lib")
-
-using namespace std;
 ComLib comLib("shaderMemory", 50, PRODUCER);
-
-
-// ===========================================================
-// ================ Structs and ENUMs ========================
-// ===========================================================
-
-struct Vec3 {
-	float x; 
-	float y; 
-	float z;
-};
-
-struct Color {
-	unsigned char r; 
-	unsigned char g;
-	unsigned char b;
-	unsigned char a;
-};
-
-struct Matrix {
-	float a11, a12, a13, a14; 
-	float a21, a22, a23, a24; 
-	float a31, a32, a33, a34; 
-	float a41, a42, a43, a44; 
-};
-
-// ===========================================================
-
-// NODE TYPE for what kind of node that is sent
-enum NODE_TYPE {
-	TRANSFORM,
-	MESH,
-	LIGHT,
-	CAMERA
-};
-
-// what kind of command is sent 
-enum CMDTYPE {
-	DEFAULT				= 1000,
-
-	NEW_NODE			= 1001,
-	UPDATE_NODE			= 1002,
-
-	UPDATE_MATRIX		= 1003,
-	UPDATE_NAME			= 1004,
-
-	NEW_MATERIAL		= 1005,
-	UPDATE_MATERIAL		= 1006,
-
-	DELETE_NODE			= 1007,
-	TRANSFORM_UPDATE	= 1008
-};
-
-// header for message that are sent
-struct MsgHeader {
-	CMDTYPE	  cmdType;
-	NODE_TYPE nodeType;
-	char objName[64];
-	int msgSize;
-	int nameLen;
-};
-
-// ===========================================================
-
-// structs with info about the specific node sent
-struct Mesh {
-	int vtxCount;
-	int trisCount;
-	int normalCount;
-	int UVcount;
-};
-
-struct Camera {
-	Vec3 up;
-	Vec3 forward;
-	Vec3 pos;
-	int type;
-	float fov;
-};
-
-struct Light {
-	Vec3 lightPos; 
-	float intensity;
-	Color color; 
-};
-
-struct Material {
-	int type;					//color = 0, texture = 1 
-	char materialName[64]; 
-	char fileTextureName[64];
-	int matNameLen; 
-	int textureNameLen; 
-	Color color;
-};
-
-struct Transf {
-	char childName[64]; 
-	int childNameLen; 
-};
 
 // ===========================================================
 // ==================== Variables ============================
@@ -121,20 +22,30 @@ bool initBool = false;
 
 MTimer gTimer;
 float globalTime  = 0.0f;
-float timerPeriod = 3.0f; 
+float timerPeriod = 0.1f; 
 
 // keep track of created meshes/ lights to maintain them
-queue<MObject> meshQueue;
-queue<MObject> lightQueue;
-queue<MObject> transformQueue; 
-queue<MObject> materialQueue; 
+//std::queue<MObject> meshQueue;
+//std::queue<MObject> lightQueue;
+//std::queue<MObject> transformQueue; 
+//std::queue<MObject> materialQueue; 
 
-string oldContent = "";
-string oldName	  = "";
+//std::string oldContent = "";
+//std::string oldName	  = "";
 
 
 // Output messages in output window
 //MStreamUtils::stdOutStream() << "...: " << ... << "_" << endl;
+
+MStringArray meshesInScene; 
+
+std::vector<MeshInfo> meshInfoToSend; 
+std::vector<LightInfo> lightInfoToSend;
+std::vector<CameraInfo> cameraInfoToSend;
+std::vector<MaterialInfo> MaterialInfoToSend;
+std::vector<TransformInfo> TransformInfoToSend;
+std::vector<NodeDeletedInfo> nodeDeleteInfoToSend;
+std::vector<NodeRenamedInfo> nodeRenamedInfoToSend;
 
 
 // ==================================================================================
@@ -678,6 +589,98 @@ void materialAttributeChanged(MNodeMessage::AttributeMessage msg, MPlug& plug, M
 // ==================================================================================
 // =============================== TRANSFORM ========================================
 // ==================================================================================
+ 
+void transformWorldMatrixChanged(MObject &transformNode, MDagMessage::MatrixModifiedFlags &modified, void *clientData) {
+
+	MStatus result;
+	MDagPath path;
+	MFnDagNode(transformNode).getPath(path);
+	MFnTransform transfNode(path, &result);
+
+	if (result) {
+
+		//MStreamUtils::stdOutStream() << endl;
+		//MStreamUtils::stdOutStream() << " =============================== " << endl;
+		//MStreamUtils::stdOutStream() << "TRANSFORM MAT CHANGED " << endl;
+		
+
+		// check if transform is directly connected to mesh
+		bool hasShapeNode = false; 
+		MFnMesh meshNode(path, &result);
+		if (result) {
+			hasShapeNode = true; 
+			MStreamUtils::stdOutStream() << "mesh of transform: " << meshNode.name() << endl;
+		}
+		
+
+		// if not directly connected to mesh, check if in hierarchy
+		MObjectArray hierarchy; 
+		int totalChildCnt = 0; 
+
+		MObject firstParentNode(transfNode.object());
+		hierarchy.append(firstParentNode);
+		int childCnt = transfNode.childCount(); 
+
+		if (!hasShapeNode) {
+
+			for (int j = 0; j < hierarchy.length(); j++) {
+
+				MFnDagNode prnt(hierarchy[j]);
+				int prntChildCnt = prnt.childCount();
+
+				for (int i = 0; i < prntChildCnt; i++) {
+
+					MObject childObject(prnt.child(i));
+
+					if (childObject.apiType() == MFn::kTransform || childObject.apiType() == MFn::kMesh) {
+
+						MFnDagNode child(childObject);
+						int tempChildCnt = child.childCount(); 
+						std::string childName = child.fullPathName().asChar();
+
+						if (tempChildCnt != 0 || childName.find("Shape") != std::string::npos) {
+
+							hierarchy.append(childObject);
+							totalChildCnt += 1; 
+							//MStreamUtils::stdOutStream()  << endl;
+							//MStreamUtils::stdOutStream() << "child " << child.fullPathName() << endl;
+							//MStreamUtils::stdOutStream() << "child cnt " << tempChildCnt << endl;
+							//MStreamUtils::stdOutStream()  << endl;
+						}
+
+						if (childName.find("Shape") != std::string::npos) {
+							hasShapeNode = true; 
+
+						}
+
+
+					}
+
+
+
+				}
+			}
+
+			MStreamUtils::stdOutStream()  << endl;
+
+		}
+		
+		if (hasShapeNode) {
+
+			
+			MMatrix worldMatrix = MMatrix(path.inclusiveMatrix());
+			MMatrix localMatrix = MMatrix(path.exclusiveMatrix());
+		}
+
+
+
+		//MStreamUtils::stdOutStream() << totalChildCnt  << endl;
+
+
+	}
+
+}
+
 
 /* 
 // callback for attribute change of transform (matrix)
@@ -857,6 +860,10 @@ void GetMeshInfo(MFnMesh &mesh) {
 	MStreamUtils::stdOutStream() << "GET MESH INFO" << endl;
 	MStreamUtils::stdOutStream() << endl;
 	MStatus result;
+	
+	Color mColor; 
+	Matrix matrixInfo = {};
+	MeshInfo mMeshInfo = {};
 
 	// mesh information (vtx, UV, norm) ===========
 	MItMeshPolygon polyIterator(mesh.object(), &result);
@@ -905,20 +912,15 @@ void GetMeshInfo(MFnMesh &mesh) {
 		}
 	}
 	
-	MStreamUtils::stdOutStream() << "vtxArray len: " << vtxArray.length() << endl;
-	MStreamUtils::stdOutStream() << "normalArray len: " << normalArray.length() << endl;
-	MStreamUtils::stdOutStream() << "uvArray len: " << uvArray.length() << endl;
-	MStreamUtils::stdOutStream() << "totalTrisCnt: " << totalTrisCnt << endl;
-	
 	// transform matrix ===========================
 	MFnTransform parentTransform(mesh.parent(0), &result); 
-
+	MMatrix transformationMatrix; 
 	if (result) {
+		transformationMatrix = parentTransform.transformationMatrix(); 
+	}
 
-		MStreamUtils::stdOutStream() << "parentTransform: " << parentTransform.name() << endl;
-		MMatrix transformationMatrix = parentTransform.transformationMatrix(); 
-	
-		MStreamUtils::stdOutStream() << "transformationMatrix: " << transformationMatrix << endl;
+	else {
+		transformationMatrix = mesh.transformationMatrix(); 
 	}
 
 	// material ===================================
@@ -927,6 +929,7 @@ void GetMeshInfo(MFnMesh &mesh) {
 	MColor color;
 	MPlug colorPlug;
 	MFnLambertShader lambertShader;
+	std::string materialNamePlug; 
 
 	MIntArray indices;
 	MPlugArray shaderConnections;
@@ -944,18 +947,18 @@ void GetMeshInfo(MFnMesh &mesh) {
 		
 		// if there are any connected shaders, get first one
 		MFnDependencyNode initialShadingGroup(connectedShaders[0]);
-		MStreamUtils::stdOutStream() << "Shader: " << initialShadingGroup.name() << endl;
+		//MStreamUtils::stdOutStream() << "Shader: " << initialShadingGroup.name() << endl;
 
 		MPlug surfaceShader = initialShadingGroup.findPlug("surfaceShader", &result); 
 
 		if (result) {
-			MStreamUtils::stdOutStream() << "Found plug!" << endl;
+			//MStreamUtils::stdOutStream() << "Found plug!" << endl;
 
 			// to find material, find the destination connections for surficeShader plug
 			// (AKA plugs that have surface shader as destination)
 			surfaceShader.connectedTo(shaderConnections, true, false); 
 
-			MStreamUtils::stdOutStream() << "shaderConnections: " << shaderConnections.length() << endl;
+			//MStreamUtils::stdOutStream() << "shaderConnections: " << shaderConnections.length() << endl;
 
 			if (shaderConnections.length() > 0) {
 
@@ -963,8 +966,8 @@ void GetMeshInfo(MFnMesh &mesh) {
 				if (shaderConnections[0].node().apiType() == MFn::kLambert) {
 
 					lambertShader.setObject(shaderConnections[0].node()); 
-					std::string materialNamePlug = lambertShader.name().asChar(); 
-					MStreamUtils::stdOutStream() << "materialNamePlug: " << materialNamePlug << endl;
+					materialNamePlug = lambertShader.name().asChar(); 
+					//MStreamUtils::stdOutStream() << "materialNamePlug: " << materialNamePlug << endl;
 					
 					// get lambert color through Color plug
 					colorPlug = lambertShader.findPlug("color", &result);
@@ -979,7 +982,12 @@ void GetMeshInfo(MFnMesh &mesh) {
 						colorAttr = lambertShader.findPlug("colorB");
 						colorAttr.getValue(color.b);
 
-						MStreamUtils::stdOutStream() << "COLOR: " << color << endl;
+						// convert from 0-1 to 0-255
+						int red   = color.r * 255;
+						int blue  = color.b * 255;
+						int green = color.g * 255;
+						int alpha = color.a * 255;
+						mColor = { (unsigned char)red, (unsigned char)green, (unsigned char)blue, (unsigned char)alpha };
 
 						// to check for textures, check if color plug is dest for another plug
 						colorPlug.connectedTo(textureConnections, true, false);
@@ -993,7 +1001,7 @@ void GetMeshInfo(MFnMesh &mesh) {
 							fileTextureName.getValue(fileName);
 							fileNameString = fileName.asChar();
 
-							MStreamUtils::stdOutStream() << "fileName: " << fileNameString << endl;
+							//MStreamUtils::stdOutStream() << "fileName: " << fileNameString << endl;
 							hasTexture = true; 
 						}
 
@@ -1010,8 +1018,170 @@ void GetMeshInfo(MFnMesh &mesh) {
 	}
 
 
+	// check if mesh already exists in scene, otherwise add
+	int index = -1;
+	for (int i = 0; i < meshesInScene.length(); i++) {
+		if (meshesInScene[i] == mesh.name()) {
+			index = i;
+			mMeshInfo.msgHeader.cmdType = UPDATE_NODE;
+			break;
+		}
+	}
+
+	if (index == -1) {
+		
+		meshesInScene.append(mesh.name());
+		mMeshInfo.msgHeader.cmdType = NEW_NODE;
+		index = 0; 
+	}
+
+	// float arrays that store mesh info  ================
+	float* meshUVs	   = new float[uvArray.length()];
+	float* meshVtx	   = new float[vtxArray.length() * 3];
+	float* meshNormals = new float[normalArray.length() * 3];
+
+	// fill arrays with info
+	int vtxPos = 0;
+	for (int i = 0; i < vtxArray.length(); i++) {
+
+		// vtx
+		meshVtx[vtxPos]		= vtxArray[i][0];
+		meshVtx[vtxPos + 1] = vtxArray[i][1];
+		meshVtx[vtxPos + 2] = vtxArray[i][2];
+
+		// normals
+		meshNormals[vtxPos]		= normalArray[i][0];
+		meshNormals[vtxPos + 1] = normalArray[i][1];
+		meshNormals[vtxPos + 2] = normalArray[i][2];
+
+		vtxPos += 3;
+	}
+
+	for (int j = 0; j < uvArray.length(); j++) {
+		meshUVs[j] = uvArray[j];
+	}
+
+
+	// fill msg to queue 
+	mMeshInfo.meshData.meshID = index;
+	mMeshInfo.meshData.trisCount = totalTrisCnt;
+	mMeshInfo.meshData.UVcount = uvArray.length();
+	mMeshInfo.meshData.vtxCount = vtxArray.length();
+	mMeshInfo.meshData.normalCount = normalArray.length();
+
+	mMeshInfo.meshName     = mesh.name();
+	mMeshInfo.meshPathName = mesh.fullPathName();
+
+	mMeshInfo.materialData.color = mColor;
+	mMeshInfo.materialData.matNameLen = materialNamePlug.length();
+	memcpy(mMeshInfo.materialData.materialName, materialNamePlug.c_str(), mMeshInfo.materialData.matNameLen);
+
+	if (hasTexture) {
+		mMeshInfo.materialData.type = 1;
+		mMeshInfo.materialData.textureNameLen = fileNameString.length();
+		memcpy(mMeshInfo.materialData.fileTextureName, fileNameString.c_str(), mMeshInfo.materialData.textureNameLen);
+
+	}
+
+	else {
+		mMeshInfo.materialData.type = 0;
+		mMeshInfo.materialData.textureNameLen = 2;
+		memcpy(mMeshInfo.materialData.fileTextureName, "NA", mMeshInfo.materialData.textureNameLen);
+
+	}
+	//row 1
+	matrixInfo.a11 = transformationMatrix(0, 0);
+	matrixInfo.a12 = transformationMatrix(1, 0);
+	matrixInfo.a13 = transformationMatrix(2, 0);
+	matrixInfo.a14 = transformationMatrix(3, 0);
+
+	//row 2
+	matrixInfo.a21 = transformationMatrix(0, 1);
+	matrixInfo.a22 = transformationMatrix(1, 1);
+	matrixInfo.a23 = transformationMatrix(2, 1);
+	matrixInfo.a24 = transformationMatrix(3, 1);
+
+	//row 3
+	matrixInfo.a31 = transformationMatrix(0, 2);
+	matrixInfo.a32 = transformationMatrix(1, 2);
+	matrixInfo.a33 = transformationMatrix(2, 2);
+	matrixInfo.a34 = transformationMatrix(3, 2);
+	//row 4
+	matrixInfo.a41 = transformationMatrix(0, 3);
+	matrixInfo.a42 = transformationMatrix(1, 3);
+	matrixInfo.a43 = transformationMatrix(2, 3);
+	matrixInfo.a44 = transformationMatrix(3, 3);
+
+	mMeshInfo.transformMatrix = matrixInfo; 
+
+	// Fill header ========
+	size_t totalMsgSize = (sizeof(MsgHeader) + sizeof(Mesh) + (2 * (sizeof(float) * mMeshInfo.meshData.vtxCount * 3)) + (sizeof(float) * mMeshInfo.meshData.UVcount) + sizeof(Material) + sizeof(Matrix));
+
+	mMeshInfo.msgHeader.msgSize = totalMsgSize;
+	mMeshInfo.msgHeader.nodeType = NODE_TYPE::MESH;
+	mMeshInfo.msgHeader.nameLen = mesh.name().length();
+	memcpy(mMeshInfo.msgHeader.objName, mesh.name().asChar(), mMeshInfo.msgHeader.nameLen);
+	
+	// check if msg already exists. If so, update
+	bool msgExists = false;
+	for (int i = 0; i < meshInfoToSend.size(); i++) {
+		if (meshInfoToSend[i].meshName == mesh.name()) {
+			msgExists = true;
+
+			if (meshInfoToSend[i].meshData.vtxCount != mMeshInfo.meshData.vtxCount) {
+
+				delete[] meshInfoToSend[i].meshVtx; 
+				delete[] meshInfoToSend[i].meshNrms;
+
+				meshInfoToSend[i].meshVtx = new float[mMeshInfo.meshData.vtxCount * 3];
+				meshInfoToSend[i].meshNrms = new float[mMeshInfo.meshData.normalCount * 3];
+
+			}
+
+			if (meshInfoToSend[i].meshData.UVcount != mMeshInfo.meshData.UVcount) {
+				delete[] meshInfoToSend[i].meshUVs;
+				meshInfoToSend[i].meshUVs = new float[mMeshInfo.meshData.UVcount];
+			}
+
+			//meshInfoToSend[i].meshData.UVcount = mMeshInfo.meshData.UVcount; 
+			//meshInfoToSend[i].meshData.vtxCount = mMeshInfo.meshData.vtxCount; 
+			//meshInfoToSend[i].meshData.normalCount = mMeshInfo.meshData.normalCount; 
+
+			meshInfoToSend[i].meshData = mMeshInfo.meshData; 
+
+			memcpy((char*)meshInfoToSend[i].meshVtx,  meshVtx,	   (sizeof(float) * (mMeshInfo.meshData.vtxCount * 3)));	
+			memcpy((char*)meshInfoToSend[i].meshNrms, meshNormals, (sizeof(float) * (mMeshInfo.meshData.normalCount * 3)));
+			memcpy((char*)meshInfoToSend[i].meshUVs,  meshUVs,	   (sizeof(float) * (mMeshInfo.meshData.UVcount)));
+
+			meshInfoToSend[i].materialData	  = mMeshInfo.materialData; 
+			meshInfoToSend[i].transformMatrix = mMeshInfo.transformMatrix; 
+
+
+			break; 
+		}
+	}
+
+	// if it doesn't exist, add it to the queue 
+	if (!msgExists) {
+		
+		mMeshInfo.meshVtx  = new float[mMeshInfo.meshData.vtxCount * 3];
+		mMeshInfo.meshNrms = new float[mMeshInfo.meshData.normalCount * 3];
+		mMeshInfo.meshUVs  = new float[mMeshInfo.meshData.UVcount];
+
+		memcpy((char*)mMeshInfo.meshVtx,  meshVtx,	   (sizeof(float) * (mMeshInfo.meshData.vtxCount * 3)));
+		memcpy((char*)mMeshInfo.meshNrms, meshNormals, (sizeof(float) * (mMeshInfo.meshData.normalCount * 3)));
+		memcpy((char*)mMeshInfo.meshUVs,  meshUVs,	   (sizeof(float) * (mMeshInfo.meshData.UVcount)));
+
+		meshInfoToSend.push_back(mMeshInfo);
+	}
+
+	delete[] meshVtx; 
+	delete[] meshUVs; 
+	delete[] meshNormals; 
+
 }
 
+/*
 void GeometryUpdate(MFnMesh &mesh) {
 
 	MStreamUtils::stdOutStream() << endl;
@@ -1075,6 +1245,7 @@ void GeometryUpdate(MFnMesh &mesh) {
 	MStreamUtils::stdOutStream() << "totalTrisCnt: " << totalTrisCnt << endl;
 
 }
+*/
 
 void MaterialChanged(MFnMesh &mesh) {
 
@@ -1189,7 +1360,9 @@ void PolySplitMesh(MPlug &plug, MPlug &otherPlug) {
 
 }
 
+
 // ============================== CALLBACKS ========================================
+/* 
 void nodePlugConnected(MPlug & plug, MPlug & otherPlug, bool made, void* clientData) {
 	
 	if (plug.partialName() == "out" && otherPlug.partialName() == "i") {
@@ -1257,12 +1430,13 @@ void nodePlugConnected(MPlug & plug, MPlug & otherPlug, bool made, void* clientD
 
 				
 			}
-			*/
+			
 
 		}
 	}
 }
 
+*/
 // callback for when an attribute is changed on a node
 void meshAttributeChanged(MNodeMessage::AttributeMessage msg, MPlug& plug, MPlug& otherPlug, void* clientData) {
 
@@ -1342,7 +1516,7 @@ void meshAttributeChanged(MNodeMessage::AttributeMessage msg, MPlug& plug, MPlug
 		// if result gives no error, get mesh information through the node
 		if (result) {
 			MStreamUtils::stdOutStream() << "In result statement" << endl;
-			GeometryUpdate(meshNode);
+			GetMeshInfo(meshNode);
 		}
 
 	}
@@ -1357,7 +1531,7 @@ void meshAttributeChanged(MNodeMessage::AttributeMessage msg, MPlug& plug, MPlug
 
 		if (result) {
 			MStreamUtils::stdOutStream() << "In result statement" << endl;
-			GeometryUpdate(meshNode);
+			GetMeshInfo(meshNode);
 		}
 	}
 	
@@ -1371,7 +1545,7 @@ void meshAttributeChanged(MNodeMessage::AttributeMessage msg, MPlug& plug, MPlug
 
 		if (result) {
 			MStreamUtils::stdOutStream() << "In result statement" << endl;
-			GeometryUpdate(meshNode);
+			GetMeshInfo(meshNode);
 		}
 	}
 
@@ -1384,7 +1558,7 @@ void meshAttributeChanged(MNodeMessage::AttributeMessage msg, MPlug& plug, MPlug
 		MStreamUtils::stdOutStream() << "mesh: " << meshNode.name().asChar() << endl;
 		if (result) {
 			MStreamUtils::stdOutStream() << "In result statement" << endl;
-			GeometryUpdate(meshNode);
+			GetMeshInfo(meshNode);
 		}
 	}
 	
@@ -1468,6 +1642,44 @@ void meshAttributeChanged(MNodeMessage::AttributeMessage msg, MPlug& plug, MPlug
 
 }
 
+void meshTopologyChanged(MObject& node, void* clientData) {
+
+	if (node.hasFn(MFn::kMesh)) {
+		MStatus stat;
+		MFnMesh mesh(node, &stat);
+		if (stat == MS::kSuccess) {
+			MStreamUtils::stdOutStream() << " =============================== " << endl;
+			MStreamUtils::stdOutStream() << "TOPOLOGY CHANGED on " << mesh.name() << endl;
+
+
+		}
+	}
+
+}
+
+void meshWorldMatrixChanged(MObject &transformNode, MDagMessage::MatrixModifiedFlags &modified, void *clientData) {
+
+	MStatus result;
+	MDagPath path; 
+	MFnDagNode(transformNode).getPath(path);
+
+	MFnTransform transfNode(path);
+	MFnMesh meshNode(path, &result); 
+
+	if (result) {
+		//MStreamUtils::stdOutStream() << endl;
+
+		//MStreamUtils::stdOutStream() << " =============================== " << endl;
+		//MStreamUtils::stdOutStream() << "meshWorldMatrixChanged for " << meshNode.name() << endl;
+		//MStreamUtils::stdOutStream() << "transfNoder " << transfNode.name() << endl;
+
+		// inclusive matrix = world matrix. exclusive matrix = local matrix
+		MMatrix worldMatrix = MMatrix(path.inclusiveMatrix());		
+		MMatrix localMatrix = MMatrix(path.exclusiveMatrix());	
+
+	}
+
+}
 
 /* 
 // Callback function for when a vtx connection is made to the dependency graph (such as triangulated, topology is changed, a new mesh is added)
@@ -2052,8 +2264,8 @@ void nodeWorldMatrixChanged(MObject &node, MDagMessage::MatrixModifiedFlags &mod
 // ==================================================================================
 void cameraWorldMatrixChanged(MObject &transformNode, MDagMessage::MatrixModifiedFlags &modified, void *clientData) {
 
-	MStreamUtils::stdOutStream() << "=================================\n";
-	MStreamUtils::stdOutStream() << "cameraWorldMatrixChanged\n";
+	//MStreamUtils::stdOutStream() << "=================================\n";
+	//MStreamUtils::stdOutStream() << "cameraWorldMatrixChanged\n";
 
 	M3dView activeView = M3dView::active3dView();
 
@@ -2062,17 +2274,17 @@ void cameraWorldMatrixChanged(MObject &transformNode, MDagMessage::MatrixModifie
 	MFnCamera cameraNode(path);
 
 	std::string cameraName = cameraNode.name().asChar(); 
-	MStreamUtils::stdOutStream() << "camera: " << cameraName << endl;
+	//MStreamUtils::stdOutStream() << "camera: " << cameraName << endl;
 
 
 	// get height/width
 	int height = activeView.portHeight();
-	int width = activeView.portWidth();
+	int width  = activeView.portWidth();
 	double FOV = 0; 
 	//get relevant vectors for raylib
 
-	MPoint camPos = cameraNode.eyePoint(MSpace::kWorld, &status);
-	MVector upDir = cameraNode.upDirection(MSpace::kWorld, &status);
+	MPoint camPos	 = cameraNode.eyePoint(MSpace::kWorld, &status);
+	MVector upDir	 = cameraNode.upDirection(MSpace::kWorld, &status);
 	MVector rightDir = cameraNode.rightDirection(MSpace::kWorld, &status);
 	MPoint COI = cameraNode.centerOfInterestPoint(MSpace::kWorld, &status);
 
@@ -2485,6 +2697,270 @@ void GetLightInfo(MFnLight& lightNode) {
 // ================================= OTHER ==========================================
 // ==================================================================================
 
+
+void nodeNameChanged(MObject& node, const MString& str, void* clientData) {
+
+	//MStreamUtils::stdOutStream() << "=========================" << endl;
+	//MStreamUtils::stdOutStream() << "NAME CHANGED " << endl;
+
+	std::string oldName;
+	std::string newName;
+
+	if (node.hasFn(MFn::kMesh)) {
+
+		MFnMesh meshNode(node);
+
+		oldName = str.asChar();
+		newName = meshNode.fullPathName().asChar();
+
+		
+	}
+
+	else if (node.hasFn(MFn::kTransform)) {
+
+		MFnTransform fransfNode(node);
+
+		oldName = str.asChar();
+		newName = fransfNode.fullPathName().asChar();
+	}
+
+	else if (node.hasFn(MFn::kCamera)) {
+	
+		MFnCamera camNode(node);
+
+		oldName = str.asChar();
+		newName = camNode.fullPathName().asChar();
+	}
+
+	else if (node.hasFn(MFn::kLight)) {
+
+		MFnLight lightNode(node);
+
+		oldName = str.asChar();
+		newName = lightNode.fullPathName().asChar();
+	}
+
+	else if (node.hasFn(MFn::kLambert)) {
+
+		MFnDependencyNode materialNode(node);
+
+		oldName = str.asChar();
+		newName = materialNode.name().asChar();
+	}
+
+
+	MStreamUtils::stdOutStream() << "From " << oldName << " to " << newName << endl;
+	MStreamUtils::stdOutStream() <<  endl;
+
+}
+
+
+// callback that goes through nodes that have been created and attatches callbacks
+void nodeAdded(MObject &node, void * clientData) {
+
+	MCallbackId tempID; 
+	MStatus Result = MS::kSuccess;
+
+	// if the node has kMesh attributes it is a mesh
+	if (node.hasFn(MFn::kMesh)) {
+		
+		// check if mesh is not intermediate
+		// The intermediate object is the object as it was before adding the deformers
+		MDagPath path;
+		MFnDagNode(node).getPath(path);
+		MFnMesh meshNode(node);
+
+		if (!meshNode.isIntermediateObject()) {
+
+			MStreamUtils::stdOutStream() << "nodeAdded: MESH was added " << endl;
+			//meshQueue.push(node);
+
+			tempID = MNodeMessage::addAttributeChangedCallback(node, meshAttributeChanged, NULL, &status);
+			if (status == MS::kSuccess)
+				callbackIdArray.append(tempID);
+
+			tempID = MPolyMessage::addPolyTopologyChangedCallback(node, meshTopologyChanged, NULL, &status);
+			if (status == MS::kSuccess)
+				callbackIdArray.append(tempID);
+
+			tempID = MDagMessage::addWorldMatrixModifiedCallback(path, meshWorldMatrixChanged, NULL, &status);
+			if (status == MS::kSuccess)
+				callbackIdArray.append(tempID);
+
+			tempID = MNodeMessage::addNameChangedCallback(node, nodeNameChanged, NULL, &status);
+			if (status == MS::kSuccess)
+				callbackIdArray.append(tempID);
+			
+		}
+
+	}
+
+	// if the node has kTransform attributes it is a transform
+	if (node.hasFn(MFn::kTransform)) {
+
+		MStreamUtils::stdOutStream() << "nodeAdded: TRANSFORM was added " << endl;
+
+		MDagPath path;
+		MFnDagNode(node).getPath(path);
+		MFnTransform transfNode(node);
+		//transformQueue.push(node);
+
+		
+		tempID = MDagMessage::addWorldMatrixModifiedCallback(path, transformWorldMatrixChanged, NULL, &status);
+		if (status == MS::kSuccess)
+			callbackIdArray.append(tempID);
+
+		tempID = MNodeMessage::addNameChangedCallback(node, nodeNameChanged, NULL, &status);
+		if (status == MS::kSuccess)
+			callbackIdArray.append(tempID);
+
+		//callbackIds.append(MNodeMessage::addAttributeChangedCallback(transform.object(), TransformChangedCB));
+		//callbackIds.append(MNodeMessage::addNameChangedCallback(transform.object(), NameChangedCB));
+		
+		
+	}
+
+	// if the node has kLight attributes it is a light
+	if (node.hasFn(MFn::kLight)) {
+
+		MStreamUtils::stdOutStream() << "nodeAdded: LIGHT was added " << endl;
+		//lightQueue.push(node);
+
+		tempID = MNodeMessage::addNameChangedCallback(node, nodeNameChanged, NULL, &status);
+		if (status == MS::kSuccess)
+			callbackIdArray.append(tempID);
+	}
+
+	// if the node has kLambert attributes it is a lambert
+	if (node.hasFn(MFn::kLambert)) {
+
+		MStreamUtils::stdOutStream() << "nodeAdded: LAMBERT was added " << endl;
+	
+		MObject lambertShader(node);
+		tempID = MNodeMessage::addAttributeChangedCallback(lambertShader, materialAttributeChanged, NULL, &status);
+		if (Result == MS::kSuccess)
+			callbackIdArray.append(tempID);
+
+		tempID = MNodeMessage::addNameChangedCallback(node, nodeNameChanged, NULL, &status);
+		if (status == MS::kSuccess)
+			callbackIdArray.append(tempID);
+		
+
+		//materialQueue.push(node);
+	}
+
+}
+
+// callback that goes through nodes that have been deleted
+void nodeDeleted(MObject &node, void *clientData) {
+
+	//MStreamUtils::stdOutStream() << "\n";
+	//MStreamUtils::stdOutStream() << "NODE DELETED";
+
+	if (node.hasFn(MFn::kMesh)) {
+
+		MFnMesh mesh(node);
+		std::string meshName = mesh.name().asChar(); 
+		MStreamUtils::stdOutStream() << "mesh deleted " << meshName << endl;
+
+		/* 
+		size_t totalMsgSize = (sizeof(MsgHeader));
+		const char* msg = new char[totalMsgSize];
+
+		// Fill header ========
+		MsgHeader msgHeader;
+		msgHeader.msgSize = totalMsgSize;
+		msgHeader.nodeType = NODE_TYPE::MESH;
+		msgHeader.nameLen = meshName.length();
+		msgHeader.cmdType = CMDTYPE::DELETE_NODE;
+		memcpy(msgHeader.objName, meshName.c_str(), meshName.length());
+
+		// copy over msg ======
+		memcpy((char*)msg, &msgHeader, sizeof(MsgHeader));
+		
+		if (comLib.send(msg, totalMsgSize)) {
+			MStreamUtils::stdOutStream() << "nodeDeleted: Message sent" << "\n";
+		}
+		*/
+
+
+	}
+
+	if (node.hasFn(MFn::kTransform)) {
+
+		MFnTransform transfNode(node);
+		std::string transfName = transfNode.name().asChar();
+		MStreamUtils::stdOutStream() << "transform deleted " << transfName << endl;
+
+
+	}
+
+	else if (node.hasFn(MFn::kLight)) {
+		
+		MFnLight lightNode(node);
+		std::string lightName = lightNode.name().asChar();
+		MStreamUtils::stdOutStream() << "light deleted " << lightName << endl;
+
+	}
+
+	else if (node.hasFn(MFn::kLambert)) {
+
+		MFnDependencyNode materialNode(node);
+		std::string matName = materialNode.name().asChar();
+		MStreamUtils::stdOutStream() << "lambert deleted " << matName << endl;
+
+	}
+
+	
+	callbackIdArray.remove(MNodeMessage::currentCallbackId());
+}
+
+// callback called every x seconds 
+void timerCallback(float elapsedTime, float lastTime, void* clientData) {
+	
+	globalTime += elapsedTime;
+
+	//MCallbackId tempID;
+	//MStatus Result = MS::kSuccess;
+
+	for (int i = 0; i < meshInfoToSend.size(); i++) {
+		
+		//meshInfoToSend
+		//MStreamUtils::stdOutStream() << "\n";
+		//MStreamUtils::stdOutStream() << "meshInfoToSend.size() " << meshInfoToSend.size() << "\n";
+		//MStreamUtils::stdOutStream() << "meshInfoToSend mesh "   << meshInfoToSend[i].meshName << "\n";
+
+		const char* msgChar = new char[meshInfoToSend[i].msgHeader.msgSize];
+
+		// copy over msg ======
+		memcpy((char*)msgChar, &meshInfoToSend[i].msgHeader, sizeof(MsgHeader));
+		memcpy((char*)msgChar + sizeof(MsgHeader), &meshInfoToSend[i].meshData, sizeof(Mesh));
+		memcpy((char*)msgChar + sizeof(MsgHeader) + sizeof(Mesh), meshInfoToSend[i].meshVtx, (sizeof(float) * meshInfoToSend[i].meshData.vtxCount * 3));
+		memcpy((char*)msgChar + sizeof(MsgHeader) + sizeof(Mesh) + (sizeof(float) * meshInfoToSend[i].meshData.vtxCount * 3), &meshInfoToSend[i].meshNrms, (sizeof(float) * meshInfoToSend[i].meshData.normalCount * 3));
+		memcpy((char*)msgChar + sizeof(MsgHeader) + sizeof(Mesh) + (sizeof(float) * meshInfoToSend[i].meshData.vtxCount * 3) + (sizeof(float) * meshInfoToSend[i].meshData.normalCount * 3), &meshInfoToSend[i].meshUVs, sizeof(float) * meshInfoToSend[i].meshData.UVcount);
+		memcpy((char*)msgChar + sizeof(MsgHeader) + sizeof(Mesh) + (sizeof(float) * meshInfoToSend[i].meshData.vtxCount * 3) + (sizeof(float) * meshInfoToSend[i].meshData.normalCount * 3) + (sizeof(float) * meshInfoToSend[i].meshData.UVcount), &meshInfoToSend[i].materialData, sizeof(Material));
+		memcpy((char*)msgChar + sizeof(MsgHeader) + sizeof(Mesh) + (sizeof(float) * meshInfoToSend[i].meshData.vtxCount * 3) + (sizeof(float) * meshInfoToSend[i].meshData.normalCount * 3) + (sizeof(float) * meshInfoToSend[i].meshData.UVcount) + sizeof(Material), &meshInfoToSend[i].transformMatrix, sizeof(Matrix));
+
+		//send it
+		if (comLib.send(msgChar, meshInfoToSend[i].msgHeader.msgSize)) {
+				MStreamUtils::stdOutStream() << "meshInfoToSend: Message sent" << "\n";
+		}
+			
+
+		// delete allocated arrays + message
+		delete[] msgChar; 
+		delete[] meshInfoToSend[i].meshVtx;
+		delete[] meshInfoToSend[i].meshUVs;
+		delete[] meshInfoToSend[i].meshNrms;
+
+		meshInfoToSend.erase(meshInfoToSend.begin() + i);
+	}
+	
+
+}
+
+
+
 void InitializeScene() {
 
 	MCallbackId tempID;
@@ -2499,6 +2975,7 @@ void InitializeScene() {
 		tempID = MNodeMessage::addAttributeChangedCallback(lambertShader, materialAttributeChanged, NULL, &status);
 		if (status == MS::kSuccess)
 			callbackIdArray.append(tempID);
+
 
 		lambertIterator.next();
 	}
@@ -2520,257 +2997,14 @@ void InitializeScene() {
 		tempID = MDagMessage::addWorldMatrixModifiedCallback(path, cameraWorldMatrixChanged, NULL, &status);
 		callbackIdArray.append(tempID);
 
+		tempID = MNodeMessage::addNameChangedCallback(cameraIterator.thisNode(), nodeNameChanged, NULL, &status);
+		if (status == MS::kSuccess)
+			callbackIdArray.append(tempID);
+
 		cameraIterator.next();
 	}
 
 }
-
-// ============================== CALLBACKS ========================================
-
-// callback that goes through nodes that have been created and attatches callbacks
-void nodeAdded(MObject &node, void * clientData) {
-
-	MCallbackId tempID; 
-	MStatus Result = MS::kSuccess;
-
-	// if the node has kMesh attributes it is a mesh
-	if (node.hasFn(MFn::kMesh)) {
-		
-		// check if mesh is not intermediate
-		// The intermediate object is the object as it was before adding the deformers
-		MFnMesh meshNode(node);
-		if (!meshNode.isIntermediateObject()) {
-
-			MStreamUtils::stdOutStream() << "nodeAdded: MESH was added " << endl;
-			meshQueue.push(node);
-
-			tempID = MNodeMessage::addAttributeChangedCallback(node, meshAttributeChanged, NULL, &status);
-			if (Result == MS::kSuccess) 
-				callbackIdArray.append(tempID);
-			
-		}
-
-		/* 
-		tempID = MDGMessage::addConnectionCallback(nodePlugConnected, NULL, &status);
-		if (Result == MS::kSuccess) {
-			callbackIdArray.append(tempID);
-		}
-		*/
-	
-	
-		
-		/* 
-		tempID = MDGMessage::addConnectionCallback(meshConnectionChanged, NULL, &Result);
-		if (Result == MS::kSuccess) {
-			callbackIdArray.append(tempID);
-		}
-		*/
-		
-	}
-
-	// if the node has kTransform attributes it is a transform
-	if (node.hasFn(MFn::kTransform)) {
-
-		MStreamUtils::stdOutStream() << "nodeAdded: TRANSFORM was added " << endl;
-		transformQueue.push(node);
-
-		
-	}
-
-	// if the node has kLight attributes it is a light
-	if (node.hasFn(MFn::kLight)) {
-
-		MStreamUtils::stdOutStream() << "nodeAdded: LIGHT was added " << endl;
-		lightQueue.push(node);
-	}
-
-	// if the node has kLambert attributes it is a lambert
-	if (node.hasFn(MFn::kLambert)) {
-
-		MStreamUtils::stdOutStream() << "nodeAdded: LAMBERT was added " << endl;
-	
-		MObject lambertShader(node);
-		tempID = MNodeMessage::addAttributeChangedCallback(lambertShader, materialAttributeChanged, NULL, &status);
-		if (Result == MS::kSuccess)
-			callbackIdArray.append(tempID);
-		
-
-		materialQueue.push(node);
-	}
-
-}
-
-// callback that goes through nodes that have been deleted
-void nodeDeleted(MObject &node, void *clientData) {
-
-	//MStreamUtils::stdOutStream() << "\n";
-	//MStreamUtils::stdOutStream() << "NODE DELETED";
-
-	if (node.hasFn(MFn::kMesh)) {
-
-		MFnMesh mesh(node);
-		std::string meshName = mesh.name().asChar(); 
-
-		size_t totalMsgSize = (sizeof(MsgHeader));
-		const char* msg = new char[totalMsgSize];
-
-		// Fill header ========
-		MsgHeader msgHeader;
-		msgHeader.msgSize = totalMsgSize;
-		msgHeader.nodeType = NODE_TYPE::MESH;
-		msgHeader.nameLen = meshName.length();
-		msgHeader.cmdType = CMDTYPE::DELETE_NODE;
-		memcpy(msgHeader.objName, meshName.c_str(), meshName.length());
-
-		// copy over msg ======
-		memcpy((char*)msg, &msgHeader, sizeof(MsgHeader));
-		
-		if (comLib.send(msg, totalMsgSize)) {
-			MStreamUtils::stdOutStream() << "nodeDeleted: Message sent" << "\n";
-		}
-
-
-	}
-
-	if (node.hasFn(MFn::kLight)) {
-		//MStreamUtils::stdOutStream() << "light to delete";
-
-	}
-}
-
-// callback called every x seconds and goes through existing nodes
-void timerCallback(float elapsedTime, float lastTime, void* clientData) {
-	
-	globalTime += elapsedTime;
-
-	MCallbackId tempID;
-	MStatus Result = MS::kSuccess;
-
-	for (int i = 0; i < meshQueue.size(); i++) {
-
-		MObject currenNode = meshQueue.back();
-		if (currenNode.hasFn(MFn::kMesh)) {
-
-			MFnMesh currentMesh = currenNode;
-
-			MDagPath path;
-			MFnDagNode(currenNode).getPath(path);
-			MFnDagNode currentDagNode = currenNode;
-			MFnTransform transform(path);
-
-			//unsigned int nrOfPrnts = currentDagNode.parentCount();
-			MObject parentTransf = currentDagNode.parent(0);
-
-			/* 
-			tempID = MDagMessage::addWorldMatrixModifiedCallback(path, nodeWorldMatrixChanged, NULL, &Result);
-			if (Result == MS::kSuccess) {
-				callbackIdArray.append(tempID);
-			}
-			*/
-
-			/* 
-			tempID = MNodeMessage::addNameChangedCallback(currenNode, nodeNameChangedMaterial, NULL, &Result);
-			if (Result == MS::kSuccess) {
-				callbackIdArray.append(tempID);
-			}
-			*/
-
-			/* 
-			tempID = MNodeMessage::addAttributeChangedCallback(currenNode, nodeAttributeChanged, NULL, &Result);
-			if (Result == MS::kSuccess) {
-				callbackIdArray.append(tempID);
-			}
-			*/
-
-			/* 
-			tempID = MNodeMessage::addNameChangedCallback(currenNode, NodeNameChanged, &Result);
-			if (Result == MS::kSuccess) {
-				callbackIdArray.append(tempID);
-			}
-			*/
-		}
-
-		meshQueue.pop();
-	}
-
-	for (int i = 0; i < transformQueue.size(); i++) {
-
-		MObject currentNode = transformQueue.back();
-		if (currentNode.hasFn(MFn::kTransform)) {
-
-			MFnTransform currentTransform = currentNode;
-
-			/* 
-			tempID = MNodeMessage::addAttributeChangedCallback(currentNode, nodeTransformAttributeChanged, NULL, &Result);
-			if (Result == MS::kSuccess) {
-				callbackIdArray.append(tempID);
-			}
-			*/
-
-			/* 
-			tempID = MNodeMessage::addNameChangedCallback(currentNode, NodeNameChanged, &Result);
-			if (Result == MS::kSuccess) {
-				callbackIdArray.append(tempID);
-			}
-			*/
-
-			/*
-			MDagPath path;
-			MFnDagNode(currentNode).getPath(path);
-			MFnDagNode currentDagNode = currentNode;
-			MFnTransform transform(path);
-
-			//unsigned int nrOfPrnts = currentDagNode.parentCount();
-			MObject parentTransf = currentDagNode.parent(0);
-
-			tempID = MDagMessage::addWorldMatrixModifiedCallback(path, nodeWorldMatrixChanged, NULL, &Result);
-			if (Result == MS::kSuccess) {
-				callbackIdArray.append(tempID);
-			}
-			*/
-		}
-	}
-
-
-	for (int i = 0; i < lightQueue.size(); i++) {
-
-		MObject currenNode = lightQueue.back();
-		if (currenNode.hasFn(MFn::kLight)) {
-
-			//MStreamUtils::stdOutStream() << "LIGHT NODE " << endl;
-			MDagPath path;
-			MFnLight sceneLight(currenNode);
-			MFnDagNode(currenNode).getPath(path);
-			/* 
-			tempID = MNodeMessage::addAttributeChangedCallback(currenNode, nodeLightAttributeChanged, NULL, &Result);
-			if (Result == MS::kSuccess) {
-				callbackIdArray.append(tempID);
-			}
-
-			MObject parentNode = sceneLight.parent(0); 
-			tempID = MNodeMessage::addAttributeChangedCallback(parentNode, nodeLightAttributeChanged, NULL, &Result);
-			if (Result == MS::kSuccess) {
-				callbackIdArray.append(tempID);
-			}
-			*/
-			
-
-			//GetLightInfo(sceneLight);
-
-			/*
-			tempID = MNodeMessage::addAttributeChangedCallback(currenNode, nodeLightAttributeChanged, NULL, &Result);
-			if (Result == MS::kSuccess) {
-				callbackIdArray.append(tempID);
-			}
-			*/
-
-		}
-
-		lightQueue.pop();
-	}
-
-}
-
 
 
 // Function to Load plugin Load
@@ -2802,6 +3036,7 @@ EXPORT MStatus initializePlugin(MObject obj) {
 
 	tempID = MTimerMessage::addTimerCallback(timerPeriod, timerCallback, NULL, &status);
 	callbackIdArray.append(tempID);
+
 
 	/* 
 	// get the lamberts in scene at startup

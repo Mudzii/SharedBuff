@@ -64,5 +64,9 @@
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="core_basic_window.cpp" />
+    <ClCompile Include="NodeFunctions.cpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="NodeFunctions.h" />
   </ItemGroup>
 </Project>
