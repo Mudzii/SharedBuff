@@ -94,7 +94,6 @@ struct lightFromMaya {
 	Vector3 lightPos;
 	float intensityRadius;
 	Color color;
-	
 };
 
 struct modelFromMaya {

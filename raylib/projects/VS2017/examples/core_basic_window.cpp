@@ -143,10 +143,13 @@ int main() {
 
 
 	// create a light ====== 
-	Vector3 lightPos = { 0,0,0 };
-	float radius = 0.1;
-	Color color = { 1 * 255, 1 * 255, 1 * 255, 1 * 255 };
-	lightsArray.push_back({ lightPos, radius, color });
+	lightFromMaya tempLight = {};
+	tempLight.lightNameLen = 5; 
+	tempLight.lightPos = { 0,0,0 };
+	tempLight.intensityRadius = 0.1;
+	tempLight.color = { 1 * 255, 1 * 255, 1 * 255, 1 * 255 };
+	memcpy(tempLight.lightName, "light", tempLight.lightNameLen);
+	lightsArray.push_back(tempLight);
 
 	// map specific commands to a specific function
 	
@@ -185,7 +188,13 @@ int main() {
 	camera.fovy		= 45.0f;
 	camera.type		= CAMERA_PERSPECTIVE;
 
-	cameraArray.push_back({ camera.up, camera.target, camera.position });
+	cameraFromMaya tempCamera = {}; 
+	tempCamera.up = camera.up; 
+	tempCamera.fov = camera.fovy; 
+	tempCamera.type = camera.type;
+	tempCamera.pos = camera.position; 
+	tempCamera.forward = camera.target; 
+	cameraArray.push_back(tempCamera);
 
 	// real models rendered each frame
 	std::vector<modelPos> flatScene;
@@ -249,10 +258,10 @@ int main() {
 		
 		// draw lights from maya
 		for (int i = 0; i < lightsArray.size(); i++) {
-			DrawSphere(lightPos, 0.1, color);
+			DrawSphere(tempLight.lightPos, 0.1, tempLight.color);
 		}
 
-		SetShaderValue(shader1, lightLoc, Vector3ToFloat(lightPos), 1);
+		SetShaderValue(shader1, lightLoc, Vector3ToFloat(tempLight.lightPos), 1);
 
 		ClearBackground(RAYWHITE);
 		/* 
