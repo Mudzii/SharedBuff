@@ -1,16 +1,279 @@
 #include "NodeFunctions.h"
 
+
+
+int findMesh(std::vector<modelFromMaya>& modelArr, std::string MeshName, int* nrOfObjs) {
+
+	int meshIndex = -1; 
+	for (int i = 0; i < *nrOfObjs; i++) {
+		if (modelArr[i].name == MeshName) {
+
+			meshIndex = i;
+			break;
+		}
+	}
+
+	return meshIndex; 
+}
+
+
+
+
 void addNode(std::vector<modelFromMaya>& modelArray, std::vector<lightFromMaya>& lightsArray, std::vector<cameraFromMaya>& cameraArray, std::vector<materialMaya>& materialArray, char* buffer, int bufferSize, Shader shader, int* nrObjs, int* index, int* nrMaterials) {
 
 	std::cout << std::endl;
 	std::cout << "=======================================" << std::endl;
 	std::cout << "ADD NODE FUNCTION" << std::endl;
 
+	MsgHeader msgHeader = {};
+	memcpy((char*)&msgHeader, buffer, sizeof(MsgHeader));
+
+	std::string objectName = msgHeader.objName;
+	objectName = objectName.substr(0, msgHeader.nameLen);
+
+	if (msgHeader.nodeType == NODE_TYPE::MESH) {
+
+		std::cout << "MESH to add " << objectName << std::endl;
+
+		// get mesh info send over
+		msgMesh meshInfo = {};
+		memcpy((char*)&meshInfo, buffer + sizeof(MsgHeader), sizeof(msgMesh));
+
+		
+		std::cout << "vtx cnt " << meshInfo.vtxCount << std::endl;
+		std::cout << "norm cnt " << meshInfo.normalCount << std::endl;
+		std::cout << "uv cnt " << meshInfo.UVcount << std::endl;
+
+		// create arrays to store information
+		float* meshVtx	   = new float[meshInfo.vtxCount * 3];
+		float* meshNorm	   = new float[meshInfo.normalCount * 3];
+		float* meshUVs	   = new float[meshInfo.UVcount];
+
+		memcpy((char*)meshVtx,	buffer + sizeof(MsgHeader) + sizeof(msgMesh),  (sizeof(float) * meshInfo.vtxCount * 3));
+		memcpy((char*)meshNorm, buffer + sizeof(MsgHeader) + sizeof(msgMesh) + (sizeof(float) * meshInfo.vtxCount * 3),  (sizeof(float) * meshInfo.normalCount * 3));
+		memcpy((char*)meshUVs,  buffer + sizeof(MsgHeader) + sizeof(msgMesh) + (sizeof(float) * meshInfo.vtxCount * 3) + (sizeof(float) * meshInfo.normalCount * 3), (sizeof(float) * meshInfo.UVcount));
+
+
+		// get material info sent over
+		materialMaya tempMat = {};
+		
+		memcpy((char*)&tempMat, buffer + sizeof(MsgHeader) + sizeof(msgMesh) + (sizeof(float) * meshInfo.vtxCount * 3) + (sizeof(float) * meshInfo.normalCount * 3) + (sizeof(float) * meshInfo.UVcount), sizeof(materialMaya));
+		Color tempColor = { tempMat.color.r, tempMat.color.g, tempMat.color.b, tempMat.color.a};
+
+		std::string materialName = tempMat.materialName;
+		materialName = materialName.substr(0, tempMat.matNameLen);
+
+		std::string texturePath = tempMat.fileTextureName;
+		texturePath = texturePath.substr(0, tempMat.textureNameLen);
+
+
+		std::cout << "textureName: " << texturePath << std::endl;
+		std::cout << "materialName: " << materialName << std::endl;
+		std::cout << "tempColor: " << (int)tempColor.r << " : " << (int)tempColor.g << " : " << (int)tempColor.b << " : " << (int)tempColor.a << std::endl;
+
+		// get matrix info sent over 
+		Matrix tempMatrix = {}; 
+		memcpy((char*)&tempMatrix, buffer + sizeof(MsgHeader) + sizeof(msgMesh) + (sizeof(float) * meshInfo.vtxCount * 3) + (sizeof(float) * meshInfo.normalCount * 3) + (sizeof(float) * meshInfo.UVcount) + sizeof(materialMaya), sizeof(Matrix));
+
+
+		// Check if material already exists
+		bool materialExists = false;
+		for (int i = 0; i < *nrMaterials; i++) {
+			if (materialArray[i].materialName == materialName) {
+
+				// if it exists, remove it and replace it
+				materialExists = true;
+				materialArray.erase(materialArray.begin() + i);
+
+				if (tempMat.type == 0) {
+					tempMat.color = tempColor;
+					materialArray.insert(materialArray.begin() + i, { tempMat });
+				}
+
+				else if (tempMat.type == 1) {
+					tempMat.color = { 255, 255, 255, 255 };
+					materialArray.insert(materialArray.begin() + i, { tempMat });
+				}
+
+				break; 
+			}
+		}
+
+		if (!materialExists) {
+
+			if (tempMat.type == 0) {
+				tempMat.color = tempColor;
+				materialArray.push_back({ tempMat });
+				*nrMaterials = *nrMaterials + 1;
+			}
+
+			else if (tempMat.type == 1) {
+				tempMat.color = { 255, 255, 255, 255 };
+				materialArray.push_back({ tempMat });
+				*nrMaterials = *nrMaterials + 1;
+			}
+		}
+
+
+		// check of mesh already exists
+		int modelindex = findMesh(modelArray, objectName, nrObjs);
+
+		// get mesh material
+		Color newColor;
+		Texture2D texture;	
+
+		if (modelindex == -1) {
+			
+			Mesh tempMesh = {};
+			
+			// vtx
+			tempMesh.vertexCount = meshInfo.vtxCount;
+			tempMesh.vertices = new float[meshInfo.vtxCount * 3];
+			memcpy(tempMesh.vertices, meshVtx, (sizeof(float) * tempMesh.vertexCount * 3));
+
+			// normals
+			tempMesh.normals = new float[meshInfo.normalCount * 3];
+			memcpy(tempMesh.normals, meshNorm, (sizeof(float) * meshInfo.normalCount * 3));
+
+			// UVs
+			tempMesh.texcoords = new float[meshInfo.UVcount];
+			memcpy(tempMesh.texcoords, meshUVs, (sizeof(float) * meshInfo.UVcount));
+
+
+			rlLoadMesh(&tempMesh, false);
+			Model tempModel = LoadModelFromMesh(tempMesh);
+			tempModel.material.shader = shader;
+			
+			if (tempMat.type == 0) {
+				newColor = { tempMat.color.r, tempMat.color.g, tempMat.color.b, 255 };
+				modelArray.push_back({ *index, objectName, tempMesh, tempModel, MatrixTranslate(0,0,0), newColor, materialName });
+
+			}
+
+			else if (tempMat.type == 1) {
+				newColor = { 255, 255, 255, 255 };
+				texture = LoadTexture(texturePath.c_str());
+				tempModel.material.maps[MAP_DIFFUSE].texture = texture;
+				modelArray.push_back({ *index, objectName, tempMesh, tempModel, MatrixTranslate(0,0,0), newColor, materialName });
+
+			}
+
+			*index = *index + 1;
+			*nrObjs = *nrObjs + 1;
+
+		}
+
+	
+		// delete any allocated arrays
+	
+		delete[] meshVtx; 
+		delete[] meshNorm;
+		delete[] meshUVs; 
+
+	}
+
+	
 }
 
 void updateNode(std::vector<modelFromMaya>& modelArray, std::vector<lightFromMaya>& lightsArray, std::vector<cameraFromMaya>& cameraArray, std::vector<materialMaya>& materialArray, char* buffer, int bufferSize, Shader shader, int* nrObjs, int* index, int* nrMaterials) {
 
+	//std::cout << std::endl;
+	//std::cout << "=======================================" << std::endl;
+	//std::cout << "UPDATE NODE FUNCTION" << std::endl;
+
+	MsgHeader msgHeader = {};
+	memcpy((char*)&msgHeader, buffer, sizeof(MsgHeader));
+
+	std::string objectName = msgHeader.objName;
+	objectName = objectName.substr(0, msgHeader.nameLen);
+
+	if (msgHeader.nodeType == NODE_TYPE::MESH) {
+
+		msgMesh meshInfo = {};
+		memcpy((char*)&meshInfo, buffer + sizeof(MsgHeader), sizeof(msgMesh));
+
+		std::cout << "update mesh " << objectName << std::endl;
+
+		// create arrays to store information
+		float* meshVtx  = new float[meshInfo.vtxCount * 3];
+		float* meshNorm = new float[meshInfo.normalCount * 3];
+		float* meshUVs  = new float[meshInfo.UVcount];
+
+		memcpy((char*)meshVtx,  buffer + sizeof(MsgHeader) + sizeof(msgMesh),  (sizeof(float) * meshInfo.vtxCount * 3));
+		memcpy((char*)meshNorm, buffer + sizeof(MsgHeader) + sizeof(msgMesh) + (sizeof(float) * meshInfo.vtxCount * 3),  (sizeof(float) * meshInfo.normalCount * 3));
+		memcpy((char*)meshUVs,  buffer + sizeof(MsgHeader) + sizeof(msgMesh) + (sizeof(float) * meshInfo.vtxCount * 3) + (sizeof(float) * meshInfo.normalCount * 3), (sizeof(float) * meshInfo.UVcount));
+	
+		int modelindex = findMesh(modelArray, objectName, nrObjs);
+
+		if (modelindex >= 0) {
+
+			Mesh tempMesh = {};
+			int tempIndex = modelArray[modelindex].index;
+
+			// vtx
+			tempMesh.vertexCount = meshInfo.vtxCount;
+			tempMesh.vertices = new float[meshInfo.vtxCount * 3];
+			memcpy(tempMesh.vertices, meshVtx, sizeof(float) * tempMesh.vertexCount * 3);
+
+			// normals
+			tempMesh.normals = new float[meshInfo.normalCount * 3];
+			memcpy(tempMesh.normals, meshNorm, sizeof(float) * tempMesh.vertexCount * 3);
+
+			// UVs
+			tempMesh.texcoords = new float[meshInfo.UVcount * 2];
+			memcpy(tempMesh.texcoords, meshUVs, sizeof(float) * tempMesh.vertexCount * 2);
+
+
+			rlLoadMesh(&tempMesh, false);
+			Model tempModel = LoadModelFromMesh(tempMesh);
+			tempModel.material.shader = shader;
+
+
+			Texture2D tempTexture;
+			Color tempColor   = modelArray[modelindex].color;
+			Matrix tempMatrix = modelArray[modelindex].modelMatrix;
+			std::string tempMaterialName = modelArray[modelindex].materialName;
+
+			// erase old model and replace with new
+			modelArray.erase(modelArray.begin() + modelindex);
+
+			modelArray.insert(modelArray.begin() + modelindex, { tempIndex, objectName, tempMesh, tempModel, tempMatrix, tempColor, tempMaterialName });
+
+
+		}
+
+
+		// delete the arrays
+		delete[] meshVtx;
+		delete[] meshNorm;
+		delete[] meshUVs;
+		
+		
+	}
+	
+	
+	if (msgHeader.nodeType == NODE_TYPE::CAMERA) {
+
+		cameraFromMaya camInfo = {};
+		memcpy((char*)&camInfo, buffer + sizeof(MsgHeader), sizeof(cameraFromMaya));
+
+		//std::cout << "CAM: " << objectName << std::endl;
+
+		// if perspective camera, change FOV from radians to degrees
+		if (camInfo.type == 0) {
+
+			float degreesFOV = camInfo.fov * (180.0 / 3.141592653589793238463);
+			camInfo.fov = degreesFOV;
+		}
+
+		cameraArray.erase(cameraArray.begin());
+		cameraArray.insert(cameraArray.begin(), { camInfo });
+
+
+	}
+	
 }
+
 void deleteNode(std::vector<modelFromMaya>& modelArray, std::vector<lightFromMaya>& lightsArray, std::vector<cameraFromMaya>& cameraArray, std::vector<materialMaya>& materialArray, char* buffer, int bufferSize, Shader shader, int* nrObjs, int* index, int* nrMaterials) {
 
 }
@@ -21,6 +284,87 @@ void updateNodeName(std::vector<modelFromMaya>& modelArray, std::vector<lightFro
 
 void updateNodeMatrix(std::vector<modelFromMaya>& modelArray, std::vector<lightFromMaya>& lightsArray, std::vector<cameraFromMaya>& cameraArray, std::vector<materialMaya>& materialArray, char* buffer, int bufferSize, Shader shader, int* nrObjs, int* index, int* nrMaterials) {
 
+
+	MsgHeader msgHeader = {};
+	memcpy((char*)&msgHeader, buffer, sizeof(MsgHeader));
+
+	std::string objectName = msgHeader.objName;
+	objectName = objectName.substr(0, msgHeader.nameLen);
+
+	if (msgHeader.nodeType == NODE_TYPE::MESH) {
+
+
+		transformFromMaya tempTransf = {}; 
+		memcpy((char*)&tempTransf, buffer + sizeof(MsgHeader), sizeof(transformFromMaya));
+
+		Matrix tempMatrix = {}; 
+		memcpy((char*)&tempMatrix, buffer + sizeof(MsgHeader) + sizeof(transformFromMaya), sizeof(Matrix));
+		
+		std::string transfName = tempTransf.transfName;
+		transfName = transfName.substr(0, tempTransf.transfNameLen);
+
+		std::string childName = tempTransf.childName;
+		childName = childName.substr(0, tempTransf.childNameLen);
+
+		int modelIndex = findMesh(modelArray, childName, nrObjs);
+
+		if (modelIndex >= 0) {
+			std::cout << "TRANSFORM UPDATE " << transfName << " for mesh " << childName << std::endl;
+			
+			// copy the existing mesh
+			int tempIndex   = modelArray[modelIndex].index;
+			Model tempModel = modelArray[modelIndex].model;
+			Mesh tempMesh   = modelArray[modelIndex].mesh;
+			Color tempColor = modelArray[modelIndex].color;
+			std::string tempMaterialName = modelArray[modelIndex].materialName;
+
+			std::cout << "objectName " << objectName << std::endl;
+
+			
+			// erase object and replace with new one
+			modelArray.erase(modelArray.begin() + modelIndex);
+			modelArray.insert(modelArray.begin() + modelIndex, { tempIndex, childName, tempMesh, tempModel, tempMatrix, tempColor, tempMaterialName  });
+			
+			
+
+		}
+
+
+	}
+}
+
+void updateNodeMaterial(std::vector<modelFromMaya>& modelArray, std::vector<lightFromMaya>& lightsArray, std::vector<cameraFromMaya>& cameraArray, std::vector<materialMaya>& materialArray, char* buffer, int bufferSize, Shader shader, int* nrObjs, int* index, int* nrMaterials) {
+
+	std::cout << std::endl;
+	std::cout << "=======================================" << std::endl;
+	std::cout << "UPDATE MATERIAL FOR NODE" << std::endl;
+
+	MsgHeader msgHeader = {};
+	memcpy((char*)&msgHeader, buffer, sizeof(MsgHeader));
+
+	std::string objectName = msgHeader.objName;
+	objectName = objectName.substr(0, msgHeader.nameLen);
+
+	if (msgHeader.nodeType == NODE_TYPE::MESH) {
+
+
+		// get mesh info send over
+		msgMesh meshInfo = {};
+		memcpy((char*)&meshInfo, buffer + sizeof(MsgHeader), sizeof(msgMesh));
+
+		materialMaya tempMat = {}; 
+		memcpy((char*)&tempMat, buffer + sizeof(MsgHeader) + sizeof(msgMesh), sizeof(materialMaya));
+
+		Color tempColor = { tempMat.color.r, tempMat.color.g, tempMat.color.b, tempMat.color.a };
+
+		std::string materialName = tempMat.materialName;
+		materialName = materialName.substr(0, tempMat.matNameLen);
+
+		std::string texturePath = tempMat.fileTextureName;
+		texturePath = texturePath.substr(0, tempMat.textureNameLen);
+		
+		std::cout << "MESH to update  " << materialName << "  material on  " << objectName << std::endl;
+	}
 }
 
 void updateMaterial(std::vector<modelFromMaya>& modelArray, std::vector<lightFromMaya>& lightsArray, std::vector<cameraFromMaya>& cameraArray, std::vector<materialMaya>& materialArray, char* buffer, int bufferSize, Shader shader, int* nrObjs, int* index, int* nrMaterials) {

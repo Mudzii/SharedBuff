@@ -155,14 +155,14 @@ int main() {
 	
 	std::map<CMDTYPE, FnPtr> funcMap;
 
-	funcMap[NEW_NODE]			 = addNode; 
-	funcMap[UPDATE_NODE]		 = updateNode;
-	funcMap[UPDATE_MATRIX]		 = updateNodeMatrix;
-	funcMap[UPDATE_NAME]		 = updateNodeName;
-	funcMap[NEW_MATERIAL]	     = updateMaterial;
-	funcMap[UPDATE_MATERIAL]     = updateMaterialName;
-	funcMap[DELETE_NODE]		 = deleteNode;
-	
+	funcMap[NEW_NODE]			  = addNode; 
+	funcMap[UPDATE_NODE]		  = updateNode;
+	funcMap[UPDATE_MATRIX]		  = updateNodeMatrix;
+	funcMap[UPDATE_NAME]		  = updateNodeName;
+	funcMap[NEW_MATERIAL]	      = updateMaterial;
+	funcMap[UPDATE_MATERIAL]      = updateMaterialName;
+	funcMap[DELETE_NODE]		  = deleteNode;
+	funcMap[UPDATE_NODE_MATERIAL] = updateNodeMaterial;
 
 	// create a simple cube
 	//Model cube;
@@ -295,7 +295,6 @@ int main() {
 			SetShaderValueMatrix(m.model.material.shader, modelLoc, m.modelMatrix);
 
 			Color finalColor = { (lightsArray[0].color.r + m.color.r),(lightsArray[0].color.g + m.color.g),(lightsArray[0].color.b + m.color.b),(lightsArray[0].color.a + m.color.a) };
-			
 			DrawModel(m.model, {}, 1.0, finalColor);
 
 		}
@@ -353,22 +352,28 @@ void recvFromMaya(char* buffer, std::map<CMDTYPE, FnPtr> functionMap, std::vecto
 	if (comLib.recv(buffer, nr)) {
 		memcpy((char*)&msgHeader, buffer, sizeof(MsgHeader));
 
+		std::cout << "NODE TYPE " << msgHeader.nodeType << std::endl; 
+
 		if (msgHeader.nodeType == NODE_TYPE::MESH) {
 
 			//std::cout << "RCV MESH" << std::endl;
 			functionMap[msgHeader.cmdType](modelArray, lightsArray, cameraArray, materialArray, buffer, bufferSize, shader, nrObjs, index, nrMaterials);
 
 		}
+
+		/* 
 		if (msgHeader.nodeType == NODE_TYPE::TRANSFORM) {
 			functionMap[msgHeader.cmdType](modelArray, lightsArray, cameraArray, materialArray, buffer, bufferSize, shader, nrObjs, index, nrMaterials);
 		}
+		*/
 
-
+		
 		if (msgHeader.nodeType == NODE_TYPE::CAMERA) {
 			//std::cout << "RCV CAM" << std::endl;
 			functionMap[msgHeader.cmdType](modelArray, lightsArray, cameraArray, materialArray, buffer, bufferSize, shader, nrObjs, index, nrMaterials);
 
 		}
+		
 
 		if (msgHeader.nodeType == NODE_TYPE::LIGHT) {
 			functionMap[msgHeader.cmdType](modelArray, lightsArray, cameraArray, materialArray, buffer, bufferSize, shader, nrObjs, index, nrMaterials);

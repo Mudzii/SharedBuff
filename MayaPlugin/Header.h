@@ -55,7 +55,9 @@ enum CMDTYPE {
 	UPDATE_MATERIAL  = 1006,
 
 	DELETE_NODE      = 1007,
-	TRANSFORM_UPDATE = 1008
+	TRANSFORM_UPDATE = 1008,
+
+	UPDATE_NODE_MATERIAL = 1009
 };
 
 // header for message that are sent
@@ -117,11 +119,6 @@ struct Transform {
 
 	char childName[MAX_CHAR_LEN];
 	int childNameLen;
-};
-
-struct NodeDeleted {
-	int nodeNameLen; 
-	char nodeName[MAX_CHAR_LEN]; 
 };
 
 struct NodeRenamed {
@@ -186,10 +183,10 @@ struct TransformInfo {
 };
 
 struct NodeDeletedInfo {
+	int nodeIndex; 
 	MsgHeader msgHeader;
 	MString nodeName; 
-	
-	NodeDeleted deletedData; 
+
 };
 
 struct NodeRenamedInfo {
