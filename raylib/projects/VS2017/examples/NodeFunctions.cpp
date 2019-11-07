@@ -308,6 +308,7 @@ void updateNodeMatrix(std::vector<modelFromMaya>& modelArray, std::vector<lightF
 
 		int modelIndex = findMesh(modelArray, childName, nrObjs);
 
+
 		if (modelIndex >= 0) {
 			std::cout << "TRANSFORM UPDATE " << transfName << " for mesh " << childName << std::endl;
 			
