@@ -229,6 +229,7 @@ int main() {
 	int projLoc  = GetShaderLocation(shader1, "projection");
 	int lightLoc = GetShaderLocation(shader1, "lightPos");
 
+
 	char* tempArray; 
 	// =====================================
 
