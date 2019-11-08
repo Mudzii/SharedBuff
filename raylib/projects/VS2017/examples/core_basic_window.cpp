@@ -124,7 +124,7 @@ void updateMaterialName(std::vector<modelFromMaya>& modelArray, std::vector<ligh
 typedef void(*FnPtr)(std::vector<modelFromMaya>&, std::vector<lightFromMaya>&, std::vector<cameraFromMaya>&, std::vector<materialMaya>&, char*, int, Shader, int*, int*,  int*);
 
 */
-void recvFromMaya(char* buffer, std::map<CMDTYPE, FnPtr> functionMap, std::vector<modelFromMaya>& modelArray, std::vector<lightFromMaya>& lightsArray, std::vector<cameraFromMaya>& cameraArray, std::vector<materialMaya>& materialArray, int bufferSize, Shader shader, int* nrObjs, int* index, int* nrMaterials);
+void recvFromMaya(char* buffer, std::map<CMDTYPE, FnPtr> functionMap, std::vector<modelFromMaya>& modelArray, std::vector<lightFromMaya>& lightsArray, std::vector<cameraFromMaya>& cameraArray, std::vector<materialMaya>& materialArray, int bufferSize, Shader shader, int* nrObjs, int* index, int* nrMaterials, std::vector<Texture2D> &textureArr);
 
 // ==================================================================================
 // ==================================================================================
@@ -136,10 +136,11 @@ int main() {
 	SetTraceLog(LOG_WARNING);
 
 	// vectors with objects from Maya ====== 
-	std::vector<materialMaya> materialArray;
-	std::vector<cameraFromMaya> cameraArray;
+	std::vector<Texture2D> textureArray;
 	std::vector<modelFromMaya> modelArray;
 	std::vector<lightFromMaya> lightsArray;
+	std::vector<cameraFromMaya> cameraArray;
+	std::vector<materialMaya> materialArray;
 
 
 	// create a light ====== 
@@ -182,18 +183,20 @@ int main() {
 
 	// Define the camera to look into our 3d world
 	Camera camera	= { 0 };
+	/* 
 	camera.position = { 4.0f, 4.0f, 4.0f };
 	camera.target	= { 0.0f, 1.0f, -1.0f };
 	camera.up		= { 0.0f, 1.0f, 0.0f };
 	camera.fovy		= 45.0f;
 	camera.type		= CAMERA_PERSPECTIVE;
+	*/
 
 	cameraFromMaya tempCamera = {}; 
-	tempCamera.up = camera.up; 
-	tempCamera.fov = camera.fovy; 
-	tempCamera.type = camera.type;
-	tempCamera.pos = camera.position; 
-	tempCamera.forward = camera.target; 
+	tempCamera.fov  = 45.0f;
+	tempCamera.type = CAMERA_PERSPECTIVE;
+	tempCamera.up   = { 0.0f, 1.0f, 0.0f };
+	tempCamera.pos  = { 4.0f, 4.0f, 4.0f }; 
+	tempCamera.forward = { 0.0f, 1.0f, -1.0f };
 	cameraArray.push_back(tempCamera);
 
 	// real models rendered each frame
@@ -207,23 +210,23 @@ int main() {
 		"resources/shaders/glsl330/phong.fs");   // Load model shader
 	material1.shader = shader1;
 
+	/* 
 	Mesh mesh1   = LoadMesh("resources/models/watermill.obj");
 	Model model1 = LoadModelFromMesh(mesh1);
 	model1.material = material1;                     // Set shader effect to 3d model
 
 	unsigned char colors[12] = { 255, 0, 0, 255, 0, 255, 0, 255, 0, 0, 255, 255 };
+	*/
 
 	std::cout << "-----------------" << std::endl;
 
 	Vector3 position = { 0.0f, 0.0f, 0.0f };    // Set model position
 	SetCameraMode(camera, CAMERA_FREE);         // Set an orbital camera mode
 	SetTargetFPS(130);                           // Set our game to run at 60 frames-per-second
-	//initializing camera!!!!
-
+	
 	int modelLoc = GetShaderLocation(shader1, "model");
 	int viewLoc  = GetShaderLocation(shader1, "view");
 	int projLoc  = GetShaderLocation(shader1, "projection");
-
 	int lightLoc = GetShaderLocation(shader1, "lightPos");
 
 	char* tempArray; 
@@ -243,7 +246,7 @@ int main() {
 		// Get the messages sent from maya
 		//tempArraySize = comLib.nextSize();
 		tempArray	  = new char[1];
-		recvFromMaya(tempArray, funcMap, modelArray, lightsArray, cameraArray, materialArray, tempArraySize, shader1, &nrOfObj, &modelIndex, &nrMaterials);
+		recvFromMaya(tempArray, funcMap, modelArray, lightsArray, cameraArray, materialArray, tempArraySize, shader1, &nrOfObj, &modelIndex, &nrMaterials, textureArray);
 		delete[] tempArray; 
 
 		// set camera
@@ -303,7 +306,7 @@ int main() {
 
 		EndMode3D();
 
-		DrawTextRL("(c) Watermill 3D model by Alberto Cano", screenWidth - 210, screenHeight - 20, 10, GRAY);
+		DrawTextRL("Maya API level editor", screenWidth - 210, screenHeight - 20, 10, GRAY);
 		DrawTextRL(FormatText("Camera position: (%.2f, %.2f, %.2f)", camera.position.x, camera.position.y, camera.position.z), 600, 20, 10, BLACK);
 		DrawTextRL(FormatText("Camera target: (%.2f, %.2f, %.2f)", camera.target.x, camera.target.y, camera.target.z), 600, 40, 10, GRAY);
 		DrawFPS(10, 10);
@@ -314,15 +317,21 @@ int main() {
 	// De-Initialization
 	UnloadShader(shader1);       // Unload shader
 	UnloadTexture(texture1);     // Unload texture
-	UnloadModel(model1);
+	
+	for (int i = 0; i < textureArray.size(); i++) {
+		UnloadTexture(textureArray[i]);
+	}
 	
 	for (int i = 0; i < modelArray.size(); i++) {
 		UnloadModel(modelArray[i].model);
 	}
 	
-	//UnloadModel(tri);
-	//UnloadModel(cubeMod);
-	//UnloadModel(cube);
+	/* 
+	UnloadModel(model1);
+	UnloadModel(tri);
+	UnloadModel(cubeMod);
+	UnloadModel(cube);
+	*/
 
 	CloseWindowRL();              // Close window and OpenGL context
 	//--------------------------------------------------------------------------------------
@@ -333,7 +342,7 @@ int main() {
 // ==================================================================================
 // ================= FUNCTION TO REVIECE MSG FROM MAYA ==============================
 // ==================================================================================
-void recvFromMaya(char* buffer, std::map<CMDTYPE, FnPtr> functionMap, std::vector<modelFromMaya>& modelArray, std::vector<lightFromMaya>& lightsArray, std::vector<cameraFromMaya>& cameraArray, std::vector<materialMaya>& materialArray, int bufferSize, Shader shader, int* nrObjs, int* index, int* nrMaterials) {
+void recvFromMaya(char* buffer, std::map<CMDTYPE, FnPtr> functionMap, std::vector<modelFromMaya>& modelArray, std::vector<lightFromMaya>& lightsArray, std::vector<cameraFromMaya>& cameraArray, std::vector<materialMaya>& materialArray, int bufferSize, Shader shader, int* nrObjs, int* index, int* nrMaterials, std::vector<Texture2D> &textureArr) {
 
 	MsgHeader msgHeader = {}; 
 	msgHeader.cmdType   = CMDTYPE::DEFAULT;
@@ -355,7 +364,7 @@ void recvFromMaya(char* buffer, std::map<CMDTYPE, FnPtr> functionMap, std::vecto
 		//std::cout << "NODE TYPE " << msgHeader.nodeType << std::endl; 
 
 		if (msgHeader.nodeType == NODE_TYPE::MESH) {
-			functionMap[msgHeader.cmdType](modelArray, lightsArray, cameraArray, materialArray, buffer, bufferSize, shader, nrObjs, index, nrMaterials);
+			functionMap[msgHeader.cmdType](modelArray, lightsArray, cameraArray, materialArray, buffer, bufferSize, shader, nrObjs, index, nrMaterials, textureArr);
 		}
 
 		/* 
@@ -366,16 +375,16 @@ void recvFromMaya(char* buffer, std::map<CMDTYPE, FnPtr> functionMap, std::vecto
 
 		
 		if (msgHeader.nodeType == NODE_TYPE::CAMERA) {
-			functionMap[msgHeader.cmdType](modelArray, lightsArray, cameraArray, materialArray, buffer, bufferSize, shader, nrObjs, index, nrMaterials);
+			functionMap[msgHeader.cmdType](modelArray, lightsArray, cameraArray, materialArray, buffer, bufferSize, shader, nrObjs, index, nrMaterials, textureArr);
 		}
 		
 
 		if (msgHeader.nodeType == NODE_TYPE::LIGHT) {
-			functionMap[msgHeader.cmdType](modelArray, lightsArray, cameraArray, materialArray, buffer, bufferSize, shader, nrObjs, index, nrMaterials);
+			functionMap[msgHeader.cmdType](modelArray, lightsArray, cameraArray, materialArray, buffer, bufferSize, shader, nrObjs, index, nrMaterials, textureArr);
 		}
 
 		if (msgHeader.nodeType == NODE_TYPE::MATERIAL) {
-			functionMap[msgHeader.cmdType](modelArray, lightsArray, cameraArray, materialArray, buffer, bufferSize, shader, nrObjs, index, nrMaterials);
+			functionMap[msgHeader.cmdType](modelArray, lightsArray, cameraArray, materialArray, buffer, bufferSize, shader, nrObjs, index, nrMaterials, textureArr);
 		}
 		
 
