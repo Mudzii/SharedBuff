@@ -37,8 +37,10 @@ float timerPeriod = 0.05f;
 // Output messages in output window
 //MStreamUtils::stdOutStream() << "...: " << ... << "_" << endl;
 
-MStringArray meshesInScene; 
 Vec3 camPosScene; 
+MStringArray meshesInScene; 
+MStringArray materialsInScene; 
+
 
 std::vector<MeshInfo> meshInfoToSend; 
 std::vector<LightInfo> lightInfoToSend;
@@ -516,28 +518,128 @@ void nodeNameChangedMaterial(MObject &node, const MString &str, void*clientData)
 
 }
  */
+void texturePlugAttributeChanged(MNodeMessage::AttributeMessage msg, MPlug& plug, MPlug& otherPlug, void* clientData) {
+
+	 
+	if (msg & msg & MNodeMessage::kAttributeSet) {
+		//MStreamUtils::stdOutStream() << "==================================" << endl;
+		//MStreamUtils::stdOutStream() << "TEX PLUG CHANGED?" << endl;
+		//MStreamUtils::stdOutStream() << endl;
+	
+		MFnDependencyNode fn(plug.node());
+	
+
+		MStatus result;
+		MPlugArray connections;
+
+		// get the outColor plug which is connected to lambert 
+		MPlug colorPlug = fn.findPlug("outColor", &result);
+		std::string fileNameString; 
+
+		if (result) {
+
+			colorPlug.connectedTo(connections, false, true);
+			if (connections.length() > 0) {
+
+				MPlugArray textureConnections;
+
+				// get lambert node and color plug 
+				MFnDependencyNode lambertNode(connections[0].node());
+				MFnLambertShader lambertShader(connections[0].node());
+				MPlug lamColorPlug = lambertShader.findPlug("color", &result);
+				
+				if (result) {
+					
+					lamColorPlug.connectedTo(textureConnections, true, false);
+					if (textureConnections.length() > 0) {
+
+						//get filepath
+						MFnDependencyNode textureNode(textureConnections[0].node());
+						MPlug fileTextureName = textureNode.findPlug("ftn");
+
+						MString fileName;
+						fileTextureName.getValue(fileName);
+						fileNameString = fileName.asChar();
+
+						MStreamUtils::stdOutStream() << "fileNameString " << fileNameString << endl;
+
+						// check if material exists in scene
+						bool matExists = false; 
+						for (int i = 0; i < materialsInScene.length(); i++) {
+							if (materialsInScene[i] == lambertNode.name().asChar()) {
+								matExists = true; 
+								break; 
+							}
+						}
+
+						if (matExists) {
+							MStreamUtils::stdOutStream() << "Material exists. Editing texture " << endl;
+							
+							MStreamUtils::stdOutStream() << "lambertNode " << lambertNode.name() << endl;
+
+
+							MaterialInfo mMatInfo = {}; 
+							size_t totalMsgSize = (sizeof(MsgHeader) + sizeof(Material));
+							
+							mMatInfo.msgHeader.msgSize = totalMsgSize; 
+							mMatInfo.msgHeader.nodeType = NODE_TYPE::MATERIAL; 
+							mMatInfo.msgHeader.cmdType = CMDTYPE::UPDATE_MATERIAL; 
+
+							mMatInfo.msgHeader.nameLen = lambertNode.name().length();
+							memcpy(mMatInfo.msgHeader.objName, lambertNode.name().asChar(), mMatInfo.msgHeader.nameLen);
+
+							mMatInfo.materialData.type = 1; 
+							mMatInfo.materialData.color = {255,255,255,255};
+							mMatInfo.materialData.matNameLen = lambertNode.name().length();
+							memcpy(mMatInfo.msgHeader.objName, lambertNode.name().asChar(), mMatInfo.msgHeader.nameLen);
+
+							mMatInfo.materialData.textureNameLen = fileNameString.length(); 
+							memcpy(mMatInfo.materialData.fileTextureName, fileNameString.c_str(), mMatInfo.materialData.textureNameLen);
+
+							mMatInfo.materialData.matNameLen = lambertNode.name().length();
+							memcpy(mMatInfo.materialData.materialName, lambertNode.name().asChar(), mMatInfo.materialData.matNameLen);
+
+
+							// check if a msg with the material already exists. If it does, replace it
+							bool msgExists = false; 
+							for (int i = 0; i < materialInfoToSend.size(); i++) {
+
+								if (materialInfoToSend[i].materialName == lambertNode.name().asChar()) {
+									msgExists = true; 
+
+									materialInfoToSend[i] = mMatInfo; 
+									
+								}
+
+							}
+
+							// if it doesn't exist, add it
+							if (!msgExists) {
+								materialInfoToSend.push_back(mMatInfo);
+							}
+						}
+						
+					}
+				}
+			}
+		}
+	}
+}
 
 void materialAttributeChanged(MNodeMessage::AttributeMessage msg, MPlug& plug, MPlug& otherPlug, void* clientData) {
 
-	//MStreamUtils::stdOutStream() << endl;
+	//MStreamUtils::stdOutStream() << endl;(msg & MNodeMessage::kAttributeSet) &&
+	MStreamUtils::stdOutStream() << "==================================" << endl;
+	MStreamUtils::stdOutStream() << "MATERIAL ATTR CHANGED" << endl;
+	MStreamUtils::stdOutStream() << endl;
 
-	//MStreamUtils::stdOutStream() << "==================================" << endl;
-	//MStreamUtils::stdOutStream() << "MATERILA ATTR CHANGED" << endl;
-	//MStreamUtils::stdOutStream() << endl;
-
-	if ((msg & MNodeMessage::kAttributeSet) && (plug.node().hasFn(MFn::kLambert))){ // && (msg != 2052)) {
+	if ((plug.node().hasFn(MFn::kLambert))){ // && (msg != 2052)) {
 		
-		//MStreamUtils::stdOutStream() << "Connection made or attr set" << endl;
-		
-		//MStreamUtils::stdOutStream() << "plug " << plug.name() << endl;
-		//MStreamUtils::stdOutStream() << "otherPlug " << otherPlug.name() << endl;
-		// plug: lambert1.message || otherP: swatchShadingGroup.surfaceShader - clr?
-		//MStreamUtils::stdOutStream() << "msg " << msg << endl;
-
-	
 		MStatus result;
+		MaterialInfo mMatInfo = {}; 
 
 		// lambert material 
+		Color mColor = {255,255,255,255};
 		MColor color;
 		MPlug colorPlug;
 		MFnLambertShader lambertShader;
@@ -553,6 +655,26 @@ void materialAttributeChanged(MNodeMessage::AttributeMessage msg, MPlug& plug, M
 		// get lambert color through Color plug
 		colorPlug = lambertShader.findPlug("color", &result);
 
+		// check if material already exists in scene, otherwise add
+		int index = -1;
+		for (int i = 0; i < materialsInScene.length(); i++) {
+			if (materialsInScene[i] == lambertShader.name()) {
+
+				index = i; 
+				MStreamUtils::stdOutStream() << "Material already exists " << endl;
+				mMatInfo.msgHeader.cmdType = CMDTYPE::UPDATE_MATERIAL;
+				break;
+			}
+		}
+
+		if (index == -1) {
+
+			MStreamUtils::stdOutStream() << "Material didn't exist. Adding " << endl;
+
+			materialsInScene.append(lambertShader.name());
+			mMatInfo.msgHeader.cmdType = CMDTYPE::NEW_MATERIAL;
+		}
+
 		if (result) {
 
 			MPlug colorAttr;
@@ -562,8 +684,14 @@ void materialAttributeChanged(MNodeMessage::AttributeMessage msg, MPlug& plug, M
 			colorAttr.getValue(color.g);
 			colorAttr = lambertShader.findPlug("colorB");
 			colorAttr.getValue(color.b);
-			//MStreamUtils::stdOutStream() << endl;
-			//MStreamUtils::stdOutStream() << "COLOR: " << color << endl;
+
+			// convert from 0-1 to 0-255
+			int red = color.r * 255;
+			int blue = color.b * 255;
+			int green = color.g * 255;
+			int alpha = color.a * 255;
+			mColor = { (unsigned char)red, (unsigned char)green, (unsigned char)blue, (unsigned char)alpha };
+
 
 			// to check for textures, check if color plug is dest for another plug
 			colorPlug.connectedTo(textureConnections, true, false);
@@ -573,12 +701,68 @@ void materialAttributeChanged(MNodeMessage::AttributeMessage msg, MPlug& plug, M
 				MFnDependencyNode textureNode(textureConnections[0].node());
 				MPlug fileTextureName = textureNode.findPlug("ftn");
 
+				 
+				MCallbackId tempID = MNodeMessage::addAttributeChangedCallback(fileTextureName.node(), texturePlugAttributeChanged, NULL, &status);
+				if (status == MS::kSuccess)
+					callbackIdArray.append(tempID);
+				
+				
 				MString fileName;
 				fileTextureName.getValue(fileName);
 				fileNameString = fileName.asChar();
 
-				//MStreamUtils::stdOutStream() << "fileName: " << fileNameString << endl;
+				MStreamUtils::stdOutStream() << "fileNameString " << fileNameString << endl;
+
 				hasTexture = true;
+			}
+
+			if((msg & MNodeMessage::kAttributeSet)){
+			
+				MStreamUtils::stdOutStream() << "kAttributeSet for material " << endl;
+
+				size_t totalMsgSize = (sizeof(MsgHeader) + sizeof(Material));
+
+				mMatInfo.msgHeader.msgSize  = totalMsgSize;
+				mMatInfo.msgHeader.nodeType = NODE_TYPE::MATERIAL; 
+				//mMatInfo.msgHeader.cmdType  = CMDTYPE::UPDATE_MATERIAL; 
+
+				mMatInfo.msgHeader.nameLen = lambertShader.name().length(); 
+				memcpy(mMatInfo.msgHeader.objName, lambertShader.name().asChar(), mMatInfo.msgHeader.nameLen);
+
+				mMatInfo.materialData.color = mColor;
+				mMatInfo.materialData.matNameLen = lambertShader.name().length();
+				memcpy(mMatInfo.materialData.materialName, lambertShader.name().asChar(), mMatInfo.materialData.matNameLen);
+
+				mMatInfo.materialName = lambertShader.name(); 
+
+				if (hasTexture) {
+					mMatInfo.materialData.type = 1;
+					mMatInfo.texturePath = fileNameString.c_str(); 
+					mMatInfo.materialData.textureNameLen = fileNameString.length();
+					memcpy(mMatInfo.materialData.fileTextureName, fileNameString.c_str(), mMatInfo.materialData.textureNameLen);
+
+				}
+
+				else {
+					mMatInfo.materialData.type = 0;
+					mMatInfo.texturePath = "NA";
+					mMatInfo.materialData.textureNameLen = 2;
+					memcpy(mMatInfo.materialData.fileTextureName, "NA", mMatInfo.materialData.textureNameLen);
+
+				}
+
+				bool msgExists = false;
+				for (int i = 0; i < materialInfoToSend.size(); i++) {
+					if (materialInfoToSend[i].materialName == lambertShader.name()) {
+						msgExists = true;
+
+						materialInfoToSend[i] = mMatInfo; 
+					}
+				}
+
+				if (!msgExists) {
+					materialInfoToSend.push_back(mMatInfo);
+				}
 			}
 		}
 
@@ -601,12 +785,19 @@ void transformWorldMatrixChanged(MObject &transformNode, MDagMessage::MatrixModi
 	Matrix mTransformMatrix = {}; 
 	TransformInfo mTransfInfo = {}; 
 
+	//MStreamUtils::stdOutStream() << endl;
+	//MStreamUtils::stdOutStream() << " =============================== " << endl;
+	//MStreamUtils::stdOutStream() << "TRANSFORM MAT CHANGED " << endl;
+
 	if (result && !transformNode.hasFn(MFn::kCamera)) {
 
-		//MStreamUtils::stdOutStream() << endl;
-		//MStreamUtils::stdOutStream() << " =============================== " << endl;
-		//MStreamUtils::stdOutStream() << "TRANSFORM MAT CHANGED " << endl;
 		
+		MObjectArray hierarchy; 
+		int totalChildCnt = 0; 
+
+		MObject firstParentNode(transfNode.object());
+		hierarchy.append(firstParentNode);
+		int childCnt = transfNode.childCount(); 
 
 		MMatrix absMat; 
 		// check if transform is directly connected to mesh
@@ -614,19 +805,13 @@ void transformWorldMatrixChanged(MObject &transformNode, MDagMessage::MatrixModi
 		MFnMesh meshNode(path, &result);
 		if (result) {
 			hasShapeNode = true; 
-			absMat = MMatrix(path.inclusiveMatrix());
+			//absMat = MMatrix(path.inclusiveMatrix());
+			hierarchy.append(meshNode.object());
 			//MStreamUtils::stdOutStream() << "mesh of transform: " << meshNode.name() << endl;
 		}
 		
 
 		// if not directly connected to mesh, check if in hierarchy
-		MObjectArray hierarchy; 
-		int totalChildCnt = 0; 
-
-		MObject firstParentNode(transfNode.object());
-		hierarchy.append(firstParentNode);
-		int childCnt = transfNode.childCount(); 
-		
 		if (!hasShapeNode) {
 
 			for (int j = 0; j < hierarchy.length(); j++) {
@@ -649,33 +834,34 @@ void transformWorldMatrixChanged(MObject &transformNode, MDagMessage::MatrixModi
 							hierarchy.append(childObject);
 							totalChildCnt += 1; 
 	
-							absMat += MMatrix(path.inclusiveMatrix());
-							//MStreamUtils::stdOutStream()  << endl;
-							//MStreamUtils::stdOutStream() << "child " << child.fullPathName() << endl;
-							//MStreamUtils::stdOutStream() << "child cnt " << tempChildCnt << endl;
-							//MStreamUtils::stdOutStream()  << endl;
+							//absMat += MMatrix(path.inclusiveMatrix());
+						
 						}
 
 						if (childName.find("Shape") != std::string::npos) {
 							hasShapeNode = true; 
 							meshNode.setObject(childObject);
 
-							absMat += MMatrix(path.inclusiveMatrix());
+							//absMat += MMatrix(path.inclusiveMatrix());
 
 
 						}
 					}
 				}
 			}
-
-			MStreamUtils::stdOutStream()  << endl;
-
 		}
 		
+		for (int i = hierarchy.length() - 1; i-- > 0; ) {
+			MFnDagNode child(hierarchy[i]);
+			absMat *= child.transformationMatrix(); 
+
+		}
+		MStreamUtils::stdOutStream() << endl;
+
 		if (hasShapeNode) {
 	
-			MMatrix worldMatrix = MMatrix(path.inclusiveMatrix());
-			MMatrix localMatrix = MMatrix(path.exclusiveMatrix());
+			//MMatrix worldMatrix = MMatrix(path.inclusiveMatrix());
+			//MMatrix localMatrix = MMatrix(path.exclusiveMatrix());
 
 			
 			//row 1
@@ -728,7 +914,7 @@ void transformWorldMatrixChanged(MObject &transformNode, MDagMessage::MatrixModi
 			for (int i = 0; i < meshInfoToSend.size(); i++) {
 				if (transformInfoToSend[i].childShapeName == meshNode.name()) {
 					msgExists = true;
-					MStreamUtils::stdOutStream() << "Transf Msg already exists! Updating " << endl;
+					//MStreamUtils::stdOutStream() << "Transf Msg already exists! Updating " << endl;
 
 					transformInfoToSend[i].transfName = transfNode.name(); 
 					transformInfoToSend[i].msgHeader = mTransfInfo.msgHeader;
@@ -738,7 +924,7 @@ void transformWorldMatrixChanged(MObject &transformNode, MDagMessage::MatrixModi
 			}
 
 			if (!msgExists) {
-				MStreamUtils::stdOutStream() << "Transf Msg doesn't exists! Adding .... " << endl;
+				//MStreamUtils::stdOutStream() << "Transf Msg doesn't exists! Adding .... " << endl;
 				transformInfoToSend.push_back(mTransfInfo);
 			}
 
@@ -1109,6 +1295,24 @@ void GetMeshInfo(MFnMesh &mesh) {
 		index = meshesInScene.length();
 	}
 
+
+	// check if mesh already exists in scene, otherwise add
+	int matIndex = -1;
+	for (int i = 0; i < materialsInScene.length(); i++) {
+		if (materialsInScene[i] == lambertShader.name()) {
+
+			matIndex = i;
+			MStreamUtils::stdOutStream() << "Material already exists " << endl;
+			break;
+		}
+	}
+
+	if (matIndex == -1) {
+
+		MStreamUtils::stdOutStream() << "Material didn't exist. Adding " << endl;
+		materialsInScene.append(lambertShader.name());
+	}
+
 	// float arrays that store mesh info  ================
 	float* meshUVs	   = new float[uvArray.length()];
 	float* meshVtx	   = new float[vtxArray.length() * 3];
@@ -1462,9 +1666,9 @@ void MaterialChanged(MFnMesh &mesh) {
 
 	if (index != -1) {
 
-		MStreamUtils::stdOutStream() << endl;
+		//MStreamUtils::stdOutStream() << endl;
 
-		MStreamUtils::stdOutStream() << "==================================" << endl;
+		//MStreamUtils::stdOutStream() << "==================================" << endl;
 		MStreamUtils::stdOutStream() << "MATERIAL CHANGED" << endl;
 		MStreamUtils::stdOutStream() << endl;
 
@@ -1560,6 +1764,24 @@ void MaterialChanged(MFnMesh &mesh) {
 
 
 			}
+		}
+
+
+		// check if material already exists in scene, otherwise add
+		int matIndex = -1;
+		for (int i = 0; i < materialsInScene.length(); i++) {
+			if (materialsInScene[i] == lambertShader.name()) {
+
+				matIndex = i;
+				MStreamUtils::stdOutStream() << "Material already exists " << endl;
+				break;
+			}
+		}
+
+		if (matIndex == -1) {
+
+			MStreamUtils::stdOutStream() << "Material didn't exist. Adding " << endl;
+			materialsInScene.append(lambertShader.name());
 		}
 
 		size_t totalMsgSize = (sizeof(MsgHeader) + sizeof(Mesh) + sizeof(Material));
@@ -1847,10 +2069,10 @@ void meshAttributeChanged(MNodeMessage::AttributeMessage msg, MPlug& plug, MPlug
 
 		MFnMesh meshNode(path, &result);
 
-		MStreamUtils::stdOutStream() << "material changed" << endl;
-		MStreamUtils::stdOutStream() << "mesh: " << meshNode.name().asChar() << endl;
+		//MStreamUtils::stdOutStream() << "material changed" << endl;
+		//MStreamUtils::stdOutStream() << "mesh: " << meshNode.name().asChar() << endl;
 		if (result) {
-			MStreamUtils::stdOutStream() << "material In result statement" << endl;
+			//MStreamUtils::stdOutStream() << "material In result statement" << endl;
 			MaterialChanged(meshNode);
 		}
 	}
@@ -3120,7 +3342,6 @@ void nodeDeleted(MObject &node, void *clientData) {
 
 		MFnMesh mesh(node);
 		std::string meshName = mesh.name().asChar(); 
-		MStreamUtils::stdOutStream() << "mesh to delete " << meshName << endl;
 
 		int index = -1;
 		for (int i = 0; i < meshesInScene.length(); i++) {
@@ -3133,6 +3354,7 @@ void nodeDeleted(MObject &node, void *clientData) {
 
 		if (index >= 0) {
 
+			MStreamUtils::stdOutStream() << "mesh to delete " << meshName << endl;
 			size_t totalMsgSize = (sizeof(MsgHeader));
 
 			deleteInfo.msgHeader.msgSize = totalMsgSize;
@@ -3193,7 +3415,34 @@ void nodeDeleted(MObject &node, void *clientData) {
 
 		MFnDependencyNode materialNode(node);
 		std::string matName = materialNode.name().asChar();
-		MStreamUtils::stdOutStream() << "lambert deleted " << matName << endl;
+
+		int index = -1;
+		for (int i = 0; i < materialsInScene.length(); i++) {
+			if (materialsInScene[i] == materialNode.name()) {
+				index = i;
+				
+				break;
+			}
+		}
+
+		if (index >= 0) {
+
+			MStreamUtils::stdOutStream() << "lambert deleted " << matName << endl;
+			size_t totalMsgSize = (sizeof(MsgHeader));
+
+			deleteInfo.msgHeader.msgSize = totalMsgSize;
+			deleteInfo.msgHeader.nodeType = NODE_TYPE::MATERIAL;
+			deleteInfo.msgHeader.nameLen = matName.length();
+			memcpy(deleteInfo.msgHeader.objName, matName.c_str(), deleteInfo.msgHeader.nameLen);
+
+			deleteInfo.nodeIndex = index;
+			deleteInfo.nodeName  = matName.c_str();
+
+			nodeDeleteInfoToSend.push_back(deleteInfo);
+		
+
+
+		}
 
 	}
 
@@ -3264,9 +3513,7 @@ void timerCallback(float elapsedTime, float lastTime, void* clientData) {
 	
 	for (int i = 0; i < nodeDeleteInfoToSend.size(); i++) {
 		
-		MStreamUtils::stdOutStream() << "nodeDeleteInfoToSend: " << nodeDeleteInfoToSend[i].nodeName << "\n";
-
-
+		
 		int index = nodeDeleteInfoToSend[i].nodeIndex; 
 		const char* msgChar = new char[nodeDeleteInfoToSend[i].msgHeader.msgSize];
 
@@ -3276,10 +3523,14 @@ void timerCallback(float elapsedTime, float lastTime, void* clientData) {
 		if (nodeDeleteInfoToSend[i].msgHeader.nodeType == NODE_TYPE::MESH) {
 			meshesInScene.remove(index);
 		}
+
+		if (nodeDeleteInfoToSend[i].msgHeader.nodeType == NODE_TYPE::MATERIAL) {
+			materialsInScene.remove(index); 
+		}
 		
 		//send it
 		if (comLib.send(msgChar, nodeDeleteInfoToSend[i].msgHeader.msgSize)) {
-			MStreamUtils::stdOutStream() << "nodeDeleted: Message sent" << "\n";
+			//MStreamUtils::stdOutStream() << "nodeDeleted: Message sent" << "\n";
 		}
 
 		delete[] msgChar; 
@@ -3304,6 +3555,23 @@ void timerCallback(float elapsedTime, float lastTime, void* clientData) {
 
 		delete[] msgChar; 
 		transformInfoToSend.erase(transformInfoToSend.begin() + i);
+	}
+
+	for (int i = 0; i < materialInfoToSend.size(); i++) {
+
+		const char* msgChar = new char[materialInfoToSend[i].msgHeader.msgSize];
+
+		memcpy((char*)msgChar, &materialInfoToSend[i].msgHeader, sizeof(MsgHeader));
+		memcpy((char*)msgChar + sizeof(MsgHeader), &materialInfoToSend[i].materialData, sizeof(Material));
+
+
+		// send it
+		if (comLib.send(msgChar, materialInfoToSend[i].msgHeader.msgSize)) {
+			//MStreamUtils::stdOutStream() << "matInfo: Message sent" << "\n";
+		}
+
+		delete[] msgChar;
+		materialInfoToSend.erase(materialInfoToSend.begin() + i);
 	}
 
 	/* 
@@ -3342,26 +3610,27 @@ void InitializeScene() {
 	MItDependencyNodes lambertIterator(MFn::kLambert);
 	while (!lambertIterator.isDone()) {
 
-		MStreamUtils::stdOutStream() << "LAMBERT FOUND\n";
+		//MStreamUtils::stdOutStream() << "LAMBERT FOUND\n";
 		MObject lambertShader(lambertIterator.thisNode());
 
 		tempID = MNodeMessage::addAttributeChangedCallback(lambertShader, materialAttributeChanged, NULL, &status);
 		if (status == MS::kSuccess)
 			callbackIdArray.append(tempID);
 
-
+		MFnLambertShader lambNode(lambertIterator.thisNode()); 
+		materialsInScene.append(lambNode.name());
 		lambertIterator.next();
 	}
 
 
 	// get all the active cameras in scene at startup 
-	MStreamUtils::stdOutStream() << "\n";
+	//MStreamUtils::stdOutStream() << "\n";
 	MItDependencyNodes cameraIterator(MFn::kCamera);
 	while (!cameraIterator.isDone()) {
 
 		MFnCamera cameraNode(cameraIterator.item());
-		MStreamUtils::stdOutStream() << "CAMERA FOUND\n";
-		MStreamUtils::stdOutStream() << "CAM " << cameraNode.name().asChar() << endl;
+		//MStreamUtils::stdOutStream() << "CAMERA FOUND\n";
+		//MStreamUtils::stdOutStream() << "CAM " << cameraNode.name().asChar() << endl;
 
 		MDagPath path;
 		MFnDagNode(cameraIterator.thisNode()).getPath(path);
@@ -3379,19 +3648,6 @@ void InitializeScene() {
 			callbackIdArray.append(tempID);
 
 		cameraIterator.next();
-	}
-
-
-	MItDependencyNodes meshIterator(MFn::kMesh);
-	while (!meshIterator.isDone()) {
-
-		MDGModifier Modifier;
-		MFnMesh meshNode(meshIterator.item());
-		MObject meshObject(meshNode.object()); 
-		Modifier.deleteNode(meshObject);
-
-		meshIterator.next();
-
 	}
 
 	

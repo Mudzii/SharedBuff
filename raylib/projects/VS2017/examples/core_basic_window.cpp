@@ -159,8 +159,8 @@ int main() {
 	funcMap[UPDATE_NODE]		  = updateNode;
 	funcMap[UPDATE_MATRIX]		  = updateNodeMatrix;
 	funcMap[UPDATE_NAME]		  = updateNodeName;
-	funcMap[NEW_MATERIAL]	      = updateMaterial;
-	funcMap[UPDATE_MATERIAL]      = updateMaterialName;
+	funcMap[NEW_MATERIAL]	      = newMaterial;
+	funcMap[UPDATE_MATERIAL]      = updateMaterial;
 	funcMap[DELETE_NODE]		  = deleteNode;
 	funcMap[UPDATE_NODE_MATERIAL] = updateNodeMaterial;
 
@@ -352,13 +352,10 @@ void recvFromMaya(char* buffer, std::map<CMDTYPE, FnPtr> functionMap, std::vecto
 	if (comLib.recv(buffer, nr)) {
 		memcpy((char*)&msgHeader, buffer, sizeof(MsgHeader));
 
-		std::cout << "NODE TYPE " << msgHeader.nodeType << std::endl; 
+		//std::cout << "NODE TYPE " << msgHeader.nodeType << std::endl; 
 
 		if (msgHeader.nodeType == NODE_TYPE::MESH) {
-
-			//std::cout << "RCV MESH" << std::endl;
 			functionMap[msgHeader.cmdType](modelArray, lightsArray, cameraArray, materialArray, buffer, bufferSize, shader, nrObjs, index, nrMaterials);
-
 		}
 
 		/* 
@@ -369,13 +366,15 @@ void recvFromMaya(char* buffer, std::map<CMDTYPE, FnPtr> functionMap, std::vecto
 
 		
 		if (msgHeader.nodeType == NODE_TYPE::CAMERA) {
-			//std::cout << "RCV CAM" << std::endl;
 			functionMap[msgHeader.cmdType](modelArray, lightsArray, cameraArray, materialArray, buffer, bufferSize, shader, nrObjs, index, nrMaterials);
-
 		}
 		
 
 		if (msgHeader.nodeType == NODE_TYPE::LIGHT) {
+			functionMap[msgHeader.cmdType](modelArray, lightsArray, cameraArray, materialArray, buffer, bufferSize, shader, nrObjs, index, nrMaterials);
+		}
+
+		if (msgHeader.nodeType == NODE_TYPE::MATERIAL) {
 			functionMap[msgHeader.cmdType](modelArray, lightsArray, cameraArray, materialArray, buffer, bufferSize, shader, nrObjs, index, nrMaterials);
 		}
 		
