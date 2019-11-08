@@ -465,7 +465,8 @@ void updateMaterial(std::vector<modelFromMaya>& modelArray, std::vector<lightFro
 		int matIndex = findMaterial(materialArray, matName, nrMaterials);
 
 		if (matIndex == -1) {
-			newMaterial(modelArray, lightsArray, cameraArray, materialArray, buffer, bufferSize, shader, nrObjs, index, nrMaterials); 
+			materialArray.push_back({ tempMat });
+			matIndex = materialArray.size() - 1; 
 		}
 
 		if (matIndex >= 0) {
@@ -608,7 +609,6 @@ void newMaterial(std::vector<modelFromMaya>& modelArray, std::vector<lightFromMa
 	}
 
 }
-
 
 
 // ==================================================================================
