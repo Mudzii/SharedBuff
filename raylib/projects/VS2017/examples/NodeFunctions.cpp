@@ -252,7 +252,6 @@ void updateNode(std::vector<modelFromMaya>& modelArray, std::vector<lightFromMay
 
 			// erase old model and replace with new
 			modelArray.erase(modelArray.begin() + modelindex);
-
 			modelArray.insert(modelArray.begin() + modelindex, { tempIndex, objectName, tempMesh, tempModel, tempMatrix, tempColor, tempMaterialName });
 
 
@@ -415,6 +414,7 @@ void updateNodeMaterial(std::vector<modelFromMaya>& modelArray, std::vector<ligh
 			Matrix tempMatrix = modelArray[modelIndex].modelMatrix;
 			std::string tempModelName = modelArray[modelIndex].name; 
 
+			
 			rlLoadMesh(&tempMesh, false);
 			Model tempModel = LoadModelFromMesh(tempMesh);
 			tempModel.material.shader = shader;
@@ -497,6 +497,7 @@ void updateMaterial(std::vector<modelFromMaya>& modelArray, std::vector<lightFro
 					std::string tempModelMaterialName = materialArray[matIndex].materialName;
 					std::string tempModelName = modelArray[i].name;
 					Matrix tempModelMatrix = modelArray[i].modelMatrix;
+
 
 					rlLoadMesh(&tempMesh, false);
 					tempModel = LoadModelFromMesh(tempMesh);
@@ -590,6 +591,7 @@ void newMaterial(std::vector<modelFromMaya>& modelArray, std::vector<lightFromMa
 					std::string tempModelName = modelArray[i].name;
 					Matrix tempModelMatrix = modelArray[i].modelMatrix;
 
+					
 					rlLoadMesh(&tempMesh, false);
 					tempModel = LoadModelFromMesh(tempMesh);
 					tempModel.material.shader = shader;

@@ -785,39 +785,87 @@ void transformWorldMatrixChanged(MObject &transformNode, MDagMessage::MatrixModi
 	MDagPath path;
 	MFnDagNode(transformNode).getPath(path);
 	MFnTransform transfNode(path, &result);
+ 
 
-	Matrix mTransformMatrix = {}; 
-	TransformInfo mTransfInfo = {}; 
+	Matrix mTransformMatrix = {};
+	TransformInfo mTransfInfo = {};
+	bool msgToSend = false; 
 
-	//MStreamUtils::stdOutStream() << endl;
-	//MStreamUtils::stdOutStream() << " =============================== " << endl;
-	//MStreamUtils::stdOutStream() << "TRANSFORM MAT CHANGED " << endl;
+	MStreamUtils::stdOutStream() << endl;
+	MStreamUtils::stdOutStream() << " =============================== " << endl;
+	MStreamUtils::stdOutStream() << "TRANSFORM MAT CHANGED " << endl;
 
 	if (result && !transformNode.hasFn(MFn::kCamera)) {
-
 		
-		MObjectArray hierarchy; 
-		int totalChildCnt = 0; 
+		MMatrix transfMatAbs; 
 
-		MObject firstParentNode(transfNode.object());
-		hierarchy.append(firstParentNode);
-		int childCnt = transfNode.childCount(); 
-
-		MMatrix absMat; 
-		// check if transform is directly connected to mesh
-		bool hasShapeNode = false; 
-		MFnMesh meshNode(path, &result);
+		// check if transform node is directry connected to a mesh
+		MFnMesh meshNode(transfNode.child(0), &result);
 		if (result) {
-			hasShapeNode = true; 
-			//absMat = MMatrix(path.inclusiveMatrix());
-			hierarchy.append(meshNode.object());
-			//MStreamUtils::stdOutStream() << "mesh of transform: " << meshNode.name() << endl;
+
+			MStreamUtils::stdOutStream() << "Has a child node mesh" << endl;
+			transfMatAbs = transfNode.transformationMatrix();
+
+			mTransformMatrix.a11 = transfMatAbs(0, 0);
+			mTransformMatrix.a12 = transfMatAbs(1, 0);
+			mTransformMatrix.a13 = transfMatAbs(2, 0);
+			mTransformMatrix.a14 = transfMatAbs(3, 0);
+
+			//row 2
+			mTransformMatrix.a21 = transfMatAbs(0, 1);
+			mTransformMatrix.a22 = transfMatAbs(1, 1);
+			mTransformMatrix.a23 = transfMatAbs(2, 1);
+			mTransformMatrix.a24 = transfMatAbs(3, 1);
+
+			//row 3
+			mTransformMatrix.a31 = transfMatAbs(0, 2);
+			mTransformMatrix.a32 = transfMatAbs(1, 2);
+			mTransformMatrix.a33 = transfMatAbs(2, 2);
+			mTransformMatrix.a34 = transfMatAbs(3, 2);
+
+			//row 4
+			mTransformMatrix.a41 = transfMatAbs(0, 3);
+			mTransformMatrix.a42 = transfMatAbs(1, 3);
+			mTransformMatrix.a43 = transfMatAbs(2, 3);
+			mTransformMatrix.a44 = transfMatAbs(3, 3);
+
+			//MStreamUtils::stdOutStream() << "TRANSF CHILD " << meshNode.name() << endl;
+			size_t totalMsgSize = (sizeof(MsgHeader) + sizeof(Transform) + sizeof(Matrix));
+
+			mTransfInfo.msgHeader.msgSize = totalMsgSize;
+			mTransfInfo.msgHeader.nodeType = NODE_TYPE::MESH;
+			mTransfInfo.msgHeader.cmdType = CMDTYPE::UPDATE_MATRIX;
+			mTransfInfo.msgHeader.nameLen = transfNode.name().length();
+			memcpy(mTransfInfo.msgHeader.objName, transfNode.name().asChar(), mTransfInfo.msgHeader.nameLen);
+
+			mTransfInfo.transfData.transfNameLen = transfNode.name().length();
+			memcpy(mTransfInfo.transfData.transfName, transfNode.name().asChar(), mTransfInfo.transfData.transfNameLen);
+
+			mTransfInfo.transfData.childNameLen = meshNode.name().length();
+			memcpy(mTransfInfo.transfData.childName, meshNode.name().asChar(), mTransfInfo.transfData.childNameLen);
+
+			mTransfInfo.transfName = transfNode.fullPathName();
+			mTransfInfo.childShapeName = meshNode.name();
+
+			mTransfInfo.transformMatrix = mTransformMatrix;
+			msgToSend = true; 
 		}
-		
 
-		// if not directly connected to mesh, check if in hierarchy
-		if (!hasShapeNode) {
 
+		// if not, check hierarchy
+		else {
+			MStreamUtils::stdOutStream() << "Has no child node mesh" << endl;
+
+			MObjectArray hierarchy;
+			//int totalChildCnt = 0; 
+
+			bool hasShapeNode = false;
+			int childCnt = transfNode.childCount();
+
+			MObject firstParentNode(transfNode.object());
+			hierarchy.append(firstParentNode);
+
+			// get hierarchy to mesh
 			for (int j = 0; j < hierarchy.length(); j++) {
 
 				MFnDagNode prnt(hierarchy[j]);
@@ -826,105 +874,109 @@ void transformWorldMatrixChanged(MObject &transformNode, MDagMessage::MatrixModi
 				for (int i = 0; i < prntChildCnt; i++) {
 
 					MObject childObject(prnt.child(i));
+					if (childObject.apiType() == MFn::kTransform) {
 
-					if (childObject.apiType() == MFn::kTransform || childObject.apiType() == MFn::kMesh) {
-
+						MStreamUtils::stdOutStream() << "Child is transform " << endl;
 						MFnDagNode child(childObject);
-						int tempChildCnt = child.childCount(); 
+						int tempChildCnt = child.childCount();
 						std::string childName = child.fullPathName().asChar();
 
-						if (tempChildCnt != 0 || childName.find("Shape") != std::string::npos) {
+						if (tempChildCnt != 0) {
 
 							hierarchy.append(childObject);
-							totalChildCnt += 1; 				
+
 						}
 
-						if (childName.find("Shape") != std::string::npos) {
-							hasShapeNode = true; 
-							meshNode.setObject(childObject);
-						}
+					}
+
+					else if (childObject.apiType() == MFn::kMesh) {
+						MStreamUtils::stdOutStream() << "Child is mesh " << endl;
+						meshNode.setObject(childObject);
+						break;
 					}
 				}
 			}
-		}
-		
-		for (int i = hierarchy.length() - 1; i-- > 0; ) {
-			MFnDagNode child(hierarchy[i]);
-			absMat *= child.transformationMatrix(); 
 
-		}
-		MStreamUtils::stdOutStream() << endl;
+			// get tot matrix by multiplying
+			for (int i = hierarchy.length() - 1; i-- > 0; ) {
+				MFnDagNode child(hierarchy[i]);
+				transfMatAbs *= child.transformationMatrix();
 
-		if (hasShapeNode) {
+			}
+
 
 			//row 1
-			mTransformMatrix.a11 = absMat(0, 0);
-			mTransformMatrix.a12 = absMat(1, 0);
-			mTransformMatrix.a13 = absMat(2, 0);
-			mTransformMatrix.a14 = absMat(3, 0);
+			mTransformMatrix.a11 = transfMatAbs(0, 0);
+			mTransformMatrix.a12 = transfMatAbs(1, 0);
+			mTransformMatrix.a13 = transfMatAbs(2, 0);
+			mTransformMatrix.a14 = transfMatAbs(3, 0);
 
 			//row 2
-			mTransformMatrix.a21 = absMat(0, 1);
-			mTransformMatrix.a22 = absMat(1, 1);
-			mTransformMatrix.a23 = absMat(2, 1);
-			mTransformMatrix.a24 = absMat(3, 1);
+			mTransformMatrix.a21 = transfMatAbs(0, 1);
+			mTransformMatrix.a22 = transfMatAbs(1, 1);
+			mTransformMatrix.a23 = transfMatAbs(2, 1);
+			mTransformMatrix.a24 = transfMatAbs(3, 1);
 
 			//row 3
-			mTransformMatrix.a31 = absMat(0, 2);
-			mTransformMatrix.a32 = absMat(1, 2);
-			mTransformMatrix.a33 = absMat(2, 2);
-			mTransformMatrix.a34 = absMat(3, 2);
+			mTransformMatrix.a31 = transfMatAbs(0, 2);
+			mTransformMatrix.a32 = transfMatAbs(1, 2);
+			mTransformMatrix.a33 = transfMatAbs(2, 2);
+			mTransformMatrix.a34 = transfMatAbs(3, 2);
 
 			//row 4
-			mTransformMatrix.a41 = absMat(0, 3);
-			mTransformMatrix.a42 = absMat(1, 3);
-			mTransformMatrix.a43 = absMat(2, 3);
-			mTransformMatrix.a44 = absMat(3, 3);
+			mTransformMatrix.a41 = transfMatAbs(0, 3);
+			mTransformMatrix.a42 = transfMatAbs(1, 3);
+			mTransformMatrix.a43 = transfMatAbs(2, 3);
+			mTransformMatrix.a44 = transfMatAbs(3, 3);
 
 
 			//MStreamUtils::stdOutStream() << "TRANSF CHILD " << meshNode.name() << endl;
 			size_t totalMsgSize = (sizeof(MsgHeader) + sizeof(Transform) + sizeof(Matrix));
 
-			mTransfInfo.msgHeader.msgSize  = totalMsgSize; 
-			mTransfInfo.msgHeader.nodeType = NODE_TYPE::MESH; 
-			mTransfInfo.msgHeader.cmdType  = CMDTYPE::UPDATE_MATRIX; 
-			mTransfInfo.msgHeader.nameLen = transfNode.name().length(); 
+			mTransfInfo.msgHeader.msgSize = totalMsgSize;
+			mTransfInfo.msgHeader.nodeType = NODE_TYPE::MESH;
+			mTransfInfo.msgHeader.cmdType = CMDTYPE::UPDATE_MATRIX;
+			mTransfInfo.msgHeader.nameLen = transfNode.name().length();
 			memcpy(mTransfInfo.msgHeader.objName, transfNode.name().asChar(), mTransfInfo.msgHeader.nameLen);
 
 			mTransfInfo.transfData.transfNameLen = transfNode.name().length();
 			memcpy(mTransfInfo.transfData.transfName, transfNode.name().asChar(), mTransfInfo.transfData.transfNameLen);
 
-			mTransfInfo.transfData.childNameLen = meshNode.name().length(); 
+			mTransfInfo.transfData.childNameLen = meshNode.name().length();
 			memcpy(mTransfInfo.transfData.childName, meshNode.name().asChar(), mTransfInfo.transfData.childNameLen);
 
-			mTransfInfo.transfName = transfNode.fullPathName(); 
-			mTransfInfo.childShapeName = meshNode.name(); 
+			mTransfInfo.transfName = transfNode.fullPathName();
+			mTransfInfo.childShapeName = meshNode.name();
 
-			mTransfInfo.transformMatrix = mTransformMatrix; 
-
-			// check if msg already exists. If so, update
-			bool msgExists = false;
-			for (int i = 0; i < meshInfoToSend.size(); i++) {
-				if (transformInfoToSend[i].childShapeName == meshNode.name()) {
-
-					msgExists = true;
-					//MStreamUtils::stdOutStream() << "Transf Msg already exists! Updating " << endl;
-					transformInfoToSend[i] = mTransfInfo; 
-				}
-			}
-
-			if (!msgExists) {
-				//MStreamUtils::stdOutStream() << "Transf Msg doesn't exists! Adding .... " << endl;
-				transformInfoToSend.push_back(mTransfInfo);
-			}
-
-			
+			mTransfInfo.transformMatrix = mTransformMatrix;
+			msgToSend = true;
 		}
 
+		if (msgToSend) {
+
+		// check if msg already exists. If so, update
+		bool msgExists = false;
+
+		for (int i = 0; i < meshInfoToSend.size(); i++) {
+			if (transformInfoToSend[i].childShapeName == meshNode.name()) {
+
+				msgExists = true;
+				//MStreamUtils::stdOutStream() << "Transf Msg already exists! Updating " << endl;
+				transformInfoToSend[i] = mTransfInfo;
+			}
+		}
+
+
+		if (!msgExists) {
+
+			//MStreamUtils::stdOutStream() << "Transf Msg doesn't exists! Adding .... " << endl;
+			transformInfoToSend.push_back(mTransfInfo);
+		}	
+
 	}
-
+	}
+	
 }
-
 
 /* 
 // callback for attribute change of transform (matrix)
@@ -1128,7 +1180,7 @@ void GetMeshInfo(MFnMesh &mesh) {
 	if (polyIterator.hasValidTriangulation()) {
 		while (!polyIterator.isDone()) {
 
-			MStreamUtils::stdOutStream() << endl;
+			//MStreamUtils::stdOutStream() << endl;
 
 			// get the tris count for the face that it's currently iterating through
 			polyIterator.numTriangles(trisCurrentFace);
@@ -1839,23 +1891,6 @@ void MaterialChanged(MFnMesh &mesh) {
 
 }
 
-// NOT IN USE
-void PolySplitMesh(MPlug &plug, MPlug &otherPlug) {
-
-	MStreamUtils::stdOutStream() << " =============================== " << endl;
-	MStreamUtils::stdOutStream() << "IN POLYSPLIT" << endl;
-
-	MStatus result;
-	MDagPath path;
-	MFnDagNode(plug.node()).getPath(path);
-	MFnMesh meshNode(path, &result);
-
-
-	MStreamUtils::stdOutStream() << "meshNode: " << meshNode.name() << endl;
-
-}
-
-
 // ============================== CALLBACKS ========================================
 /* 
 void nodePlugConnected(MPlug & plug, MPlug & otherPlug, bool made, void* clientData) {
@@ -1959,20 +1994,7 @@ void meshAttributeChanged(MNodeMessage::AttributeMessage msg, MPlug& plug, MPlug
 	MStreamUtils::stdOutStream() << " =============================== " << endl;
 	*/
 
-	/* 
-	MStreamUtils::stdOutStream() << endl;
-	MStreamUtils::stdOutStream() << " ------------ " << endl;
-
-	MStreamUtils::stdOutStream() << "OTHER: " << endl;
-
-	MStreamUtils::stdOutStream() << "PlugName: " << plug.name().asChar() << endl;
-	MStreamUtils::stdOutStream() << "oteher plug: " << otherPlug.name().asChar() << endl;
-	MStreamUtils::stdOutStream() << endl;
-	MStreamUtils::stdOutStream() << " ------------ " << endl;
-
-	*/
-
-	MStreamUtils::stdOutStream() << endl;
+	
 
 	std::string plugName	  = plug.name().asChar();
 	std::string plugPartName  = plug.partialName().asChar();
@@ -1988,7 +2010,7 @@ void meshAttributeChanged(MNodeMessage::AttributeMessage msg, MPlug& plug, MPlug
 		// get mesh through dag path
 		MFnMesh meshNode(path, &result);
 
-		MStreamUtils::stdOutStream() << "Mesh name: " << meshNode.name().asChar() << endl;
+		MStreamUtils::stdOutStream() << "Double sided Mesh name: " << meshNode.name().asChar() << endl;
 		MStreamUtils::stdOutStream() << "result: " << result << endl;
 		MStreamUtils::stdOutStream() << "\n";
 
@@ -2002,6 +2024,7 @@ void meshAttributeChanged(MNodeMessage::AttributeMessage msg, MPlug& plug, MPlug
 
 	}
 
+	/* 
 	// finished extruding mesh
 	else if (otherPlugName.find("polyExtrude") != std::string::npos && otherPlugName.find("manipMatrix") != std::string::npos) {
 
@@ -2016,6 +2039,7 @@ void meshAttributeChanged(MNodeMessage::AttributeMessage msg, MPlug& plug, MPlug
 		}
 
 	}
+	*/
 
 	// if vtx is changed
 	else if (plugPartName.find("pt[") != std::string::npos) {
@@ -2071,9 +2095,16 @@ void meshAttributeChanged(MNodeMessage::AttributeMessage msg, MPlug& plug, MPlug
 		}
 	}
 	
+	else if (plugName.find("outMesh") != std::string::npos && (plugName.find("polySplit") == std::string::npos) && (otherPlugName.find("polyExtrude") == std::string::npos)){
 	
-	//FIX !!!! 
-	// if multicut was performed 
+		MFnMesh meshNode(path, &result);
+		if (result) {
+			//MStreamUtils::stdOutStream() << "outmesh In result statement" << endl;
+			GeometryUpdate(meshNode);
+		}
+	}
+
+		
 	/* 
 	else if (otherPlugName.find("polySplit") != std::string::npos && (msg & MNodeMessage::AttributeMessage::kConnectionMade)) {
 
@@ -2134,20 +2165,20 @@ void meshAttributeChanged(MNodeMessage::AttributeMessage msg, MPlug& plug, MPlug
 
 }
 
-// NOT IN USE
+// for whenever topology is changed (poly split, extrude, subdivision change)
 void meshTopologyChanged(MObject& node, void* clientData) {
 
 	if (node.hasFn(MFn::kMesh)) {
 		MStatus stat;
-		MFnMesh mesh(node, &stat);
+		MFnMesh meshNode(node, &stat);
 
 		if (stat) {
-			MStreamUtils::stdOutStream() << " =============================== " << endl;
-			MStreamUtils::stdOutStream() << "TOPOLOGY CHANGED on " << mesh.name() << endl;
+			//MStreamUtils::stdOutStream() << " =============================== " << endl;
+			//MStreamUtils::stdOutStream() << "TOPOLOGY CHANGED on " << meshNode.name() << endl;
 
 			//MStreamUtils::stdOutStream() << "plug " << plug.name() << endl;
 			//MStreamUtils::stdOutStream() << "other plug " << otherPlug.name() << endl;
-
+			GeometryUpdate(meshNode); 
 
 
 		}
@@ -2172,8 +2203,8 @@ void meshWorldMatrixChanged(MObject &transformNode, MDagMessage::MatrixModifiedF
 		//MStreamUtils::stdOutStream() << "transfNoder " << transfNode.name() << endl;
 
 		// inclusive matrix = world matrix. exclusive matrix = local matrix
-		MMatrix worldMatrix = MMatrix(path.inclusiveMatrix());		
-		MMatrix localMatrix = MMatrix(path.exclusiveMatrix());	
+		//MMatrix worldMatrix = MMatrix(path.inclusiveMatrix());		
+		//MMatrix localMatrix = MMatrix(path.exclusiveMatrix());	
 
 	}
 
@@ -2761,7 +2792,6 @@ void nodeWorldMatrixChanged(MObject &node, MDagMessage::MatrixModifiedFlags &mod
 // ================================ CAMERA ==========================================
 // ==================================================================================
 
-
 // callback function for the active pannel in the viewport
 void activeCamera(const MString &panelName, void* cliendData) {
 
@@ -2801,25 +2831,25 @@ void activeCamera(const MString &panelName, void* cliendData) {
 	MVector rightDir = cameraView.rightDirection(MSpace::kWorld, &status);
 	MPoint COI = cameraView.centerOfInterestPoint(MSpace::kWorld, &status);
 
-	float vertFOV = cameraNode.verticalFieldOfView();
+	//float vertFOV = cameraNode.verticalFieldOfView();
 
 
 	//get fov or zoom depending on ortho/persp
 	bool isOrtographic = cameraView.isOrtho();
 	if (isOrtographic) {
 		double ortoWidth = cameraView.orthoWidth(&status);
-		FOV = vertFOV;
+		FOV = ortoWidth;
 	}
 	else {
 		double verticalFOV;
 		double horizontalFOV;
 		cameraView.getPortFieldOfView(width, height, horizontalFOV, verticalFOV);
-		FOV = vertFOV;
+		FOV = verticalFOV;
 	}
 
 	// fill camInfo struct
 	cameraInfo.pos	   = { (float)camPos.x, (float)camPos.y, (float)camPos.z };
-	if ((camPosScene.x != cameraInfo.pos.x) && (camPosScene.y != cameraInfo.pos.y) && (camPosScene.z != cameraInfo.pos.z)) {
+	//if ((camPosScene.x != cameraInfo.pos.x) && (camPosScene.y != cameraInfo.pos.y) && (camPosScene.z != cameraInfo.pos.z)) {
 
 		cameraInfo.up	   = { (float)upDir.x, (float)upDir.y, (float)upDir.z };
 		cameraInfo.forward = { (float)COI.x, (float)COI.y, (float)COI.z };
@@ -2870,15 +2900,131 @@ void activeCamera(const MString &panelName, void* cliendData) {
 		}
 		
 		
-	}
+	//}
 	
 
 }
 
-
 // ==================================================================================
 // ================================= LIGHT ==========================================
 // ==================================================================================
+
+void GetLightInfo(MFnLight &light) {
+
+	MColor color;
+	MStatus status;
+	MVector position;
+	float intensity = 0;
+	LightInfo mLightInfo = {}; 
+	
+	MFnTransform parent(light.child(0), &status);
+
+	color = light.color(); 
+	intensity = light.intensity();
+
+	if (status) {
+		position = parent.getTranslation(MSpace::kObject, &status);
+	}
+
+	// convert from 0-1 to 0-255
+	int red   = color.r * 255;
+	int blue  = color.b * 255;
+	int green = color.g * 255;
+	int alpha = color.a * 255;
+	Color mColor = { (unsigned char)red, (unsigned char)green, (unsigned char)blue, (unsigned char)alpha };
+
+
+	size_t totalMsgSize = (sizeof(MsgHeader) + sizeof(Light));
+	
+	mLightInfo.msgHeader.msgSize = totalMsgSize; 
+	mLightInfo.msgHeader.cmdType = CMDTYPE::NEW_NODE; 
+	mLightInfo.msgHeader.nodeType = NODE_TYPE::LIGHT; 
+	mLightInfo.msgHeader.nameLen = light.name().length(); 
+	memcpy(mLightInfo.msgHeader.objName, light.name().asChar(), mLightInfo.msgHeader.nameLen);
+
+	mLightInfo.lightData.lightNameLen = light.name().length();
+	memcpy(mLightInfo.lightData.lightName, light.name().asChar(), mLightInfo.lightData.lightNameLen);
+
+	mLightInfo.lightData.color = mColor; 
+	mLightInfo.lightData.intensity = intensity; 
+	mLightInfo.lightData.lightPos = { (float)position.x, (float)position.y, (float)position.z};
+
+	mLightInfo.lightName = light.name(); 
+	mLightInfo.lightPathName = light.fullPathName(); 
+
+	lightInfoToSend.push_back(mLightInfo);
+}
+
+void lightAttributeChanged(MNodeMessage::AttributeMessage msg, MPlug& plug, MPlug& otherPlug, void* clientData) {
+
+	if (msg & MNodeMessage::kAttributeSet) {
+
+		std::string plugName = plug.name().asChar();
+		std::string plugPartName = plug.partialName().asChar();
+		std::string otherPlugName = otherPlug.name().asChar();
+
+		MColor color;
+		MStatus result;
+		MVector position;
+		float intensity = 0;
+		LightInfo mLightInfo = {};
+
+		MDagPath path;
+		MFnDagNode(plug.node()).getPath(path);
+
+		MFnLight lightNode; 
+		MFnTransform lightTransf;
+
+		if (plugName.find("color") != std::string::npos) {
+
+			lightNode.setObject(path); 
+			lightTransf.setObject(lightNode.parent(0));
+			
+		}
+
+		else if (plugName.find("translate") != std::string::npos || plugName.find("rotate") != std::string::npos || plugName.find("scale") != std::string::npos) {
+
+			lightTransf.setObject(path); 
+			lightNode.setObject(lightTransf.child(0));
+
+
+		}
+
+		color	  = lightNode.color(); 
+		intensity = lightNode.intensity(); 
+		position  = lightTransf.getTranslation(MSpace::kObject, &status);
+
+
+		// convert from 0-1 to 0-255
+		int red = color.r * 255;
+		int blue = color.b * 255;
+		int green = color.g * 255;
+		int alpha = color.a * 255;
+		Color mColor = { (unsigned char)red, (unsigned char)green, (unsigned char)blue, (unsigned char)alpha };
+
+
+		size_t totalMsgSize = (sizeof(MsgHeader) + sizeof(Light));
+
+		mLightInfo.msgHeader.msgSize = totalMsgSize;
+		mLightInfo.msgHeader.cmdType = CMDTYPE::NEW_NODE;
+		mLightInfo.msgHeader.nodeType = NODE_TYPE::LIGHT;
+		mLightInfo.msgHeader.nameLen = lightNode.name().length();
+		memcpy(mLightInfo.msgHeader.objName, lightNode.name().asChar(), mLightInfo.msgHeader.nameLen);
+
+		mLightInfo.lightData.lightNameLen = lightNode.name().length();
+		memcpy(mLightInfo.lightData.lightName, lightNode.name().asChar(), mLightInfo.lightData.lightNameLen);
+
+		mLightInfo.lightData.color = mColor;
+		mLightInfo.lightData.intensity = intensity;
+		mLightInfo.lightData.lightPos = { (float)position.x, (float)position.y, (float)position.z };
+
+		mLightInfo.lightName = lightNode.name();
+		mLightInfo.lightPathName = lightNode.fullPathName();
+
+		lightInfoToSend.push_back(mLightInfo);
+
+	}
+}
 
 /* 
 //not sending 
@@ -2954,7 +3100,7 @@ void nodeLightAttributeChanged(MNodeMessage::AttributeMessage msg, MPlug &plug, 
 
 */
 
-void nodeWorldMatrixChangedLight(MObject &node, MDagMessage::MatrixModifiedFlags &modified, void *clientData) {
+//void nodeWorldMatrixChangedLight(MObject &node, MDagMessage::MatrixModifiedFlags &modified, void *clientData) {
 	//MStreamUtils::stdOutStream() << "nodeWorldMatrixChangedLight " << endl;
 	/* 
 	// get light node path
@@ -3094,7 +3240,7 @@ void nodeWorldMatrixChangedLight(MObject &node, MDagMessage::MatrixModifiedFlags
 		}
 	}
 	*/
-}
+//}
 
 /*
 void GetLightInfo(MFnLight& lightNode) {
@@ -3251,6 +3397,7 @@ void nodeAdded(MObject &node, void * clientData) {
 			if (status == MS::kSuccess)
 				callbackIdArray.append(tempID);
 
+			
 			tempID = MDagMessage::addWorldMatrixModifiedCallback(path, meshWorldMatrixChanged, NULL, &status);
 			if (status == MS::kSuccess)
 				callbackIdArray.append(tempID);
@@ -3266,14 +3413,13 @@ void nodeAdded(MObject &node, void * clientData) {
 	// if the node has kTransform attributes it is a transform
 	if (node.hasFn(MFn::kTransform)) {
 
-		//MStreamUtils::stdOutStream() << "nodeAdded: TRANSFORM was added " << endl;
+		MStreamUtils::stdOutStream() << "nodeAdded: TRANSFORM was added " << endl;
 
 		MDagPath path;
 		MFnDagNode(node).getPath(path);
 		MFnTransform transfNode(node);
 		//transformQueue.push(node);
 
-		
 		tempID = MDagMessage::addWorldMatrixModifiedCallback(path, transformWorldMatrixChanged, NULL, &status);
 		if (status == MS::kSuccess)
 			callbackIdArray.append(tempID);
@@ -3293,10 +3439,24 @@ void nodeAdded(MObject &node, void * clientData) {
 
 		//MStreamUtils::stdOutStream() << "nodeAdded: LIGHT was added " << endl;
 		//lightQueue.push(node);
+		MDagPath path;
+		MFnDagNode(node).getPath(path);
+		MFnLight lightNode(path);
+
+		MObject parentNode(lightNode.parent(0));
 
 		tempID = MNodeMessage::addNameChangedCallback(node, nodeNameChanged, NULL, &status);
 		if (status == MS::kSuccess)
 			callbackIdArray.append(tempID);
+
+		tempID = MNodeMessage::addAttributeChangedCallback(node, lightAttributeChanged, NULL, &status);
+		if (status == MS::kSuccess)
+			callbackIdArray.append(tempID);
+
+		tempID = MNodeMessage::addAttributeChangedCallback(parentNode, lightAttributeChanged, NULL, &status);
+		if (status == MS::kSuccess)
+			callbackIdArray.append(tempID);
+
 	}
 
 	// if the node has kLambert attributes it is a lambert
@@ -3620,9 +3780,7 @@ void InitializeScene() {
 		lambertIterator.next();
 	}
 
-
 	// get all the active cameras in scene at startup 
-	//MStreamUtils::stdOutStream() << "\n";
 	MItDependencyNodes cameraIterator(MFn::kCamera);
 	while (!cameraIterator.isDone()) {
 
@@ -3648,6 +3806,24 @@ void InitializeScene() {
 		cameraIterator.next();
 	}
 
+	MItDependencyNodes lightIterator(MFn::kLight);
+	while (!lightIterator.isDone()) {
+
+		MFnLight light(lightIterator.item());
+		GetLightInfo(light);
+		
+		tempID = MNodeMessage::addAttributeChangedCallback(lightIterator.thisNode(), lightAttributeChanged, NULL, &status);
+		if (status == MS::kSuccess)
+			callbackIdArray.append(tempID);
+		
+		tempID = MNodeMessage::addAttributeChangedCallback(light.parent(0), lightAttributeChanged, NULL, &status);
+		if (status == MS::kSuccess)
+			callbackIdArray.append(tempID);
+		
+		lightIterator.next(); 
+	}
+
+
 	
 	// camera callbacks initialized for all the view panels 
 	tempID = MUiMessage::add3dViewPostRenderMsgCallback("modelPanel1", activeCamera, NULL, &status);
@@ -3671,7 +3847,6 @@ void InitializeScene() {
 		callbackIdArray.append(tempID);
 	}
 	
-
 
 }
 
