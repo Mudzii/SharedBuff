@@ -186,8 +186,7 @@ void addNode(std::vector<modelFromMaya>& modelArray, std::vector<lightFromMaya>&
 		delete[] meshUVs; 
 
 	}
-
-
+	
 	
 }
 
