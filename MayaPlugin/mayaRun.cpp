@@ -6,7 +6,6 @@
 #include <queue>
 #include <string>
 
-
 #include "Header.h"
 #include "comLib.h"
 #pragma comment(lib, "Project1.lib")
@@ -38,9 +37,9 @@ float timerPeriod = 0.05f;
 //MStreamUtils::stdOutStream() << "...: " << ... << "_" << endl;
 
 Vec3 camPosScene; 
-MStringArray meshesInScene; 
+//MStringArray meshesInScene; 
 MStringArray materialsInScene; 
-
+std::vector<ItemsInScene> itemsInScene; 
 
 std::vector<MeshInfo> meshInfoToSend; 
 std::vector<LightInfo> lightInfoToSend;
@@ -673,6 +672,7 @@ void materialAttributeChanged(MNodeMessage::AttributeMessage msg, MPlug& plug, M
 		if (index == -1) {
 
 			MStreamUtils::stdOutStream() << "Material didn't exist. Adding " << endl;
+			itemsInScene.push_back({ lambertShader.name(), NODE_TYPE::MATERIAL});
 
 			materialsInScene.append(lambertShader.name());
 			mMatInfo.msgHeader.cmdType = CMDTYPE::NEW_MATERIAL;
@@ -1321,8 +1321,8 @@ void GetMeshInfo(MFnMesh &mesh) {
 
 	// check if mesh already exists in scene, otherwise add
 	int index = -1;
-	for (int i = 0; i < meshesInScene.length(); i++) {
-		if (meshesInScene[i] == mesh.name()) {
+	for (int i = 0; i < itemsInScene.size(); i++) {
+		if (itemsInScene[i].nodeName == mesh.name() && itemsInScene[i].nodeType == NODE_TYPE::MESH) {
 			//MStreamUtils::stdOutStream() << "Mesh already exists "<< endl;
 
 			index = i;
@@ -1334,10 +1334,11 @@ void GetMeshInfo(MFnMesh &mesh) {
 	if (index == -1) {
 		
 		//MStreamUtils::stdOutStream() << "Mesh didn't exist. Adding " << endl;
+		itemsInScene.push_back({ mesh.name(), NODE_TYPE::MESH });
 
-		meshesInScene.append(mesh.name());
+		//meshesInScene.append(mesh.name());
 		mMeshInfo.msgHeader.cmdType = NEW_NODE;
-		index = meshesInScene.length();
+		index = itemsInScene.size() - 1;
 	}
 
 
@@ -1355,6 +1356,8 @@ void GetMeshInfo(MFnMesh &mesh) {
 	if (matIndex == -1) {
 
 		//MStreamUtils::stdOutStream() << "Material didn't exist. Adding " << endl;
+		itemsInScene.push_back({ lambertShader.name(), NODE_TYPE::MATERIAL });
+
 		materialsInScene.append(lambertShader.name());
 	}
 
@@ -1576,19 +1579,18 @@ void GeometryUpdate(MFnMesh &mesh) {
 
 	// check if mesh already exists in scene
 	int index = -1;
-	for (int i = 0; i < meshesInScene.length(); i++) {
-		if (meshesInScene[i] == mesh.name()) {
+	for (int i = 0; i < itemsInScene.size(); i++) {
+		if (itemsInScene[i].nodeName == mesh.name() && itemsInScene[i].nodeType == NODE_TYPE::MESH) {
 			//MStreamUtils::stdOutStream() << "mesh exists" << endl;
 			index = i;
-			
 			break;
 		}
 	}
 
 	// if it doesn't exist, it's a new mesh and should be handled by that function
-	if (index == -1) {
+	//if (index == -1) {
 		//GetMeshInfo(mesh);
-	}
+	//}
 
 	if (index >= 0) {
 		
@@ -1701,8 +1703,8 @@ void MaterialChanged(MFnMesh &mesh) {
 
 	// check if mesh exists in scene
 	int index = -1;
-	for (int i = 0; i < meshesInScene.length(); i++) {
-		if (meshesInScene[i] == mesh.name()) {
+	for (int i = 0; i < itemsInScene.size(); i++) {
+		if (itemsInScene[i].nodeName == mesh.name() && itemsInScene[i].nodeType == NODE_TYPE::MESH) {
 			index = i;
 			break;
 		}
@@ -1825,6 +1827,8 @@ void MaterialChanged(MFnMesh &mesh) {
 		if (matIndex == -1) {
 
 			//MStreamUtils::stdOutStream() << "Material didn't exist. Adding " << endl;
+			itemsInScene.push_back({ lambertShader.name(), NODE_TYPE::MATERIAL });
+
 			materialsInScene.append(lambertShader.name());
 		}
 
@@ -3502,6 +3506,7 @@ void nodeDeleted(MObject &node, void *clientData) {
 		MFnMesh mesh(node);
 		std::string meshName = mesh.name().asChar(); 
 
+		/* 
 		int index = -1;
 		for (int i = 0; i < meshesInScene.length(); i++) {
 			if (meshesInScene[i] == mesh.name()) {
@@ -3510,6 +3515,17 @@ void nodeDeleted(MObject &node, void *clientData) {
 				break;
 			}
 		}
+		*/
+
+		int index = -1;
+		for (int i = 0; i < itemsInScene.size(); i++) {
+			if (itemsInScene[i].nodeName == mesh.name() && itemsInScene[i].nodeType == NODE_TYPE::MESH) {
+				index = i;
+				deleteInfo.msgHeader.cmdType = CMDTYPE::DELETE_NODE; 
+				break; 
+			}
+		}
+
 
 		if (index >= 0) {
 
@@ -3672,20 +3688,30 @@ void timerCallback(float elapsedTime, float lastTime, void* clientData) {
 	
 	for (int i = 0; i < nodeDeleteInfoToSend.size(); i++) {
 		
+		int nodeIndex = -1; 
+		std::string nodeName = nodeDeleteInfoToSend[i].msgHeader.objName; 
 		
-		int index = nodeDeleteInfoToSend[i].nodeIndex; 
+		for (int j = 0; j < itemsInScene.size(); j++) {
+			if (itemsInScene[j].nodeName == nodeName.c_str()) {
+				nodeIndex = j;
+				break; 
+			}
+		}
+
 		const char* msgChar = new char[nodeDeleteInfoToSend[i].msgHeader.msgSize];
 
 		// copy over msg ======
 		memcpy((char*)msgChar, &nodeDeleteInfoToSend[i].msgHeader, sizeof(MsgHeader));
 	
-		if (nodeDeleteInfoToSend[i].msgHeader.nodeType == NODE_TYPE::MESH) {
-			meshesInScene.remove(index);
+		if (nodeIndex >= 0) {
+			itemsInScene.erase(itemsInScene.begin() + nodeIndex);
 		}
 
+		/* 
 		if (nodeDeleteInfoToSend[i].msgHeader.nodeType == NODE_TYPE::MATERIAL) {
 			materialsInScene.remove(index); 
 		}
+		*/
 		
 		//send it
 		if (comLib.send(msgChar, nodeDeleteInfoToSend[i].msgHeader.msgSize)) {
@@ -3694,8 +3720,7 @@ void timerCallback(float elapsedTime, float lastTime, void* clientData) {
 
 		delete[] msgChar; 
 		nodeDeleteInfoToSend.erase(nodeDeleteInfoToSend.begin() + i);
-
-			
+	
 	}
 
 	for (int i = 0; i < transformInfoToSend.size(); i++) {
@@ -3732,6 +3757,9 @@ void timerCallback(float elapsedTime, float lastTime, void* clientData) {
 		delete[] msgChar;
 		materialInfoToSend.erase(materialInfoToSend.begin() + i);
 	}
+
+	//MStreamUtils::stdOutStream() << "ITEMS " << itemsInScene.size() << "\n";
+
 
 	/* 
 	for (int i = 0; i < cameraInfoToSend.size(); i++) {
@@ -3776,6 +3804,8 @@ void InitializeScene() {
 			callbackIdArray.append(tempID);
 
 		MFnLambertShader lambNode(lambertIterator.thisNode()); 
+		itemsInScene.push_back({ lambNode.name() , NODE_TYPE::MATERIAL});
+
 		materialsInScene.append(lambNode.name());
 		lambertIterator.next();
 	}

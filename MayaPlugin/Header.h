@@ -197,6 +197,10 @@ struct NodeRenamedInfo {
 	NodeRenamed renamedInfo; 
 };
 
+struct ItemsInScene {
+	MString nodeName; 
+	NODE_TYPE nodeType; 
+};
 
 
 
