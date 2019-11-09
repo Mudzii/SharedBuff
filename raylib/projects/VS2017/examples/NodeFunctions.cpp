@@ -591,7 +591,6 @@ void newMaterial(std::vector<modelFromMaya>& modelArray, std::vector<lightFromMa
 					std::string tempModelName = modelArray[i].name;
 					Matrix tempModelMatrix = modelArray[i].modelMatrix;
 
-					
 					rlLoadMesh(&tempMesh, false);
 					tempModel = LoadModelFromMesh(tempMesh);
 					tempModel.material.shader = shader;
