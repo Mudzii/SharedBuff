@@ -144,8 +144,8 @@ void updateMaterial(std::vector<modelFromMaya>& modelArray, std::vector<lightFro
 
 typedef void(*FnPtr)(std::vector<modelFromMaya>&, std::vector<lightFromMaya>&, std::vector<cameraFromMaya>&, std::vector<materialMaya>&, char*, int, Shader, int*, int*, int*, std::vector<Texture2D>&);
 
-int findMesh(std::vector<modelFromMaya>& modelArr, std::string MeshName, int* nrMaterials);
-int findMaterial(std::vector<materialMaya>& matArr, std::string MatName, int* nrOfObjs);
+int findMesh(std::vector<modelFromMaya>& modelArr, std::string MeshName);
+int findMaterial(std::vector<materialMaya>& matArr, std::string MatName);
 
 
 void createModel(); 

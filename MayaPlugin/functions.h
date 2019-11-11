@@ -1,6 +1,6 @@
 #pragma once
-#ifndef HEADER_H
-#define HEADER_H
+#ifndef FUNCTIONS_H
+#define FUNCTIONS_H
 
 #include "maya_includes.h"
 
@@ -197,11 +197,11 @@ struct NodeRenamedInfo {
 	NodeRenamed renamedInfo; 
 };
 
-struct ItemsInScene {
-	MString nodeName; 
-	NODE_TYPE nodeType; 
-};
+// =====================================
+void GetMeshInfo(MFnMesh &mesh); 
+void GeometryUpdate(MFnMesh &mesh);
+void MaterialChanged(MFnMesh &mesh); 
 
-
+int findMesh(MStringArray meshesInScene, std::string MeshName);
 
 #endif
