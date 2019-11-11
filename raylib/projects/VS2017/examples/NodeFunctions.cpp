@@ -199,6 +199,7 @@ void addNode(std::vector<modelFromMaya>& modelArray, std::vector<lightFromMaya>&
 // updates a node
 void updateNode(std::vector<modelFromMaya>& modelArray, std::vector<lightFromMaya>& lightsArray, std::vector<cameraFromMaya>& cameraArray, std::vector<materialMaya>& materialArray, char* buffer, int bufferSize, Shader shader, int* nrObjs, int* index, int* nrMaterials, std::vector<Texture2D> &textureArr) {
 
+
 	std::cout << std::endl;
 	std::cout << "=======================================" << std::endl;
 	std::cout << "UPDATE NODE FUNCTION" << std::endl;
