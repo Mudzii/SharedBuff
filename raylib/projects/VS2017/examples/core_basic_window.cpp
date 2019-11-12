@@ -291,6 +291,7 @@ int main() {
 
 		BeginMode3D(camera);
 
+		
 		// draw models from maya
 		for (int i = 0; i < modelArray.size(); i++) {
 			
@@ -363,35 +364,30 @@ void recvFromMaya(char* buffer, std::map<CMDTYPE, FnPtr> functionMap, std::vecto
 		memcpy((char*)&msgHeader, buffer, sizeof(MsgHeader));
 
 		//std::cout << "NODE TYPE " << msgHeader.nodeType << std::endl; 
+		functionMap[msgHeader.cmdType](modelArray, lightsArray, cameraArray, materialArray, buffer, bufferSize, shader, nrObjs, index, nrMaterials, textureArr);
 
+		/* 
 		if (msgHeader.nodeType == NODE_TYPE::MESH) {
 			functionMap[msgHeader.cmdType](modelArray, lightsArray, cameraArray, materialArray, buffer, bufferSize, shader, nrObjs, index, nrMaterials, textureArr);
 		}
-
-		/* 
-		if (msgHeader.nodeType == NODE_TYPE::TRANSFORM) {
-			functionMap[msgHeader.cmdType](modelArray, lightsArray, cameraArray, materialArray, buffer, bufferSize, shader, nrObjs, index, nrMaterials);
-		}
-		*/
-
-		
+	
 		if (msgHeader.nodeType == NODE_TYPE::CAMERA) {
 			functionMap[msgHeader.cmdType](modelArray, lightsArray, cameraArray, materialArray, buffer, bufferSize, shader, nrObjs, index, nrMaterials, textureArr);
 		}
 		
-
 		if (msgHeader.nodeType == NODE_TYPE::LIGHT) {
 			functionMap[msgHeader.cmdType](modelArray, lightsArray, cameraArray, materialArray, buffer, bufferSize, shader, nrObjs, index, nrMaterials, textureArr);
 		}
 
 		if (msgHeader.nodeType == NODE_TYPE::MATERIAL) {
+		
 			functionMap[msgHeader.cmdType](modelArray, lightsArray, cameraArray, materialArray, buffer, bufferSize, shader, nrObjs, index, nrMaterials, textureArr);
 		}
+		*/
 		
 
 	}
 
 	delete[] buffer; 
 		
-	
 }
