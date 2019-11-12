@@ -236,6 +236,7 @@ void updateNode(std::vector<modelFromMaya>& modelArray, std::vector<lightFromMay
 		texturePath = texturePath.substr(0, tempMat.textureNameLen);
 		*/
 
+
 		// get matrix info sent over 
 		//Matrix tempMatrix = {};
 		//memcpy((char*)&tempMatrix, buffer + sizeof(MsgHeader) + sizeof(msgMesh) + (sizeof(float) * meshInfo.vtxCount * 3) + (sizeof(float) * meshInfo.normalCount * 3) + (sizeof(float) * meshInfo.UVcount) + sizeof(materialMaya), sizeof(Matrix));
