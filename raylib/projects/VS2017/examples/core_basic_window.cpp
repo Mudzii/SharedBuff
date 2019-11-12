@@ -124,7 +124,7 @@ void updateMaterialName(std::vector<modelFromMaya>& modelArray, std::vector<ligh
 typedef void(*FnPtr)(std::vector<modelFromMaya>&, std::vector<lightFromMaya>&, std::vector<cameraFromMaya>&, std::vector<materialMaya>&, char*, int, Shader, int*, int*,  int*);
 
 */
-void recvFromMaya(char* buffer, std::map<CMDTYPE, FnPtr> functionMap, std::vector<modelFromMaya>& modelArray, std::vector<lightFromMaya>& lightsArray, std::vector<cameraFromMaya>& cameraArray, std::vector<materialMaya>& materialArray, int bufferSize, Shader shader, int* nrObjs, int* index, int* nrMaterials, std::vector<Texture2D> &textureArr);
+void recvFromMaya(char* buffer, std::map<CMDTYPE, FnPtr> functionMap, std::vector<modelFromMaya>& modelArray, std::vector<lightFromMaya>& lightsArray, std::vector<cameraFromMaya>& cameraArray, std::vector<materialMaya>& materialArray, Shader shader, int* index, std::vector<Texture2D> &textureArr);
 
 // ==================================================================================
 // ==================================================================================
@@ -247,7 +247,7 @@ int main() {
 		// Get the messages sent from maya
 		//tempArraySize = comLib.nextSize();
 		tempArray	  = new char[1];
-		recvFromMaya(tempArray, funcMap, modelArray, lightsArray, cameraArray, materialArray, tempArraySize, shader1, &nrOfObj, &modelIndex, &nrMaterials, textureArray);
+		recvFromMaya(tempArray, funcMap, modelArray, lightsArray, cameraArray, materialArray, shader1, &modelIndex, textureArray);
 		delete[] tempArray; 
 
 		// set camera
@@ -260,12 +260,24 @@ int main() {
 			camera.target	= cameraArray[0].forward;
 		}
 		
-		// draw lights from maya
-		for (int i = 0; i < lightsArray.size(); i++) {
-			DrawSphere(tempLight.lightPos, 0.1, tempLight.color);
-		}
-
+		DrawSphere(tempLight.lightPos, 0.1, tempLight.color);
 		SetShaderValue(shader1, lightLoc, Vector3ToFloat(tempLight.lightPos), 1);
+
+		// draw lights from maya
+		//for (int i = 0; i < lightsArray.size(); i++) {
+			//std::cout << lightsArray[i].lightName << std::endl; 
+			//std::cout << lightsArray[i].intensityRadius << std::endl;
+
+			//DrawSphere(lightsArray[i].lightPos, lightsArray[i].intensityRadius, lightsArray[i].color);
+			//SetShaderValue(shader1, lightLoc, Vector3ToFloat(lightsArray[i].lightPos), 1);
+
+
+			//Vector3 lightPos2 = lightsArray[i].lightPos; 
+			//int lightLoc2 = GetShaderLocation(shader1, "lightPos");
+			//SetShaderValue(shader1, lightLoc2, Vector3ToFloat(lightsArray[i].lightPos), 1);
+
+		//}
+
 
 		ClearBackground(RAYWHITE);
 		/* 
@@ -308,7 +320,7 @@ int main() {
 
 		EndMode3D();
 
-		DrawTextRL("Maya API level editor", screenWidth - 210, screenHeight - 20, 10, GRAY);
+		DrawTextRL("Maya API level editor", screenWidth - 190, screenHeight - 20, 10, GRAY);
 		DrawTextRL(FormatText("Camera position: (%.2f, %.2f, %.2f)", camera.position.x, camera.position.y, camera.position.z), 600, 20, 10, BLACK);
 		DrawTextRL(FormatText("Camera target: (%.2f, %.2f, %.2f)", camera.target.x, camera.target.y, camera.target.z), 600, 40, 10, GRAY);
 		DrawFPS(10, 10);
@@ -344,7 +356,7 @@ int main() {
 // ==================================================================================
 // ================= FUNCTION TO REVIECE MSG FROM MAYA ==============================
 // ==================================================================================
-void recvFromMaya(char* buffer, std::map<CMDTYPE, FnPtr> functionMap, std::vector<modelFromMaya>& modelArray, std::vector<lightFromMaya>& lightsArray, std::vector<cameraFromMaya>& cameraArray, std::vector<materialMaya>& materialArray, int bufferSize, Shader shader, int* nrObjs, int* index, int* nrMaterials, std::vector<Texture2D> &textureArr) {
+void recvFromMaya(char* buffer, std::map<CMDTYPE, FnPtr> functionMap, std::vector<modelFromMaya>& modelArray, std::vector<lightFromMaya>& lightsArray, std::vector<cameraFromMaya>& cameraArray, std::vector<materialMaya>& materialArray, Shader shader, int* index, std::vector<Texture2D> &textureArr) {
 
 	MsgHeader msgHeader = {}; 
 	msgHeader.cmdType   = CMDTYPE::DEFAULT;
@@ -364,7 +376,7 @@ void recvFromMaya(char* buffer, std::map<CMDTYPE, FnPtr> functionMap, std::vecto
 		memcpy((char*)&msgHeader, buffer, sizeof(MsgHeader));
 
 		//std::cout << "NODE TYPE " << msgHeader.nodeType << std::endl; 
-		functionMap[msgHeader.cmdType](modelArray, lightsArray, cameraArray, materialArray, buffer, bufferSize, shader, nrObjs, index, nrMaterials, textureArr);
+		functionMap[msgHeader.cmdType](modelArray, lightsArray, cameraArray, materialArray, buffer, shader, index, textureArr);
 
 		/* 
 		if (msgHeader.nodeType == NODE_TYPE::MESH) {

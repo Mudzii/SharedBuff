@@ -101,6 +101,8 @@ void texturePlugAttributeChanged(MNodeMessage::AttributeMessage msg, MPlug& plug
 							}
 						}
 
+					
+
 						if (matExists) {
 							MStreamUtils::stdOutStream() << "Material exists. Editing texture " << endl;
 							
@@ -162,7 +164,7 @@ void materialAttributeChanged(MNodeMessage::AttributeMessage msg, MPlug& plug, M
 	MStreamUtils::stdOutStream() << "==================================" << endl;
 	MStreamUtils::stdOutStream() << "MATERIAL ATTR CHANGED" << endl;
 	MStreamUtils::stdOutStream() << endl;
-	MStreamUtils::stdOutStream() << "msg " << msg << endl;
+	//MStreamUtils::stdOutStream() << "msg " << msg << endl;
 
 
 	if ((plug.node().hasFn(MFn::kLambert))){ // && (msg != 2052)) {
@@ -189,32 +191,6 @@ void materialAttributeChanged(MNodeMessage::AttributeMessage msg, MPlug& plug, M
 		colorPlug = lambertShader.findPlug("color", &result);
 
 		if (result) {
-
-		// check if material already exists in scene, otherwise add
-			int index = -1;
-			for (int i = 0; i < materialsInScene.length(); i++) {
-				if (materialsInScene[i] == lambertShader.name()) {
-
-					index = i; 
-					MStreamUtils::stdOutStream() << "Material already exists " << endl;
-					mMatInfo.msgHeader.cmdType = CMDTYPE::UPDATE_MATERIAL;
-					break;
-				}
-			}
-
-			if (index == -1) {
-
-				MStreamUtils::stdOutStream() << "Material didn't exist. Adding " << endl;
-
-				materialsInScene.append(lambertShader.name());
-				mMatInfo.msgHeader.cmdType = CMDTYPE::NEW_MATERIAL;
-			}
-
-			else if(index >= 0) {
-				mMatInfo.msgHeader.cmdType = CMDTYPE::UPDATE_MATERIAL;
-
-			}
-
 
 			transp = lambertShader.findPlug("transparency", &result);
 			if (result) {
@@ -266,14 +242,36 @@ void materialAttributeChanged(MNodeMessage::AttributeMessage msg, MPlug& plug, M
 
 			if((msg & MNodeMessage::kAttributeSet) || (msg & MNodeMessage::kOtherPlugSet)){
 			
-				MStreamUtils::stdOutStream() << "kAttributeSet for material " << endl;
+				// check if material already exists in scene, otherwise add
+				int index = -1;
+				for (int i = 0; i < materialsInScene.length(); i++) {
+					if (materialsInScene[i] == lambertShader.name()) {
+
+						index = i;
+						MStreamUtils::stdOutStream() << "Material already exists " << endl;
+						mMatInfo.msgHeader.cmdType = CMDTYPE::UPDATE_MATERIAL;
+						break;
+					}
+				}
+
+				if (index == -1) {
+
+					MStreamUtils::stdOutStream() << "Material didn't exist. Adding " << endl;
+
+					materialsInScene.append(lambertShader.name());
+					mMatInfo.msgHeader.cmdType = CMDTYPE::NEW_MATERIAL;
+				}
+
+				else if (index >= 0) {
+					mMatInfo.msgHeader.cmdType = CMDTYPE::UPDATE_MATERIAL;
+
+				}
 
 				size_t totalMsgSize = (sizeof(MsgHeader) + sizeof(Material));
 
 				mMatInfo.msgHeader.msgSize  = totalMsgSize;
 				mMatInfo.msgHeader.nodeType = NODE_TYPE::MATERIAL; 
-				//mMatInfo.msgHeader.cmdType  = CMDTYPE::UPDATE_MATERIAL; 
-
+	
 				mMatInfo.msgHeader.nameLen = lambertShader.name().length(); 
 				memcpy(mMatInfo.msgHeader.objName, lambertShader.name().asChar(), mMatInfo.msgHeader.nameLen);
 
@@ -1104,7 +1102,7 @@ void MaterialChanged(MFnMesh &mesh) {
 		MStreamUtils::stdOutStream() << endl;
 
 		MStreamUtils::stdOutStream() << "==================================" << endl;
-		MStreamUtils::stdOutStream() << "MATERIAL CHANGED" << endl;
+		MStreamUtils::stdOutStream() << "MATERIAL ON MESH CHANGED" << endl;
 		MStreamUtils::stdOutStream() << endl;
 
 		MStatus result;
@@ -1156,7 +1154,7 @@ void MaterialChanged(MFnMesh &mesh) {
 						materialNamePlug = lambertShader.name().asChar();
 
 
-						MStreamUtils::stdOutStream() << "surfaceShader: " << surfaceShader.name() << endl;
+						//MStreamUtils::stdOutStream() << "surfaceShader: " << surfaceShader.name() << endl;
 
 						// get lambert color through Color plug
 						colorPlug = lambertShader.findPlug("color", &result);
@@ -1232,9 +1230,16 @@ void MaterialChanged(MFnMesh &mesh) {
 
 		if (matIndex == -1) {
 
-			//MStreamUtils::stdOutStream() << "Material didn't exist. Adding " << endl;
+			MStreamUtils::stdOutStream() << "Material didn't exist. Adding " << endl;
 			materialsInScene.append(lambertShader.name());
 		}
+		else {
+			MStreamUtils::stdOutStream() << "Material does exist " << endl;
+
+		}
+
+		MStreamUtils::stdOutStream() << "Mat name " << lambertShader.name() << endl;
+
 
 		size_t totalMsgSize = (sizeof(MsgHeader) + sizeof(Mesh) + sizeof(Material));
 
@@ -1403,7 +1408,7 @@ void meshAttributeChanged(MNodeMessage::AttributeMessage msg, MPlug& plug, MPlug
 
 		MFnMesh meshNode(path, &result);
 		if (result) {
-			//MStreamUtils::stdOutStream() << "material changed. In result statement" << endl;
+			MStreamUtils::stdOutStream() << "material changed. In result statement" << endl;
 			MaterialChanged(meshNode);
 		}
 	}
@@ -1702,29 +1707,37 @@ void GetLightInfo(MFnPointLight &light) {
 		}
 	}
 
-	if (lightIndex == -1)
+	if (lightIndex == -1) {
 		lightInScene.append(light.name());
+		lightIndex = lightInScene.length() - 1; 
+	}
 
+	if (lightIndex >= 0) {
 
-	size_t totalMsgSize = (sizeof(MsgHeader) + sizeof(Light));
 	
-	mLightInfo.msgHeader.msgSize = totalMsgSize; 
-	mLightInfo.msgHeader.cmdType = CMDTYPE::NEW_NODE; 
-	mLightInfo.msgHeader.nodeType = NODE_TYPE::LIGHT; 
-	mLightInfo.msgHeader.nameLen = light.name().length(); 
-	memcpy(mLightInfo.msgHeader.objName, light.name().asChar(), mLightInfo.msgHeader.nameLen);
+		size_t totalMsgSize = (sizeof(MsgHeader) + sizeof(Light));
+	
+		mLightInfo.msgHeader.msgSize  = totalMsgSize; 
+		mLightInfo.msgHeader.cmdType  = CMDTYPE::NEW_NODE; 
+		mLightInfo.msgHeader.nodeType = NODE_TYPE::LIGHT; 
+		mLightInfo.msgHeader.nameLen  = light.name().length(); 
+		memcpy(mLightInfo.msgHeader.objName, light.name().asChar(), mLightInfo.msgHeader.nameLen);
 
-	mLightInfo.lightData.lightNameLen = light.name().length();
-	memcpy(mLightInfo.lightData.lightName, light.name().asChar(), mLightInfo.lightData.lightNameLen);
+		mLightInfo.lightData.lightNameLen = light.name().length();
+		memcpy(mLightInfo.lightData.lightName, light.name().asChar(), mLightInfo.lightData.lightNameLen);
 
-	mLightInfo.lightData.color = mColor; 
-	mLightInfo.lightData.intensity = intensity; 
-	mLightInfo.lightData.lightPos = { (float)position.x, (float)position.y, (float)position.z};
+		mLightInfo.lightData.color = mColor; 
+		mLightInfo.lightData.intensity = intensity; 
+		mLightInfo.lightData.lightPos = { (float)position.x, (float)position.y, (float)position.z};
 
-	mLightInfo.lightName = light.name(); 
-	mLightInfo.lightPathName = light.fullPathName(); 
+		mLightInfo.lightName = light.name(); 
+		mLightInfo.lightPathName = light.fullPathName(); 
 
-	lightInfoToSend.push_back(mLightInfo);
+		MStreamUtils::stdOutStream() << "light.name(): " << light.name()  << endl;
+
+
+		lightInfoToSend.push_back(mLightInfo);
+	}
 }
 
 void lightAttributeChanged(MNodeMessage::AttributeMessage msg, MPlug& plug, MPlug& otherPlug, void* clientData) {
@@ -1744,6 +1757,7 @@ void lightAttributeChanged(MNodeMessage::AttributeMessage msg, MPlug& plug, MPlu
 		MDagPath path;
 		MFnDagNode(plug.node()).getPath(path);
 
+		bool msgToSend = false; 
 		MFnPointLight lightNode;
 		MFnTransform lightTransf;
 
@@ -1751,16 +1765,14 @@ void lightAttributeChanged(MNodeMessage::AttributeMessage msg, MPlug& plug, MPlu
 
 			lightNode.setObject(path); 
 			lightTransf.setObject(lightNode.parent(0));
-
-
-			
+			msgToSend = true; 
 		}
 
 		else if (plugName.find("translate") != std::string::npos || plugName.find("rotate") != std::string::npos || plugName.find("scale") != std::string::npos) {
 
 			lightTransf.setObject(path); 
 			lightNode.setObject(lightTransf.child(0));
-
+			msgToSend = true;
 
 		}
 
@@ -1775,44 +1787,51 @@ void lightAttributeChanged(MNodeMessage::AttributeMessage msg, MPlug& plug, MPlu
 		if (lightIndex == -1) {
 			lightInScene.append(lightNode.name());
 			mLightInfo.msgHeader.cmdType = CMDTYPE::NEW_NODE;
+			lightIndex = lightInScene.length() - 1; 
 		}
 
 		else if (lightIndex >= 0) {
 			mLightInfo.msgHeader.cmdType = CMDTYPE::UPDATE_NODE;
 		}
 
-		color	  = lightNode.color(); 
-		intensity = lightNode.intensity(); 
-		position  = lightTransf.getTranslation(MSpace::kObject, &status);
-
-
-		// convert from 0-1 to 0-255
-		int red = color.r * 255;
-		int blue = color.b * 255;
-		int green = color.g * 255;
-		int alpha = 1 * 255;
-		Color mColor = { (unsigned char)red, (unsigned char)green, (unsigned char)blue, (unsigned char)alpha };
-
-		size_t totalMsgSize = (sizeof(MsgHeader) + sizeof(Light));
-
-		mLightInfo.msgHeader.msgSize = totalMsgSize;
-		mLightInfo.msgHeader.nodeType = NODE_TYPE::LIGHT;
 		
-		mLightInfo.msgHeader.nameLen = lightNode.name().length();
-		memcpy(mLightInfo.msgHeader.objName, lightNode.name().asChar(), mLightInfo.msgHeader.nameLen);
+		if (lightIndex >= 0 && msgToSend == true) {
 
-		mLightInfo.lightData.lightNameLen = lightNode.name().length();
-		memcpy(mLightInfo.lightData.lightName, lightNode.name().asChar(), mLightInfo.lightData.lightNameLen);
+				color	  = lightNode.color(); 
+				intensity = lightNode.intensity(); 
+				position  = lightTransf.getTranslation(MSpace::kObject, &status);
 
-		mLightInfo.lightData.color = mColor;
-		mLightInfo.lightData.intensity = intensity;
-		mLightInfo.lightData.lightPos = { (float)position.x, (float)position.y, (float)position.z };
 
-		mLightInfo.lightName = lightNode.name();
-		mLightInfo.lightPathName = lightNode.fullPathName();
+				// convert from 0-1 to 0-255
+				int red = color.r * 255;
+				int blue = color.b * 255;
+				int green = color.g * 255;
+				int alpha = 1 * 255;
+				Color mColor = { (unsigned char)red, (unsigned char)green, (unsigned char)blue, (unsigned char)alpha };
 
-		lightInfoToSend.push_back(mLightInfo);
+				size_t totalMsgSize = (sizeof(MsgHeader) + sizeof(Light));
 
+				mLightInfo.msgHeader.msgSize = totalMsgSize;
+				mLightInfo.msgHeader.nodeType = NODE_TYPE::LIGHT;
+		
+				mLightInfo.msgHeader.nameLen = lightNode.name().length();
+				memcpy(mLightInfo.msgHeader.objName, lightNode.name().asChar(), mLightInfo.msgHeader.nameLen);
+
+				mLightInfo.lightData.lightNameLen = lightNode.name().length();
+				memcpy(mLightInfo.lightData.lightName, lightNode.name().asChar(), mLightInfo.lightData.lightNameLen);
+
+				mLightInfo.lightData.color = mColor;
+				mLightInfo.lightData.intensity = intensity;
+				mLightInfo.lightData.lightPos = { (float)position.x, (float)position.y, (float)position.z };
+
+				mLightInfo.lightName = lightNode.name();
+				mLightInfo.lightPathName = lightNode.fullPathName();
+
+				MStreamUtils::stdOutStream() << "lightNode.name(): " << lightNode.name() << endl;
+
+
+				lightInfoToSend.push_back(mLightInfo);
+		}
 	}
 }
 
@@ -2170,7 +2189,6 @@ void nodeDeleted(MObject &node, void *clientData) {
 		
 		MFnPointLight lightNode(node);
 		std::string lightName = lightNode.name().asChar();
-		//MStreamUtils::stdOutStream() << "light deleted " << lightName << endl;
 
 		int index = -1;
 		for (int i = 0; i < lightInScene.length(); i++) {
@@ -2180,10 +2198,10 @@ void nodeDeleted(MObject &node, void *clientData) {
 				break;
 			}
 		}
-			
 
 		if (index >= 0) {
 
+			MStreamUtils::stdOutStream() << "light deleted " << lightName << endl;
 			//MStreamUtils::stdOutStream() << "mesh to delete " << meshName << endl;
 			size_t totalMsgSize = (sizeof(MsgHeader));
 
@@ -2252,8 +2270,6 @@ void timerCallback(float elapsedTime, float lastTime, void* clientData) {
 	MStreamUtils::stdOutStream() << "\n";
 	 */
 	
-	
-
 	for (int i = 0; i < meshInfoToSend.size(); i++) {
 		
 	
@@ -2313,22 +2329,6 @@ void timerCallback(float elapsedTime, float lastTime, void* clientData) {
 
 	}
 	
-	for (int i = 0; i < nodeDeleteInfoToSend.size(); i++) {
-		
-		
-		//int index = nodeDeleteInfoToSend[i].nodeIndex; 
-		const char* msgChar = new char[nodeDeleteInfoToSend[i].msgHeader.msgSize];
-		memcpy((char*)msgChar, &nodeDeleteInfoToSend[i].msgHeader, sizeof(MsgHeader));
-
-		if (comLib.send(msgChar, nodeDeleteInfoToSend[i].msgHeader.msgSize)) 
-			MStreamUtils::stdOutStream() << "nodeDeleted: Message sent for " << nodeDeleteInfoToSend[i].nodeName << "\n";
-		
-		delete[] msgChar; 
-		nodeDeleteInfoToSend.erase(nodeDeleteInfoToSend.begin() + i);
-
-			
-	}
-
 	for (int i = 0; i < transformInfoToSend.size(); i++) {
 
 		//size_t totalMsgSize = (sizeof(MsgHeader) + sizeof(Transform) + sizeof(Matrix));
@@ -2402,6 +2402,39 @@ void timerCallback(float elapsedTime, float lastTime, void* clientData) {
 		nodeRenamedInfoToSend.erase(nodeRenamedInfoToSend.begin() + i);
 	}
 	
+	for (int i = 0; i < lightInfoToSend.size(); i++) {
+
+		const char* msgChar = new char[lightInfoToSend[i].msgHeader.msgSize];
+
+		memcpy((char*)msgChar, &lightInfoToSend[i].msgHeader, sizeof(MsgHeader));
+		memcpy((char*)msgChar + sizeof(MsgHeader), &lightInfoToSend[i].lightData, sizeof(Light));
+
+		//send it
+		if (comLib.send(msgChar, lightInfoToSend[i].msgHeader.msgSize)) {
+			MStreamUtils::stdOutStream() << "light: Message sent" << "\n";
+		}
+		
+
+		delete[] msgChar; 
+		lightInfoToSend.erase(lightInfoToSend.begin() + i);
+
+	}
+
+	for (int i = 0; i < nodeDeleteInfoToSend.size(); i++) {
+		
+		
+		//int index = nodeDeleteInfoToSend[i].nodeIndex; 
+		const char* msgChar = new char[nodeDeleteInfoToSend[i].msgHeader.msgSize];
+		memcpy((char*)msgChar, &nodeDeleteInfoToSend[i].msgHeader, sizeof(MsgHeader));
+
+		if (comLib.send(msgChar, nodeDeleteInfoToSend[i].msgHeader.msgSize)) 
+			MStreamUtils::stdOutStream() << "nodeDeleted: Message sent for " << nodeDeleteInfoToSend[i].nodeName << "\n";
+		
+		delete[] msgChar; 
+		nodeDeleteInfoToSend.erase(nodeDeleteInfoToSend.begin() + i);
+
+			
+	}
 }
 
 // ==================================================================================

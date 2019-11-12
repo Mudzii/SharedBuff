@@ -33,11 +33,11 @@ int findMaterial(std::vector<materialMaya>& matArr, std::string MatName) {
 // ==============================================
 
 // adds a new node
-void addNode(std::vector<modelFromMaya>& modelArray, std::vector<lightFromMaya>& lightsArray, std::vector<cameraFromMaya>& cameraArray, std::vector<materialMaya>& materialArray, char* buffer, int bufferSize, Shader shader, int* nrObjs, int* index, int* nrMaterials, std::vector<Texture2D> &textureArr) {
+void addNode(std::vector<modelFromMaya>& modelArray, std::vector<lightFromMaya>& lightsArray, std::vector<cameraFromMaya>& cameraArray, std::vector<materialMaya>& materialArray, char* buffer, Shader shader, int* index, std::vector<Texture2D> &textureArr) {
 
-	std::cout << std::endl;
-	std::cout << "=======================================" << std::endl;
-	std::cout << "ADD NODE FUNCTION" << std::endl;
+	//std::cout << std::endl;
+	//std::cout << "=======================================" << std::endl;
+	//std::cout << "ADD NODE FUNCTION" << std::endl;
 
 	MsgHeader msgHeader = {};
 	memcpy((char*)&msgHeader, buffer, sizeof(MsgHeader));
@@ -120,13 +120,13 @@ void addNode(std::vector<modelFromMaya>& modelArray, std::vector<lightFromMaya>&
 			if (tempMat.type == 0) {
 				tempMat.color = tempColor;
 				materialArray.push_back({ tempMat });
-				*nrMaterials = *nrMaterials + 1;
+				//*nrMaterials = *nrMaterials + 1;
 			}
 
 			else if (tempMat.type == 1) {
 				tempMat.color = { 255, 255, 255, 255 };
 				materialArray.push_back({ tempMat });
-				*nrMaterials = *nrMaterials + 1;
+				//*nrMaterials = *nrMaterials + 1;
 			}
 		}
 
@@ -180,7 +180,7 @@ void addNode(std::vector<modelFromMaya>& modelArray, std::vector<lightFromMaya>&
 			}
 
 			*index = *index + 1;
-			*nrObjs = *nrObjs + 1;
+			//*nrObjs = *nrObjs + 1;
 
 		}
 
@@ -193,16 +193,49 @@ void addNode(std::vector<modelFromMaya>& modelArray, std::vector<lightFromMaya>&
 
 	}
 	
+	if (msgHeader.nodeType == NODE_TYPE::LIGHT) {
+		std::cout << "New light  " << objectName << std::endl;
+
+		// get mesh info send over
+		lightFromMaya lightInfo = {};
+		memcpy((char*)&lightInfo, buffer + sizeof(MsgHeader), sizeof(lightFromMaya));
+
+		std::string lightName = lightInfo.lightName;
+		lightName = lightName.substr(0, lightInfo.lightNameLen);
+		Color tempColor = { lightInfo.color.r, lightInfo.color.g, lightInfo.color.b, lightInfo.color.a };
+
+		//std::cout << "LIGHT POS: " << lightInfo.lightPos.x << " : " << lightInfo.lightPos.y << " : " << lightInfo.lightPos.z << std::endl;
+		//std::cout << "LIGHT INS: " << lightInfo.intensityRadius << std::endl;
+		lightInfo.intensityRadius = lightInfo.intensityRadius - 0.5; 
+
+		int lightIndex = -1; 
+		for (int i = 0; i < lightsArray.size(); i++) {
+			if (lightsArray[i].lightName == lightName.c_str()) {
+				lightIndex = i; 
+				break; 
+			}
+		}
+
+
+		if (lightIndex == -1) {
+			lightsArray.push_back(lightInfo);
+		}
+
+		else {
+			lightsArray.at(lightIndex) = { lightInfo }; 
+		}
+
+	}
 	
 }
 
 // updates an existing node
-void updateNode(std::vector<modelFromMaya>& modelArray, std::vector<lightFromMaya>& lightsArray, std::vector<cameraFromMaya>& cameraArray, std::vector<materialMaya>& materialArray, char* buffer, int bufferSize, Shader shader, int* nrObjs, int* index, int* nrMaterials, std::vector<Texture2D> &textureArr) {
+void updateNode(std::vector<modelFromMaya>& modelArray, std::vector<lightFromMaya>& lightsArray, std::vector<cameraFromMaya>& cameraArray, std::vector<materialMaya>& materialArray, char* buffer, Shader shader, int* index, std::vector<Texture2D> &textureArr) {
 
 
-	std::cout << std::endl;
-	std::cout << "=======================================" << std::endl;
-	std::cout << "UPDATE NODE FUNCTION" << std::endl;
+	//std::cout << std::endl;
+	//std::cout << "=======================================" << std::endl;
+	//std::cout << "UPDATE NODE FUNCTION" << std::endl;
 
 	MsgHeader msgHeader = {};
 	memcpy((char*)&msgHeader, buffer, sizeof(MsgHeader));
@@ -298,9 +331,11 @@ void updateNode(std::vector<modelFromMaya>& modelArray, std::vector<lightFromMay
 
 			}
 
+			/* 
 			else {
 				std::cout << "material does not exist!" << std::endl; 
 			}
+			*/
 
 			// replace with new
 			modelArray.at(modelindex) = { tempIndex, objectName, tempMesh, tempModel, tempMatrix, tempColor, tempMaterialName}; 
@@ -335,14 +370,44 @@ void updateNode(std::vector<modelFromMaya>& modelArray, std::vector<lightFromMay
 
 	}
 	
+	if (msgHeader.nodeType == NODE_TYPE::LIGHT) {
+		//std::cout << "update light" << std::endl;
+
+		// get mesh info send over
+		lightFromMaya lightInfo = {};
+		memcpy((char*)&lightInfo, buffer + sizeof(MsgHeader), sizeof(lightFromMaya));
+
+		std::string lightName = lightInfo.lightName;
+		lightName = lightName.substr(0, lightInfo.lightNameLen);
+		Color tempColor = { lightInfo.color.r, lightInfo.color.g, lightInfo.color.b, lightInfo.color.a };
+
+		//std::cout << "LIGHT POS: " << lightInfo.lightPos.x << " : " << lightInfo.lightPos.y << " : " << lightInfo.lightPos.z << std::endl;
+		//std::cout << "LIGHT INS: " << lightInfo.intensityRadius << std::endl;
+		
+		int lightIndex = -1; 
+		for (int i = 0; i < lightsArray.size(); i++) {
+			if (lightsArray[i].lightName == lightName.c_str()) {
+				lightIndex = i; 
+				break; 
+			}
+		}
+
+		if (lightIndex >= 0) {
+			lightsArray.at(lightIndex) = { lightInfo }; 
+			
+		}
+
+	}
 }
 
 // deletes a node
-void deleteNode(std::vector<modelFromMaya>& modelArray, std::vector<lightFromMaya>& lightsArray, std::vector<cameraFromMaya>& cameraArray, std::vector<materialMaya>& materialArray, char* buffer, int bufferSize, Shader shader, int* nrObjs, int* index, int* nrMaterials, std::vector<Texture2D> &textureArr) {
+void deleteNode(std::vector<modelFromMaya>& modelArray, std::vector<lightFromMaya>& lightsArray, std::vector<cameraFromMaya>& cameraArray, std::vector<materialMaya>& materialArray, char* buffer, Shader shader, int* index, std::vector<Texture2D> &textureArr) {
 
+	
 	std::cout << std::endl;
 	std::cout << "=======================================" << std::endl;
 	std::cout << "DELETE NODE FUNCTION" << std::endl;
+	
 
 	MsgHeader msgHeader = {};
 	memcpy((char*)&msgHeader, buffer, sizeof(MsgHeader));
@@ -357,7 +422,7 @@ void deleteNode(std::vector<modelFromMaya>& modelArray, std::vector<lightFromMay
 		if (modelIndex >= 0) {
 
 			modelArray.erase(modelArray.begin() + modelIndex);
-			*nrObjs = *nrObjs - 1;
+			//*nrObjs = *nrObjs - 1;
 			*index  = *index - 1;
 		}
 		
@@ -378,14 +443,31 @@ void deleteNode(std::vector<modelFromMaya>& modelArray, std::vector<lightFromMay
 		*/
 	}
 
+	if (msgHeader.nodeType == NODE_TYPE::LIGHT) {
+		int lightIndex = -1; 
+		for (int i = 0; i < lightsArray.size(); i++) {
+			if (lightsArray[i].lightName == objectName) {
+				lightIndex = i; 
+			}
+		}
+
+		if (lightIndex >= 0) {
+			lightsArray.erase(lightsArray.begin() + lightIndex);
+		}
+
+
+	}
+
 }
 
 // updates the name of a node
-void updateNodeName(std::vector<modelFromMaya>& modelArray, std::vector<lightFromMaya>& lightsArray, std::vector<cameraFromMaya>& cameraArray, std::vector<materialMaya>& materialArray, char* buffer, int bufferSize, Shader shader, int* nrObjs, int* index, int* nrMaterials, std::vector<Texture2D> &textureArr) {
+void updateNodeName(std::vector<modelFromMaya>& modelArray, std::vector<lightFromMaya>& lightsArray, std::vector<cameraFromMaya>& cameraArray, std::vector<materialMaya>& materialArray, char* buffer, Shader shader, int* index, std::vector<Texture2D> &textureArr) {
 
+	/*
 	std::cout << std::endl;
 	std::cout << "=======================================" << std::endl;
 	std::cout << "UPDATE NODE NAME FUNCTION" << std::endl;
+	*/
 
 	MsgHeader msgHeader = {};
 	memcpy((char*)&msgHeader, buffer, sizeof(MsgHeader));
@@ -406,7 +488,7 @@ void updateNodeName(std::vector<modelFromMaya>& modelArray, std::vector<lightFro
 
 		int meshIndex = findMesh(modelArray, oldName);
 		if (meshIndex >= 0) {
-			std::cout << "Name changed for " << oldName << " to " << newName  << std::endl;
+			//std::cout << "Name changed for " << oldName << " to " << newName  << std::endl;
 
 			Mesh tempMesh = modelArray[meshIndex].mesh; 
 			Model tempModel = modelArray[meshIndex].model;
@@ -424,17 +506,15 @@ void updateNodeName(std::vector<modelFromMaya>& modelArray, std::vector<lightFro
 
 			if (materialIndex >= 0) {
 
-				std::cout << "Material " << materialArray[materialIndex].materialName << std::endl;
-
 				if (materialArray[materialIndex].type == 0) {
 
-					std::cout << "Updating color" << std::endl;
+					//std::cout << "Updating color" << std::endl;
 					tempColor = materialArray[materialIndex].color;
 				}
 
 				else if (materialArray[materialIndex].type == 1) {
 
-					std::cout << "Updating material" << std::endl;
+					//std::cout << "Updating material" << std::endl;
 
 					tempColor = { 255, 255, 255, 255 };
 					texture = LoadTexture(materialArray[materialIndex].fileTextureName);
@@ -446,7 +526,7 @@ void updateNodeName(std::vector<modelFromMaya>& modelArray, std::vector<lightFro
 			}
 
 			else {
-				std::cout << "material does not exist!" << std::endl;
+				//std::cout << "material does not exist!" << std::endl;
 			}
 
 			modelArray.at(meshIndex) = { tempIndex, newName, tempMesh, tempModel, tempMatrix, tempColor, tempMaterialName };
@@ -480,7 +560,7 @@ void updateNodeName(std::vector<modelFromMaya>& modelArray, std::vector<lightFro
 }
 
 // updates the matrix of a node
-void updateNodeMatrix(std::vector<modelFromMaya>& modelArray, std::vector<lightFromMaya>& lightsArray, std::vector<cameraFromMaya>& cameraArray, std::vector<materialMaya>& materialArray, char* buffer, int bufferSize, Shader shader, int* nrObjs, int* index, int* nrMaterials, std::vector<Texture2D> &textureArr) {
+void updateNodeMatrix(std::vector<modelFromMaya>& modelArray, std::vector<lightFromMaya>& lightsArray, std::vector<cameraFromMaya>& cameraArray, std::vector<materialMaya>& materialArray, char* buffer, Shader shader, int* index, std::vector<Texture2D> &textureArr) {
 
 	MsgHeader msgHeader = {};
 	memcpy((char*)&msgHeader, buffer, sizeof(MsgHeader));
@@ -530,11 +610,13 @@ void updateNodeMatrix(std::vector<modelFromMaya>& modelArray, std::vector<lightF
 }
 
 // updates a material that is connected to a node
-void updateNodeMaterial(std::vector<modelFromMaya>& modelArray, std::vector<lightFromMaya>& lightsArray, std::vector<cameraFromMaya>& cameraArray, std::vector<materialMaya>& materialArray, char* buffer, int bufferSize, Shader shader, int* nrObjs, int* index, int* nrMaterials, std::vector<Texture2D> &textureArr) {
+void updateNodeMaterial(std::vector<modelFromMaya>& modelArray, std::vector<lightFromMaya>& lightsArray, std::vector<cameraFromMaya>& cameraArray, std::vector<materialMaya>& materialArray, char* buffer, Shader shader, int* index, std::vector<Texture2D> &textureArr) {
 
+	
 	std::cout << std::endl;
 	std::cout << "=======================================" << std::endl;
 	std::cout << "UPDATE MATERIAL FOR NODE" << std::endl;
+	
 
 	MsgHeader msgHeader = {};
 	memcpy((char*)&msgHeader, buffer, sizeof(MsgHeader));
@@ -560,32 +642,70 @@ void updateNodeMaterial(std::vector<modelFromMaya>& modelArray, std::vector<ligh
 		texturePath = texturePath.substr(0, tempMat.textureNameLen);
 		
 		int modelIndex = findMesh(modelArray, objectName);
-		int matIndex = findMaterial(materialArray, materialName);
 
 		if (modelIndex >= 0) {
-			std::cout << "MESH to update  " << materialName << "  material on  " << objectName << std::endl;
+			//std::cout << "MESH to update  " << materialName << "  material on  " << objectName << std::endl;
 
 			Mesh tempMesh	  = modelArray[modelIndex].mesh;
 			int tempIndex	  = modelArray[modelIndex].index;
 			Matrix tempMatrix = modelArray[modelIndex].modelMatrix;
 			std::string tempModelName = modelArray[modelIndex].name; 
 
-			if (matIndex >= 0) {
-				materialArray.at(matIndex) = { tempMat }; 
-			}
+			int matIndex = findMaterial(materialArray, materialName);
 
-			else {
-				materialArray.push_back({tempMat});
-			}
 			
 			rlLoadMesh(&tempMesh, false);
 			Model tempModel = LoadModelFromMesh(tempMesh);
 			tempModel.material.shader = shader;
-	
-			// erase old model and replace with new
-			//modelArray.erase(modelArray.begin() + modelIndex);
-			//modelArray.insert(modelArray.begin() + modelIndex, { tempIndex, objectName, tempMesh, tempModel, tempMatrix, tempColor, materialName });
-			modelArray.at(modelIndex) = { tempIndex, objectName, tempMesh, tempModel, tempMatrix, tempColor, materialName }; 
+		
+			Texture2D texture; 
+			if (matIndex >= 0) {
+
+				if (materialArray[matIndex].type == 1) {
+					texture = LoadTexture(materialArray[matIndex].fileTextureName);
+					tempModel.material.maps[MAP_DIFFUSE].texture = texture;
+					textureArr.push_back(texture);
+				}
+
+
+				materialArray.at(matIndex) = { tempMat }; 
+
+				// erase old model and replace with new
+				modelArray.at(modelIndex) = { tempIndex, objectName, tempMesh, tempModel, tempMatrix, tempColor, materialName }; 
+			}
+
+			else {
+				std::cout << "Material does not exist" << std::endl; 
+				/* Texture2D texture;
+		Color tempColor = { tempMat.color.r, tempMat.color.g, tempMat.color.b, tempMat.color.a };
+
+		if (tempMat.type == 0) {
+			tempMat.color = tempColor;
+		}
+
+		else if (tempMat.type == 1) {
+			tempMat.color = { 255, 255, 255, 255 };
+			texture = LoadTexture(textureName.c_str());
+			textureArr.push_back(texture);
+		}
+
+		int matIndex = findMaterial(materialArray, matName);
+
+		//std::cout << "matIndex " << matIndex << std::endl;
+		if(matIndex >= 0) {
+			materialArray.at(matIndex) = { tempMat };
+		}
+
+		else if (matIndex == -1) {
+			materialArray.push_back({ tempMat });
+			//*nrMaterials = *nrMaterials + 1;
+			matIndex = materialArray.size() - 1; 
+		}
+				
+				*/
+				//materialArray.push_back({tempMat});
+			}
+
 			
 		}
 
@@ -593,11 +713,13 @@ void updateNodeMaterial(std::vector<modelFromMaya>& modelArray, std::vector<ligh
 }
 
 // updates a material
-void updateMaterial(std::vector<modelFromMaya>& modelArray, std::vector<lightFromMaya>& lightsArray, std::vector<cameraFromMaya>& cameraArray, std::vector<materialMaya>& materialArray, char* buffer, int bufferSize, Shader shader, int* nrObjs, int* index, int* nrMaterials, std::vector<Texture2D> &textureArr) {
+void updateMaterial(std::vector<modelFromMaya>& modelArray, std::vector<lightFromMaya>& lightsArray, std::vector<cameraFromMaya>& cameraArray, std::vector<materialMaya>& materialArray, char* buffer, Shader shader, int* index, std::vector<Texture2D> &textureArr) {
 
+	/* 
 	std::cout << std::endl;
 	std::cout << "=======================================" << std::endl;
 	std::cout << "UPDATE MATERIAL" << std::endl;
+	*/
 
 	MsgHeader msgHeader = {};
 	memcpy((char*)&msgHeader, buffer, sizeof(MsgHeader));
@@ -689,11 +811,13 @@ void updateMaterial(std::vector<modelFromMaya>& modelArray, std::vector<lightFro
 }
 
 // adds new material
-void newMaterial(std::vector<modelFromMaya>& modelArray, std::vector<lightFromMaya>& lightsArray, std::vector<cameraFromMaya>& cameraArray, std::vector<materialMaya>& materialArray, char* buffer, int bufferSize, Shader shader, int* nrObjs, int* index, int* nrMaterials, std::vector<Texture2D> &textureArr) {
+void newMaterial(std::vector<modelFromMaya>& modelArray, std::vector<lightFromMaya>& lightsArray, std::vector<cameraFromMaya>& cameraArray, std::vector<materialMaya>& materialArray, char* buffer, Shader shader, int* index, std::vector<Texture2D> &textureArr) {
 
+	/* 
 	std::cout << std::endl;
 	std::cout << "=======================================" << std::endl;
 	std::cout << "NEW MATERIAL" << std::endl;
+	*/
 
 	MsgHeader msgHeader = {};
 	memcpy((char*)&msgHeader, buffer, sizeof(MsgHeader));
@@ -737,7 +861,7 @@ void newMaterial(std::vector<modelFromMaya>& modelArray, std::vector<lightFromMa
 
 		else if (matIndex == -1) {
 			materialArray.push_back({ tempMat });
-			*nrMaterials = *nrMaterials + 1;
+			//*nrMaterials = *nrMaterials + 1;
 			matIndex = materialArray.size() - 1; 
 		}
 
@@ -780,9 +904,7 @@ void newMaterial(std::vector<modelFromMaya>& modelArray, std::vector<lightFromMa
 					}
 				}
 			}
-
 		}
-
 	}
 
 }
