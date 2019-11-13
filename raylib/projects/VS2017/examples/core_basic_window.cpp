@@ -352,7 +352,6 @@ int main() {
 	return 0;
 }
 
-
 // ==================================================================================
 // ================= FUNCTION TO REVIECE MSG FROM MAYA ==============================
 // ==================================================================================
@@ -373,13 +372,8 @@ void recvFromMaya(char* buffer, std::map<CMDTYPE, FnPtr> functionMap, std::vecto
 
 	// get message from Maya ======
 	if (comLib.recv(buffer, nr)) {
+
 		memcpy((char*)&msgHeader, buffer, sizeof(MsgHeader));
-
-		std::cout << " ------------------ " << std::endl;
-		std::cout << "NODE TYPE " << msgHeader.nodeType << std::endl; 
-		std::cout << "CMD TYPE " << msgHeader.cmdType << std::endl;
-		std::cout << " ------------------ " << std::endl;
-
 		functionMap[msgHeader.cmdType](modelArray, lightsArray, cameraArray, materialArray, buffer, shader, index, textureArr);
 
 		/* 
@@ -400,7 +394,6 @@ void recvFromMaya(char* buffer, std::map<CMDTYPE, FnPtr> functionMap, std::vecto
 			functionMap[msgHeader.cmdType](modelArray, lightsArray, cameraArray, materialArray, buffer, bufferSize, shader, nrObjs, index, nrMaterials, textureArr);
 		}
 		*/
-		
 
 	}
 
