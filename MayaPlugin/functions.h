@@ -197,11 +197,17 @@ struct NodeRenamedInfo {
 	NodeRenamed renamedInfo; 
 };
 
+struct MatrixInfo {
+	MsgHeader msgHeader;
+	Matrix matrixData; 
+};
+
 // =====================================
 void GetMeshInfo(MFnMesh &mesh); 
 void GeometryUpdate(MFnMesh &mesh);
 void MaterialChanged(MFnMesh &mesh); 
 
-int findMesh(MStringArray meshesInScene, std::string MeshName);
+int findMesh(std::string MeshName);
+
 
 #endif

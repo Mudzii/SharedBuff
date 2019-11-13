@@ -570,6 +570,32 @@ void updateNodeMatrix(std::vector<modelFromMaya>& modelArray, std::vector<lightF
 
 	if (msgHeader.nodeType == NODE_TYPE::MESH) {
 
+		Matrix tempMatrix = {};
+		memcpy((char*)&tempMatrix, buffer + sizeof(MsgHeader), sizeof(Matrix));
+		int modelIndex = findMesh(modelArray, objectName);
+
+		if (modelIndex >= 0) {
+			
+			// copy the existing mesh
+			int tempIndex = modelArray[modelIndex].index;
+			Model tempModel = modelArray[modelIndex].model;
+			Mesh tempMesh = modelArray[modelIndex].mesh;
+			Color tempColor = modelArray[modelIndex].color;
+			std::string tempMaterialName = modelArray[modelIndex].materialName;
+
+
+			// erase object and replace with new one
+			modelArray.at(modelIndex) = { tempIndex, objectName, tempMesh, tempModel, tempMatrix, tempColor, tempMaterialName };
+
+		}
+
+
+	}
+
+
+	/* 
+	if (msgHeader.nodeType == NODE_TYPE::MESH) {
+
 		transformFromMaya tempTransf = {}; 
 		memcpy((char*)&tempTransf, buffer + sizeof(MsgHeader), sizeof(transformFromMaya));
 
@@ -602,6 +628,7 @@ void updateNodeMatrix(std::vector<modelFromMaya>& modelArray, std::vector<lightF
 
 
 	}
+	*/
 }
 
 // updates a material that is connected to a node
