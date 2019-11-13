@@ -119,15 +119,15 @@ void addNode(std::vector<modelFromMaya>& modelArray, std::vector<lightFromMaya>&
 
 			if (tempMat.type == 0) {
 				tempMat.color = tempColor;
-				materialArray.push_back({ tempMat });
+				//materialArray.push_back({ tempMat });
 				//*nrMaterials = *nrMaterials + 1;
 			}
 
 			else if (tempMat.type == 1) {
 				tempMat.color = { 255, 255, 255, 255 };
-				materialArray.push_back({ tempMat });
 				//*nrMaterials = *nrMaterials + 1;
 			}
+			materialArray.push_back({ tempMat });
 		}
 
 
@@ -163,13 +163,7 @@ void addNode(std::vector<modelFromMaya>& modelArray, std::vector<lightFromMaya>&
 			Model tempModel = LoadModelFromMesh(tempMesh);
 			tempModel.material.shader = shader;
 			
-			if (tempMat.type == 0) {
-				newColor = { tempMat.color.r, tempMat.color.g, tempMat.color.b, 255 };
-				modelArray.push_back({ *index, objectName, tempMesh, tempModel, MatrixTranslate(0,0,0), newColor, materialName });
-
-			}
-
-			else if (tempMat.type == 1) {
+			if (tempMat.type == 1 && texturePath.length() > 0) {
 				newColor = { 255, 255, 255, 255 };
 				texture = LoadTexture(texturePath.c_str());
 				tempModel.material.maps[MAP_DIFFUSE].texture = texture;
@@ -178,6 +172,13 @@ void addNode(std::vector<modelFromMaya>& modelArray, std::vector<lightFromMaya>&
 				textureArr.push_back(texture);
 
 			}
+
+			else {
+				newColor = { tempMat.color.r, tempMat.color.g, tempMat.color.b, 255 };
+				modelArray.push_back({ *index, objectName, tempMesh, tempModel, MatrixTranslate(0,0,0), newColor, materialName });
+
+			}
+
 
 			*index = *index + 1;
 			//*nrObjs = *nrObjs + 1;
@@ -318,11 +319,10 @@ void updateNode(std::vector<modelFromMaya>& modelArray, std::vector<lightFromMay
 				}
 				*/
 
-				if (materialArray[materialIndex].type == 1) {
+				if (materialArray[materialIndex].type == 1 && materialArray[materialIndex].textureNameLen > 0) {
 
 					//std::cout << "Updating material" << std::endl;
-
-					//newColor = { 255, 255, 255, 255 };
+					tempColor = { 255, 255, 255, 255 };
 					texture = LoadTexture(materialArray[materialIndex].fileTextureName);
 					tempModel.material.maps[MAP_DIFFUSE].texture = texture;
 					textureArr.push_back(texture);
@@ -421,6 +421,7 @@ void deleteNode(std::vector<modelFromMaya>& modelArray, std::vector<lightFromMay
 
 		if (modelIndex >= 0) {
 
+			//UnloadModel(modelArray[modelIndex].model);
 			modelArray.erase(modelArray.begin() + modelIndex);
 			//*nrObjs = *nrObjs - 1;
 			*index  = *index - 1;
@@ -506,13 +507,7 @@ void updateNodeName(std::vector<modelFromMaya>& modelArray, std::vector<lightFro
 
 			if (materialIndex >= 0) {
 
-				if (materialArray[materialIndex].type == 0) {
-
-					//std::cout << "Updating color" << std::endl;
-					tempColor = materialArray[materialIndex].color;
-				}
-
-				else if (materialArray[materialIndex].type == 1) {
+				if (materialArray[materialIndex].type == 1 && materialArray[materialIndex].textureNameLen > 0) {
 
 					//std::cout << "Updating material" << std::endl;
 
@@ -520,8 +515,13 @@ void updateNodeName(std::vector<modelFromMaya>& modelArray, std::vector<lightFro
 					texture = LoadTexture(materialArray[materialIndex].fileTextureName);
 					tempModel.material.maps[MAP_DIFFUSE].texture = texture;
 					textureArr.push_back(texture);
-
 				}
+
+				else {
+					//std::cout << "Updating color" << std::endl;
+					tempColor = materialArray[materialIndex].color;
+				}
+
 
 			}
 
@@ -594,15 +594,10 @@ void updateNodeMatrix(std::vector<modelFromMaya>& modelArray, std::vector<lightF
 			Color tempColor = modelArray[modelIndex].color;
 			std::string tempMaterialName = modelArray[modelIndex].materialName;
 
-			//std::cout << "objectName " << objectName << std::endl;
-
 			
 			// erase object and replace with new one
-			//modelArray.erase(modelArray.begin() + modelIndex);
-			//modelArray.insert(modelArray.begin() + modelIndex, { tempIndex, childName, tempMesh, tempModel, tempMatrix, tempColor, tempMaterialName  });
 			modelArray.at(modelIndex) = { tempIndex, childName, tempMesh, tempModel, tempMatrix, tempColor, tempMaterialName };
 			
-
 		}
 
 
@@ -617,7 +612,6 @@ void updateNodeMaterial(std::vector<modelFromMaya>& modelArray, std::vector<ligh
 	std::cout << "=======================================" << std::endl;
 	std::cout << "UPDATE MATERIAL FOR NODE" << std::endl;
 	
-
 	MsgHeader msgHeader = {};
 	memcpy((char*)&msgHeader, buffer, sizeof(MsgHeader));
 
@@ -659,14 +653,23 @@ void updateNodeMaterial(std::vector<modelFromMaya>& modelArray, std::vector<ligh
 			tempModel.material.shader = shader;
 		
 			Texture2D texture; 
+			if (matIndex == -1) {
+				std::cout << "Material does not exist. Adding" << std::endl; 
+				materialArray.push_back({tempMat});
+				matIndex = materialArray.size() - 1; 
+			}
+
 			if (matIndex >= 0) {
 
-				if (materialArray[matIndex].type == 1) {
+				std::cout << "MAT TEXTURE: " << materialArray[matIndex].fileTextureName << std::endl;
+
+				if (materialArray[matIndex].type == 1 && texturePath.length() > 0) {
+					tempColor = { 255,255,255,255 }; 
+
 					texture = LoadTexture(materialArray[matIndex].fileTextureName);
 					tempModel.material.maps[MAP_DIFFUSE].texture = texture;
 					textureArr.push_back(texture);
 				}
-
 
 				materialArray.at(matIndex) = { tempMat }; 
 
@@ -674,42 +677,11 @@ void updateNodeMaterial(std::vector<modelFromMaya>& modelArray, std::vector<ligh
 				modelArray.at(modelIndex) = { tempIndex, objectName, tempMesh, tempModel, tempMatrix, tempColor, materialName }; 
 			}
 
-			else {
-				std::cout << "Material does not exist" << std::endl; 
-				/* Texture2D texture;
-		Color tempColor = { tempMat.color.r, tempMat.color.g, tempMat.color.b, tempMat.color.a };
-
-		if (tempMat.type == 0) {
-			tempMat.color = tempColor;
-		}
-
-		else if (tempMat.type == 1) {
-			tempMat.color = { 255, 255, 255, 255 };
-			texture = LoadTexture(textureName.c_str());
-			textureArr.push_back(texture);
-		}
-
-		int matIndex = findMaterial(materialArray, matName);
-
-		//std::cout << "matIndex " << matIndex << std::endl;
-		if(matIndex >= 0) {
-			materialArray.at(matIndex) = { tempMat };
-		}
-
-		else if (matIndex == -1) {
-			materialArray.push_back({ tempMat });
-			//*nrMaterials = *nrMaterials + 1;
-			matIndex = materialArray.size() - 1; 
-		}
-				
-				*/
-				//materialArray.push_back({tempMat});
-			}
-
 			
 		}
 
 	}
+
 }
 
 // updates a material
@@ -744,30 +716,26 @@ void updateMaterial(std::vector<modelFromMaya>& modelArray, std::vector<lightFro
 		Texture2D texture;
 		Color tempColor = { tempMat.color.r, tempMat.color.g, tempMat.color.b, tempMat.color.a };
 		
-		if (tempMat.type == 0) {
-			tempMat.color = tempColor;
-		}
-
-		else if (tempMat.type == 1) {
+		if (tempMat.type == 1 && textureName.length() > 0) {
 			tempMat.color = { 255, 255, 255, 255 };
 			texture = LoadTexture(textureName.c_str());
 			textureArr.push_back(texture);
 		}
+
+		else {
+			tempMat.color = tempColor;
+		}
+
 		
 		int matIndex = findMaterial(materialArray, matName);
-
-
 		if (matIndex == -1) {
 			materialArray.push_back({ tempMat });
 			matIndex = materialArray.size() - 1; 
 		}
 
 		if (matIndex >= 0) {
-			//std::cout << "Material exists" << std::endl;
-			//materialArray.erase(materialArray.begin() + matIndex);
-			//materialArray.insert(materialArray.begin() + matIndex, { tempMat });
+			
 			materialArray.at(matIndex) = { tempMat };
-
 
 			// check if objects have material and update them
 			for (int i = 0; i < modelArray.size(); i++) {
@@ -788,22 +756,19 @@ void updateMaterial(std::vector<modelFromMaya>& modelArray, std::vector<lightFro
 					tempModel.material.shader = shader;
 
 					//modelArray.erase(modelArray.begin() + i);
+					//std::cout << "MAT TEXTURE 2: " << textureName << std::endl;
 
-					if (tempMat.type == 0) {
-						//std::cout << "Updating model w color " << std::endl;
-						modelArray.at(i) = { tempModelIndex, tempModelName, tempMesh, tempModel, tempModelMatrix, tempModelColor, tempModelMaterialName }; 
-						//modelArray.insert(modelArray.begin() + i, { tempModelIndex, tempModelName, tempMesh, tempModel, tempModelMatrix, tempModelColor, tempModelMaterialName });
-
-					}
-
-					else if (tempMat.type == 1) {
+					if (tempMat.type == 1 && textureName.length() > 0) {
 						//std::cout << "Updating model w texture " << std::endl;
 						tempModel.material.maps[MAP_DIFFUSE].texture = texture;
 						modelArray.at(i) = { tempModelIndex, tempModelName, tempMesh, tempModel, tempModelMatrix, tempModelColor, tempModelMaterialName };
-						//modelArray.insert(modelArray.begin() + i, { tempModelIndex, tempModelName, tempMesh, tempModel, tempModelMatrix, tempModelColor, tempModelMaterialName });
-
-
 					}
+
+					else {
+						modelArray.at(i) = { tempModelIndex, tempModelName, tempMesh, tempModel, tempModelMatrix, tempModelColor, tempModelMaterialName }; 
+					}
+
+
 				}
 			}
 		}
@@ -842,15 +807,16 @@ void newMaterial(std::vector<modelFromMaya>& modelArray, std::vector<lightFromMa
 		Texture2D texture;
 		Color tempColor = { tempMat.color.r, tempMat.color.g, tempMat.color.b, tempMat.color.a };
 
-		if (tempMat.type == 0) {
-			tempMat.color = tempColor;
-		}
-
-		else if (tempMat.type == 1) {
+		if (tempMat.type == 1 && textureName.length() > 0) {
 			tempMat.color = { 255, 255, 255, 255 };
 			texture = LoadTexture(textureName.c_str());
 			textureArr.push_back(texture);
 		}
+
+		else {
+			tempMat.color = tempColor;
+		}
+
 
 		int matIndex = findMaterial(materialArray, matName);
 
@@ -872,8 +838,6 @@ void newMaterial(std::vector<modelFromMaya>& modelArray, std::vector<lightFromMa
 			for (int i = 0; i < modelArray.size(); i++) {
 				if (modelArray[i].materialName == matName) {
 
-					//std::cout << "Mesh with mat " << modelArray[i].name << std::endl;
-
 					Color tempModelColor = tempMat.color;
 					Mesh tempMesh		 = modelArray[i].mesh;
 					Model tempModel		 = modelArray[i].model;
@@ -886,22 +850,19 @@ void newMaterial(std::vector<modelFromMaya>& modelArray, std::vector<lightFromMa
 					tempModel = LoadModelFromMesh(tempMesh);
 					tempModel.material.shader = shader;
 
-					//modelArray.erase(modelArray.begin() + i);
-
-					if (tempMat.type == 0) {
-						//std::cout << "Updating model w color " << std::endl;
-						//modelArray.insert(modelArray.begin() + i, { tempModelIndex, tempModelName, tempMesh, tempModel, tempModelMatrix, tempModelColor, tempModelMaterialName });
-						modelArray.at(i) = { tempModelIndex, tempModelName, tempMesh, tempModel, tempModelMatrix, tempModelColor, tempModelMaterialName }; 
-					}
-
-					else if (tempMat.type == 1) {
+					if (tempMat.type == 1 && textureName.length() > 0) {
 						//std::cout << "Updating model w texture " << std::endl;
 						tempModel.material.maps[MAP_DIFFUSE].texture = texture;
 						//modelArray.insert(modelArray.begin() + i, { tempModelIndex, tempModelName, tempMesh, tempModel, tempModelMatrix, tempModelColor, tempModelMaterialName });
 						modelArray.at(i) = { tempModelIndex, tempModelName, tempMesh, tempModel, tempModelMatrix, tempModelColor, tempModelMaterialName };
-
-
 					}
+
+					//if (tempMat.type == 0) {
+					else {
+						//std::cout << "Updating model w color " << std::endl;
+						modelArray.at(i) = { tempModelIndex, tempModelName, tempMesh, tempModel, tempModelMatrix, tempModelColor, tempModelMaterialName }; 
+					}
+
 				}
 			}
 		}

@@ -146,7 +146,7 @@ int main() {
 	// create a light ====== 
 	lightFromMaya tempLight = {};
 	tempLight.lightNameLen = 5; 
-	tempLight.lightPos = { 0,0,0 };
+	tempLight.lightPos = { 0,4,0 };
 	tempLight.intensityRadius = 0.1;
 	tempLight.color = { 1 * 255, 1 * 255, 1 * 255, 1 * 255 };
 	memcpy(tempLight.lightName, "light", tempLight.lightNameLen);
@@ -375,7 +375,11 @@ void recvFromMaya(char* buffer, std::map<CMDTYPE, FnPtr> functionMap, std::vecto
 	if (comLib.recv(buffer, nr)) {
 		memcpy((char*)&msgHeader, buffer, sizeof(MsgHeader));
 
-		//std::cout << "NODE TYPE " << msgHeader.nodeType << std::endl; 
+		std::cout << " ------------------ " << std::endl;
+		std::cout << "NODE TYPE " << msgHeader.nodeType << std::endl; 
+		std::cout << "CMD TYPE " << msgHeader.cmdType << std::endl;
+		std::cout << " ------------------ " << std::endl;
+
 		functionMap[msgHeader.cmdType](modelArray, lightsArray, cameraArray, materialArray, buffer, shader, index, textureArr);
 
 		/* 
