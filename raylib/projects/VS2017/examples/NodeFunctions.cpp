@@ -592,7 +592,6 @@ void updateNodeMatrix(std::vector<modelFromMaya>& modelArray, std::vector<lightF
 
 	}
 
-
 	/* 
 	if (msgHeader.nodeType == NODE_TYPE::MESH) {
 
