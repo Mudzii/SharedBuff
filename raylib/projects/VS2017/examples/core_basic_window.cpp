@@ -209,9 +209,9 @@ int main() {
 			auto l = GetShaderLocation(m.model.material.shader, "model");
 			SetShaderValueMatrix(m.model.material.shader, modelLoc, m.modelMatrix);
 
-			Color finalColor = { (lightsArray[0].color.r + m.color.r),(lightsArray[0].color.g + m.color.g),(lightsArray[0].color.b + m.color.b),(lightsArray[0].color.a + m.color.a) };
+			//Color finalColor = { (lightsArray[0].color.r + m.color.r),(lightsArray[0].color.g + m.color.g),(lightsArray[0].color.b + m.color.b),(lightsArray[0].color.a + m.color.a) };
+			Color finalColor = { ( m.color.r),(m.color.g),(m.color.b),(m.color.a) };
 			DrawModel(m.model, {}, 1.0, finalColor);
-
 		}
 		
 		DrawGrid(10, 1.0f);     // Draw a grid
@@ -272,7 +272,7 @@ void recvFromMaya(char* buffer, std::map<CMDTYPE, FnPtr> functionMap, std::vecto
 	if (comLib.recv(buffer, nr)) {
 
 		memcpy((char*)&msgHeader, buffer, sizeof(MsgHeader));
-		functionMap[msgHeader.cmdType](modelArray, lightsArray, cameraArray, materialArray, buffer, shader, index, textureArr);
+		functionMap[msgHeader.cmdType](msgHeader, modelArray, lightsArray, cameraArray, materialArray, buffer, shader, index, textureArr);
 	}
 
 	delete[] buffer; 

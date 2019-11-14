@@ -137,7 +137,7 @@ struct MeshInfo {
 	MsgHeader msgHeader; 
 
 	MString meshName; 
-	MString meshPathName;
+	//MString meshPathName;
 
 	float* meshVtx; 
 	float* meshUVs;
@@ -150,26 +150,17 @@ struct MeshInfo {
 
 struct CameraInfo {
 	MsgHeader msgHeader;
-	MString cameraName; 
-	MString cameraPathName;
-
 	Camera camData; 
 };
 
 struct LightInfo {
 	MsgHeader msgHeader;
-	MString lightName;
-	MString lightPathName;
-
 	Light lightData; 
 };
 
 struct MaterialInfo {
 	MsgHeader msgHeader;
-
-	MString materialName; 
-	MString texturePath; 
-
+	MString matName; 
 	Material materialData; 
 };
 
@@ -202,12 +193,24 @@ struct MatrixInfo {
 	Matrix matrixData; 
 };
 
-// =====================================
-void GetMeshInfo(MFnMesh &mesh); 
-void GeometryUpdate(MFnMesh &mesh);
-void MaterialChanged(MFnMesh &mesh); 
 
-int findMesh(std::string MeshName);
+// ===========================================================
+// ===================== MSG SIZES ===========================
+// ===========================================================
+size_t totalMsgSizeLight      = (sizeof(MsgHeader) + sizeof(Light));
+size_t totalMsgSizeCamera     = (sizeof(MsgHeader) + sizeof(Camera));
+size_t totalMsgSizeMatrix     = (sizeof(MsgHeader) + sizeof(Matrix));
+size_t totalMsgSizeMaterial   = (sizeof(MsgHeader) + sizeof(Material));
+size_t totalMsgSizeRenamed    = (sizeof(MsgHeader) + sizeof(NodeRenamed));
+size_t totalMsgSizeMatAndMesh = (sizeof(MsgHeader) + sizeof(Mesh) + sizeof(Material));
+
+
+// =====================================
+//void GetMeshInfo(MFnMesh &mesh); 
+//void GeometryUpdate(MFnMesh &mesh);
+//void MaterialChanged(MFnMesh &mesh); 
+
+//int findMesh(MString MeshName);
 
 
 #endif
