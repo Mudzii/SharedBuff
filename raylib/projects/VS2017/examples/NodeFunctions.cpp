@@ -32,6 +32,7 @@ int findMaterial(std::vector<materialMaya>& matArr, std::string MatName) {
 
 // ==============================================
 
+
 // function that adds a new node
 void addNode(MsgHeader &msgHeader, std::vector<modelFromMaya>& modelArray, std::vector<lightFromMaya>& lightsArray, std::vector<cameraFromMaya>& cameraArray, std::vector<materialMaya>& materialArray, char* buffer, Shader shader, int* index, std::vector<Texture2D> &textureArr) {
 
