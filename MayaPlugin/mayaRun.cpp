@@ -43,7 +43,7 @@ std::vector<MaterialInfo> materialInfoToSend;
 std::vector<NodeDeletedInfo> nodeDeleteInfoToSend;
 std::vector<NodeRenamedInfo> nodeRenamedInfoToSend;
 
-//std::vector<CameraInfo> cameraInfoToSend;
+std::vector<CameraInfo> cameraInfoToSend;
 //std::vector<TransformInfo> transformInfoToSend;
 
 // ==================================================================================
@@ -1630,55 +1630,34 @@ void activeCamera(const MString &panelName, void* cliendData) {
 		updateCam = true;
 
 	if (updateCam) {
+		//Camera cameraInfo = {};
+		//MsgHeader msgHeader;
 
 		// fill camInfo struct
-		Camera cameraInfo = {};
-		cameraInfo.fov    = FOV;
-		cameraInfo.type   = isOrtographic;
+		CameraInfo mCamInfo = {}; 
+		mCamInfo.camData.fov    = FOV;
+		mCamInfo.camData.type   = isOrtographic;
 
-		cameraInfo.pos	   = { (float)camPos.x, (float)camPos.y, (float)camPos.z };
-		cameraInfo.up	   = { (float)upDir.x, (float)upDir.y, (float)upDir.z };
-		cameraInfo.forward = { (float)COI.x, (float)COI.y, (float)COI.z };
-
-
-		//size_t totalMsgSize = (sizeof(MsgHeader) + sizeof(Camera));
-		// Fill header ========
-		MsgHeader msgHeader;
-		msgHeader.nameLen  = objName.length();
-		msgHeader.nodeType = NODE_TYPE::CAMERA;
-		msgHeader.msgSize  = totalMsgSizeCamera;
-		msgHeader.cmdType  = CMDTYPE::UPDATE_NODE;
-		memcpy(msgHeader.objName, objName.c_str(), objName.length());
-
-		/*
-		CameraInfo mCamInfo = {};
-		mCamInfo.cameraName = cameraNode.name();
-		mCamInfo.msgHeader = msgHeader;
-		mCamInfo.camData = cameraInfo;
+		mCamInfo.camData.pos	 = { (float)camPos.x, (float)camPos.y, (float)camPos.z };
+		mCamInfo.camData.up	     = { (float)upDir.x, (float)upDir.y, (float)upDir.z };
+		mCamInfo.camData.forward = { (float)COI.x, (float)COI.y, (float)COI.z };
 
 
-		// check if msg already exists. If so, update
-		bool msgExists = false;
-		for (int i = 0; i < cameraInfoToSend.size(); i++) {
-			if (cameraInfoToSend[i].cameraName == cameraNode.name()) {
-				msgExists = true;
+		mCamInfo.msgHeader.nameLen  = objName.length();
+		mCamInfo.msgHeader.nodeType = NODE_TYPE::CAMERA;
+		mCamInfo.msgHeader.msgSize = totalMsgSizeCamera;
+		mCamInfo.msgHeader.msgSize  = totalMsgSizeCamera;
+		mCamInfo.msgHeader.cmdType  = CMDTYPE::UPDATE_NODE;
+		memcpy(mCamInfo.msgHeader.objName, objName.c_str(), objName.length());
 
-				cameraInfoToSend[i] = mCamInfo;
-			}
-		}
-
-		if (!msgExists) {
-			cameraInfoToSend.push_back(mCamInfo);
-		}
-
+		
 		cameraInfoToSend.push_back(mCamInfo);
-		*/
-
+		
 		const char* msg = new char[totalMsgSizeCamera];
 
 		// copy over msg ======
-		memcpy((char*)msg, &msgHeader, sizeof(MsgHeader));
-		memcpy((char*)msg + sizeof(MsgHeader), &cameraInfo, sizeof(Camera));
+		memcpy((char*)msg, &mCamInfo.msgHeader, sizeof(MsgHeader));
+		memcpy((char*)msg + sizeof(MsgHeader), &mCamInfo.camData, sizeof(Camera));
 
 		//send it
 		if (comLib.send(msg, totalMsgSizeCamera)) {
@@ -1687,7 +1666,9 @@ void activeCamera(const MString &panelName, void* cliendData) {
 
 		delete[]msg;
 		updateCam = false; 
-		camPosScene = cameraInfo.pos;
+		camPosScene = mCamInfo.camData.pos;
+		
+		
 	}
 
 }
@@ -2356,8 +2337,7 @@ void timerCallback(float elapsedTime, float lastTime, void* clientData) {
 		delete[]msgChar;
 		nodeRenamedInfoToSend.erase(nodeRenamedInfoToSend.begin() + i);
 	}
-
-	
+		
 	for (int i = 0; i < nodeDeleteInfoToSend.size(); i++) {
 
 		//int index = nodeDeleteInfoToSend[i].nodeIndex; 
@@ -2395,7 +2375,7 @@ void timerCallback(float elapsedTime, float lastTime, void* clientData) {
 	}
 	*/
 
-	/*
+	/* 
 	for (int i = 0; i < cameraInfoToSend.size(); i++) {
 
 		//MStreamUtils::stdOutStream() << "cameraInfoToSend " << cameraInfoToSend[i].cameraName << "\n";
@@ -2417,6 +2397,7 @@ void timerCallback(float elapsedTime, float lastTime, void* clientData) {
 
 	}
 	*/
+
 
 
 	/*
