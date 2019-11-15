@@ -25,7 +25,7 @@ bool initBool = false;
 
 MTimer gTimer;
 float globalTime = 0.0f;
-float timerPeriod = 0.05f;
+float timerPeriod = 0.1f;
 
 
 // arrays with info in scene
@@ -43,7 +43,7 @@ std::vector<MaterialInfo> materialInfoToSend;
 std::vector<NodeDeletedInfo> nodeDeleteInfoToSend;
 std::vector<NodeRenamedInfo> nodeRenamedInfoToSend;
 
-std::vector<CameraInfo> cameraInfoToSend;
+//std::vector<CameraInfo> cameraInfoToSend;
 //std::vector<TransformInfo> transformInfoToSend;
 
 // ==================================================================================
@@ -1346,22 +1346,64 @@ void meshTopologyChanged(MObject& node, void* clientData) {
 void meshWorldMatrixChanged(MObject &transformNode, MDagMessage::MatrixModifiedFlags &modified, void *clientData) {
 
 	MStatus result;
-	MDagPath path;
-	MFnDagNode(transformNode).getPath(path);
+	
+	MatrixInfo mMatrixInfo = {};
+	MItDag dagIterator(MItDag::kDepthFirst, MFn::kTransform, &status);
+	dagIterator.reset(transformNode);
 
-	MFnTransform transfNode(path);
-	MFnMesh meshNode(path, &result);
+	MStreamUtils::stdOutStream() << " =================== " << endl;
+	for (; !dagIterator.isDone(); dagIterator.next()) {
 
-	MMatrix absMatrix; 
-	MFnDagNode childHierarchy; 
+		// get path for selected node
+		MDagPath objectPath; 
+		status = dagIterator.getPath(objectPath); 
+
+		// skip over the transform with shape 
+		if ((objectPath.hasFn(MFn::kMesh)) && (objectPath.hasFn(MFn::kTransform))) {
+			continue;
+		}
+
+		// get mesh shape node
+		else if (objectPath.hasFn(MFn::kMesh)) {
+
+			MFnMesh meshNode(objectPath);
+			MMatrix meshMatrix = objectPath.inclusiveMatrix(); 
+			float matFloat[4][4]; 
+			meshMatrix.get(matFloat); 
+
+			mMatrixInfo.nodeName = meshNode.name(); 
+
+			mMatrixInfo.matrixData = {  matFloat[0][0], matFloat[1][0], matFloat[2][0], matFloat[3][0],
+										matFloat[0][1], matFloat[1][1], matFloat[2][1], matFloat[3][1],
+										matFloat[0][2], matFloat[1][2], matFloat[2][2], matFloat[3][2],
+										matFloat[0][3], matFloat[1][3], matFloat[2][3], matFloat[3][3] };
+	
+			//MsgHeader msgHeader = {}; 
+			mMatrixInfo.msgHeader.nodeType = NODE_TYPE::MESH;
+			mMatrixInfo.msgHeader.msgSize = totalMsgSizeMatrix;
+			mMatrixInfo.msgHeader.cmdType = CMDTYPE::UPDATE_MATRIX;
+			mMatrixInfo.msgHeader.nameLen = meshNode.name().length();
+			memcpy(mMatrixInfo.msgHeader.objName, meshNode.name().asChar(), mMatrixInfo.msgHeader.nameLen);
+		
+			bool msgExists = false;
+			for (int i = 0; i < matrixInfoToSend.size(); i++) {
+				if (matrixInfoToSend[i].nodeName == meshNode.name()) {
+					msgExists = true;
+					matrixInfoToSend[i] = mMatrixInfo;
+				}
+			}
+
+			if (!msgExists) {
+				matrixInfoToSend.push_back(mMatrixInfo);
+			}
+		}
+
+	}
 	
 	
-
+	/* 
 	if (result) {
 		absMatrix = path.inclusiveMatrix(); 
-		//MStreamUtils::stdOutStream() << "path has direct connection to mesh " << path.fullPathName() << endl;
-		//MStreamUtils::stdOutStream() << "mesh " << meshNode.name() << endl;
-		
 		MatrixInfo mMatrixInfo = {};
 
 		//row 1
@@ -1388,9 +1430,6 @@ void meshWorldMatrixChanged(MObject &transformNode, MDagMessage::MatrixModifiedF
 		mMatrixInfo.matrixData.a43 = absMatrix(2, 3);
 		mMatrixInfo.matrixData.a44 = absMatrix(3, 3);
 
-		// fill TransformInfo struct to add to msg vector
-		//size_t totalMsgSize = (sizeof(MsgHeader) + sizeof(Matrix));
-
 		//MsgHeader msgHeader = {}; 
 		mMatrixInfo.msgHeader.nodeType = NODE_TYPE::MESH;
 		mMatrixInfo.msgHeader.msgSize = totalMsgSizeMatrix;
@@ -1414,7 +1453,9 @@ void meshWorldMatrixChanged(MObject &transformNode, MDagMessage::MatrixModifiedF
 		
 
 	}
+	*/
 	
+	/* 
 	else {
 		
 		// add first node to hierarchy
@@ -1453,19 +1494,8 @@ void meshWorldMatrixChanged(MObject &transformNode, MDagMessage::MatrixModifiedF
 		}
 		
 		
-		//MStreamUtils::stdOutStream() << " ============================== " << endl;
-		/* 
-		for (int i = hierarchy.length(); i-- > 0; ) {
-
-			MFnDagNode hi(hierarchy[i]);
-			MDagPath path2;
-			MFnDagNode(hierarchy[i]).getPath(path2);
-
-			//MStreamUtils::stdOutStream() << hi.name() << endl;
-			//MStreamUtils::stdOutStream() << path2.fullPathName() << endl;
-
-		}
-		*/
+	
+		
 
 		childHierarchy.setObject(hierarchy[hierarchy.length() - 1]);
 		MDagPath path2;
@@ -1479,14 +1509,8 @@ void meshWorldMatrixChanged(MObject &transformNode, MDagMessage::MatrixModifiedF
 		absMatrix = path2.inclusiveMatrix(); 
 		
 		//MStreamUtils::stdOutStream() << " ============================== "<< endl;
-		/* 
-		// get tot matrix by multiplying backwards
-		for (int i = hierarchy.length() - 1; i-- > 0; ) {
-			MFnDagNode child(hierarchy[i]);
-			transfMatAbs *= child.transformationMatrix();
+	
 
-		}
-		*/
 		
 
 		MatrixInfo mMatrixInfo = {}; 
@@ -1539,30 +1563,15 @@ void meshWorldMatrixChanged(MObject &transformNode, MDagMessage::MatrixModifiedF
 
 		delete[]msg;
 		
-		 /* 
-		
-		bool msgExists = false;
-		for (int i = 0; i < matrixInfoToSend.size(); i++) {
-			if (matrixInfoToSend[i].msgHeader.objName == meshNode.name().asChar()) {
-				msgExists = true;
-				matrixInfoToSend[i] = mMatrixInfo;
-			}
-		}
-
-		if (!msgExists) {
-			matrixInfoToSend.push_back(mMatrixInfo);
-		}
-		 */
 
 
 		//matrixInfoToSend.push_back(mMatrixInfo);
 			
 
 		
+		
 	}
-
-
-
+		*/
 
 }
 
@@ -1574,7 +1583,7 @@ void meshWorldMatrixChanged(MObject &transformNode, MDagMessage::MatrixModifiedF
 void activeCamera(const MString &panelName, void* cliendData) {
 
 	MStatus status = MS::kFailure;
-
+	
 	//get active camera
 	M3dView activeView;
 	status = M3dView::getM3dViewFromModelPanel(panelName, activeView);
@@ -1634,25 +1643,23 @@ void activeCamera(const MString &panelName, void* cliendData) {
 		//MsgHeader msgHeader;
 
 		// fill camInfo struct
-		CameraInfo mCamInfo = {}; 
-		mCamInfo.camData.fov    = FOV;
-		mCamInfo.camData.type   = isOrtographic;
+		CameraInfo mCamInfo = {};
+		mCamInfo.camData.fov = FOV;
+		mCamInfo.camData.type = isOrtographic;
 
-		mCamInfo.camData.pos	 = { (float)camPos.x, (float)camPos.y, (float)camPos.z };
-		mCamInfo.camData.up	     = { (float)upDir.x, (float)upDir.y, (float)upDir.z };
+		mCamInfo.camData.pos = { (float)camPos.x, (float)camPos.y, (float)camPos.z };
+		mCamInfo.camData.up = { (float)upDir.x, (float)upDir.y, (float)upDir.z };
 		mCamInfo.camData.forward = { (float)COI.x, (float)COI.y, (float)COI.z };
 
 
-		mCamInfo.msgHeader.nameLen  = objName.length();
+		mCamInfo.msgHeader.nameLen = objName.length();
 		mCamInfo.msgHeader.nodeType = NODE_TYPE::CAMERA;
 		mCamInfo.msgHeader.msgSize = totalMsgSizeCamera;
-		mCamInfo.msgHeader.msgSize  = totalMsgSizeCamera;
-		mCamInfo.msgHeader.cmdType  = CMDTYPE::UPDATE_NODE;
+		mCamInfo.msgHeader.msgSize = totalMsgSizeCamera;
+		mCamInfo.msgHeader.cmdType = CMDTYPE::UPDATE_NODE;
 		memcpy(mCamInfo.msgHeader.objName, objName.c_str(), objName.length());
 
-		
-		cameraInfoToSend.push_back(mCamInfo);
-		
+
 		const char* msg = new char[totalMsgSizeCamera];
 
 		// copy over msg ======
@@ -1665,11 +1672,8 @@ void activeCamera(const MString &panelName, void* cliendData) {
 		}
 
 		delete[]msg;
-		updateCam = false; 
-		camPosScene = mCamInfo.camData.pos;
-		
-		
 	}
+	
 
 }
 
@@ -1677,6 +1681,7 @@ void activeCamera(const MString &panelName, void* cliendData) {
 // ================================= LIGHT ==========================================
 // ==================================================================================
 
+/* 
 // get light information for when a light is created 
 void GetLightInfo(MFnPointLight &light) {
 
@@ -1829,6 +1834,7 @@ void lightAttributeChanged(MNodeMessage::AttributeMessage msg, MPlug& plug, MPlu
 		}
 	}
 }
+*/
 
 // ==================================================================================
 // ================================= OTHER ==========================================
@@ -2016,6 +2022,7 @@ void nodeAdded(MObject &node, void * clientData) {
 
 	}
 
+	/* 
 	// if the node has kPointLight attributes it is a pointLight
 	if (node.hasFn(MFn::kPointLight)) {
 		
@@ -2041,6 +2048,7 @@ void nodeAdded(MObject &node, void * clientData) {
 			callbackIdArray.append(tempID);
 
 	}
+	*/
 
 	// if the node has kLambert attributes it is a lambert
 	if (node.hasFn(MFn::kLambert)) {
@@ -2225,6 +2233,23 @@ void timerCallback(float elapsedTime, float lastTime, void* clientData) {
 	globalTime += elapsedTime;
 
 
+	for (int i = 0; i < matrixInfoToSend.size(); i++) {
+
+		const char* msgChar = new char[matrixInfoToSend[i].msgHeader.msgSize];
+
+		memcpy((char*)msgChar, &matrixInfoToSend[i].msgHeader, sizeof(MsgHeader));
+		memcpy((char*)msgChar + sizeof(MsgHeader), &matrixInfoToSend[i].matrixData, sizeof(Matrix));
+
+		// send it
+		if (comLib.send(msgChar, matrixInfoToSend[i].msgHeader.msgSize)) {
+			//MStreamUtils::stdOutStream() << "matrixInfo: Message sent" << "\n";
+		}
+
+		delete[] msgChar;
+		matrixInfoToSend.erase(matrixInfoToSend.begin() + i);
+
+	}
+
 	for (int i = 0; i < meshInfoToSend.size(); i++) {
 
 
@@ -2304,23 +2329,6 @@ void timerCallback(float elapsedTime, float lastTime, void* clientData) {
 		materialInfoToSend.erase(materialInfoToSend.begin() + i);
 	}
 
-	for (int i = 0; i < matrixInfoToSend.size(); i++) {
-
-		const char* msgChar = new char[matrixInfoToSend[i].msgHeader.msgSize];
-
-		memcpy((char*)msgChar, &matrixInfoToSend[i].msgHeader, sizeof(MsgHeader));
-		memcpy((char*)msgChar + sizeof(MsgHeader), &matrixInfoToSend[i].matrixData, sizeof(Matrix));
-
-		// send it
-		if (comLib.send(msgChar, matrixInfoToSend[i].msgHeader.msgSize)) {
-			//MStreamUtils::stdOutStream() << "matrixInfo: Message sent" << "\n";
-		}
-		
-		delete[] msgChar;
-		matrixInfoToSend.erase(matrixInfoToSend.begin() + i);
-
-	}
-
 	for (int i = 0; i < nodeRenamedInfoToSend.size(); i++) {
 
 		const char* msgChar = new char[nodeRenamedInfoToSend[i].msgHeader.msgSize];
@@ -2375,31 +2383,7 @@ void timerCallback(float elapsedTime, float lastTime, void* clientData) {
 	}
 	*/
 
-	/* 
-	for (int i = 0; i < cameraInfoToSend.size(); i++) {
-
-		//MStreamUtils::stdOutStream() << "cameraInfoToSend " << cameraInfoToSend[i].cameraName << "\n";
-
-		const char* msgChar = new char[cameraInfoToSend[i].msgHeader.msgSize];
-
-		// copy over msg ======
-		memcpy((char*)msgChar, &cameraInfoToSend[i].msgHeader, sizeof(MsgHeader));
-		memcpy((char*)msgChar + sizeof(MsgHeader), &cameraInfoToSend[i].camData, sizeof(Camera));
-
-		//send it
-		if (comLib.send(msgChar, cameraInfoToSend[i].msgHeader.msgSize)) {
-			//MStreamUtils::stdOutStream() << "camInfo: Message sent" << "\n";
-		}
-
-		delete[] msgChar;
-		cameraInfoToSend.erase(cameraInfoToSend.begin() + i);
-
-
-	}
-	*/
-
-
-
+	
 	/*
 	for (int i = 0; i < lightInfoToSend.size(); i++) {
 
@@ -2419,6 +2403,7 @@ void timerCallback(float elapsedTime, float lastTime, void* clientData) {
 
 	}
 	*/
+
 }
 
 // ==================================================================================
@@ -2472,6 +2457,7 @@ void InitializeScene() {
 		cameraIterator.next();
 	}
 
+	/* 
 	MItDependencyNodes lightIterator(MFn::kPointLight);
 	while (!lightIterator.isDone()) {
 
@@ -2488,10 +2474,14 @@ void InitializeScene() {
 
 		lightIterator.next();
 	}
+	*/
 
 
 
 	// camera callbacks initialized for all the view panels 
+
+
+	// callbacks for all the 4 model panels used for camera 
 	tempID = MUiMessage::add3dViewPostRenderMsgCallback("modelPanel1", activeCamera, NULL, &status);
 	if (status == MS::kSuccess) {
 		callbackIdArray.append(tempID);
@@ -2535,6 +2525,7 @@ EXPORT MStatus initializePlugin(MObject obj) {
 	MStreamUtils::stdOutStream() << "\n";
 	MStreamUtils::stdOutStream() << "Plugin loaded ===========================\n";
 
+	InitializeScene();
 
 	// register callbacks here for
 	tempID = MDGMessage::addNodeAddedCallback(nodeAdded);
@@ -2543,11 +2534,11 @@ EXPORT MStatus initializePlugin(MObject obj) {
 	tempID = MDGMessage::addNodeRemovedCallback(nodeDeleted);
 	callbackIdArray.append(tempID);
 
+	//tempID = MModelMessage::addAfterDuplicateCallback(nodeDuplicated);
+	//callbackIdArray.append(tempID);
+
 	tempID = MTimerMessage::addTimerCallback(timerPeriod, timerCallback, NULL, &status);
 	callbackIdArray.append(tempID);
-
-	InitializeScene();
-
 
 	// Timer
 	gTimer.clear();

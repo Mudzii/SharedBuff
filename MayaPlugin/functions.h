@@ -189,6 +189,7 @@ struct NodeRenamedInfo {
 };
 
 struct MatrixInfo {
+	MString nodeName; 
 	MsgHeader msgHeader;
 	Matrix matrixData; 
 };
@@ -204,13 +205,7 @@ size_t totalMsgSizeMaterial   = (sizeof(MsgHeader) + sizeof(Material));
 size_t totalMsgSizeRenamed    = (sizeof(MsgHeader) + sizeof(NodeRenamed));
 size_t totalMsgSizeMatAndMesh = (sizeof(MsgHeader) + sizeof(Mesh) + sizeof(Material));
 
-
 // =====================================
-//void GetMeshInfo(MFnMesh &mesh); 
-//void GeometryUpdate(MFnMesh &mesh);
-//void MaterialChanged(MFnMesh &mesh); 
-
-//int findMesh(MString MeshName);
 
 
 #endif

@@ -17,7 +17,6 @@
 ComLib comLib("shaderMemory", 50, CONSUMER);
 
 #include <Windows.h>
-
 // ==================================================================================
 
 void recvFromMaya(char* buffer, std::map<CMDTYPE, FnPtr> functionMap, std::vector<modelFromMaya>& modelArray, std::vector<lightFromMaya>& lightsArray, std::vector<cameraFromMaya>& cameraArray, std::vector<materialMaya>& materialArray, Shader shader, int* index, std::vector<Texture2D> &textureArr);
@@ -121,7 +120,7 @@ int main() {
 	//std::cout << "-----------------" << std::endl;
 	Vector3 position = { 0.0f, 0.0f, 0.0f };     // Set model position
 	SetCameraMode(camera, CAMERA_FREE);          // Set an orbital camera mode
-	SetTargetFPS(130);                           // Set our game to run at 60 frames-per-second
+	SetTargetFPS(140);                           // Set our game to run at 60 frames-per-second
 	
 	int modelLoc = GetShaderLocation(shader1, "model");
 	int viewLoc  = GetShaderLocation(shader1, "view");

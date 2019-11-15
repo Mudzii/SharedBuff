@@ -45,55 +45,54 @@ void addNode(MsgHeader &msgHeader, std::vector<modelFromMaya>& modelArray, std::
 
 	if (msgHeader.nodeType == NODE_TYPE::MESH) {
 
-		// get mesh info send over
-		msgMesh meshInfo = {};
-		memcpy((char*)&meshInfo, buffer + sizeof(MsgHeader), sizeof(msgMesh));
-
-		// create arrays to store information & get info from buffer
-		float* meshUVs	   = new float[meshInfo.UVcount];
-		float* meshVtx	   = new float[meshInfo.vtxCount * 3];
-		float* meshNorm	   = new float[meshInfo.normalCount * 3];
-
-		memcpy((char*)meshVtx,	buffer + sizeof(MsgHeader) + sizeof(msgMesh),  (sizeof(float) * meshInfo.vtxCount * 3));
-		memcpy((char*)meshNorm, buffer + sizeof(MsgHeader) + sizeof(msgMesh) + (sizeof(float) * meshInfo.vtxCount * 3),  (sizeof(float) * meshInfo.normalCount * 3));
-		memcpy((char*)meshUVs,  buffer + sizeof(MsgHeader) + sizeof(msgMesh) + (sizeof(float) * meshInfo.vtxCount * 3) + (sizeof(float) * meshInfo.normalCount * 3), (sizeof(float) * meshInfo.UVcount));
-
-		// get material info sent over
-		materialMaya materialInfo = {};
-		memcpy((char*)&materialInfo, buffer + sizeof(MsgHeader) + sizeof(msgMesh) + (sizeof(float) * meshInfo.vtxCount * 3) + (sizeof(float) * meshInfo.normalCount * 3) + (sizeof(float) * meshInfo.UVcount), sizeof(materialMaya));
-		
-		std::string materialName = materialInfo.materialName;
-		materialName = materialName.substr(0, materialInfo.matNameLen);
-
-		std::string texturePath = materialInfo.fileTextureName;
-		texturePath = texturePath.substr(0, materialInfo.textureNameLen);
-
-		// get matrix info sent over 
-		Matrix matrixInfo = {};
-		memcpy((char*)&matrixInfo, buffer + sizeof(MsgHeader) + sizeof(msgMesh) + (sizeof(float) * meshInfo.vtxCount * 3) + (sizeof(float) * meshInfo.normalCount * 3) + (sizeof(float) * meshInfo.UVcount) + sizeof(materialMaya), sizeof(Matrix));
-
-		// Check if material already exists, else push back new mat
-		int materialIndex = findMaterial(materialArray, materialName);
-		if(materialIndex >= 0){
-			materialArray[materialIndex] = materialInfo;
-		}
-
-		else {
-			materialArray.push_back({ materialInfo });
-		}
 
 		// check of mesh already exists
 		int modelindex = findMesh(modelArray, objectName);
 		if (modelindex == -1) {
-			
+
+			// get mesh info send over
+			msgMesh meshInfo = {};
+			memcpy((char*)&meshInfo, buffer + sizeof(MsgHeader), sizeof(msgMesh));
+
+			// create arrays to store information & get info from buffer
+			float* meshUVs = new float[meshInfo.UVcount];
+			float* meshVtx = new float[meshInfo.vtxCount * 3];
+			float* meshNorm = new float[meshInfo.normalCount * 3];
+
+			memcpy((char*)meshVtx, buffer + sizeof(MsgHeader) + sizeof(msgMesh), (sizeof(float) * meshInfo.vtxCount * 3));
+			memcpy((char*)meshNorm, buffer + sizeof(MsgHeader) + sizeof(msgMesh) + (sizeof(float) * meshInfo.vtxCount * 3), (sizeof(float) * meshInfo.normalCount * 3));
+			memcpy((char*)meshUVs, buffer + sizeof(MsgHeader) + sizeof(msgMesh) + (sizeof(float) * meshInfo.vtxCount * 3) + (sizeof(float) * meshInfo.normalCount * 3), (sizeof(float) * meshInfo.UVcount));
+
+			// get material info sent over
+			materialMaya materialInfo = {};
+			memcpy((char*)&materialInfo, buffer + sizeof(MsgHeader) + sizeof(msgMesh) + (sizeof(float) * meshInfo.vtxCount * 3) + (sizeof(float) * meshInfo.normalCount * 3) + (sizeof(float) * meshInfo.UVcount), sizeof(materialMaya));
+
+			std::string materialName = materialInfo.materialName;
+			materialName = materialName.substr(0, materialInfo.matNameLen);
+
+			std::string texturePath = materialInfo.fileTextureName;
+			texturePath = texturePath.substr(0, materialInfo.textureNameLen);
+
+			// get matrix info sent over 
+			Matrix matrixInfo = {};
+			memcpy((char*)&matrixInfo, buffer + sizeof(MsgHeader) + sizeof(msgMesh) + (sizeof(float) * meshInfo.vtxCount * 3) + (sizeof(float) * meshInfo.normalCount * 3) + (sizeof(float) * meshInfo.UVcount) + sizeof(materialMaya), sizeof(Matrix));
+
+			// Check if material already exists, else push back new mat
+			int materialIndex = findMaterial(materialArray, materialName);
+			if (materialIndex >= 0) {
+				materialArray[materialIndex] = materialInfo;
+			}
+
+			else {
+				materialArray.push_back({ materialInfo });
+			}
 
 			// create a temp mesh and fill with info
-			Texture2D texture;	
 			Mesh tempMesh = {};
 
 			// vtx information
 			tempMesh.vertexCount = meshInfo.vtxCount;
-			tempMesh.vertices	 = new float[meshInfo.vtxCount * 3];
+			tempMesh.vertices = new float[meshInfo.vtxCount * 3];
 			memcpy(tempMesh.vertices, meshVtx, (sizeof(float) * tempMesh.vertexCount * 3));
 
 			// normal information
@@ -108,10 +107,10 @@ void addNode(MsgHeader &msgHeader, std::vector<modelFromMaya>& modelArray, std::
 			rlLoadMesh(&tempMesh, false);
 			Model tempModel = LoadModelFromMesh(tempMesh);
 			tempModel.material.shader = shader;
-			
+
 			// if materal has texture, load it
 			if (materialInfo.type == 1 && texturePath.length() > 0) {
-				texture = LoadTexture(texturePath.c_str());
+				Texture2D texture = LoadTexture(texturePath.c_str());
 				tempModel.material.maps[MAP_DIFFUSE].texture = texture;
 
 				textureArr.push_back(texture);
@@ -119,16 +118,14 @@ void addNode(MsgHeader &msgHeader, std::vector<modelFromMaya>& modelArray, std::
 
 			// pushback the new node
 			modelArray.push_back({ *index, objectName, tempMesh, tempModel, matrixInfo, materialInfo.color, materialName });
-
 			*index = *index + 1;
 
-		}
 
-	
-		// delete any allocated arrays
-		delete[] meshVtx; 
-		delete[] meshNorm;
-		delete[] meshUVs; 
+			// delete any allocated arrays
+			delete[] meshVtx;
+			delete[] meshNorm;
+			delete[] meshUVs;
+		}
 
 	}
 	
@@ -291,12 +288,10 @@ void deleteNode(MsgHeader &msgHeader, std::vector<modelFromMaya>& modelArray, st
 	if (msgHeader.nodeType == NODE_TYPE::MESH) {
 
 		int modelIndex = findMesh(modelArray, objectName); 
-
 		if (modelIndex >= 0) {
 
 			//UnloadModel(modelArray[modelIndex].model);
 			modelArray.erase(modelArray.begin() + modelIndex);
-			//*nrObjs = *nrObjs - 1;
 			*index  = *index - 1;
 		}
 		
@@ -384,7 +379,7 @@ void updateNodeMatrix(MsgHeader &msgHeader, std::vector<modelFromMaya>& modelArr
 	Matrix tempMatrix = {};
 	memcpy((char*)&tempMatrix, buffer + sizeof(MsgHeader), sizeof(Matrix));
 
-	if (msgHeader.nodeType == NODE_TYPE::MESH) {
+	//if (msgHeader.nodeType == NODE_TYPE::MESH) {
 
 		// check if mesh exists in scene and update the matrix
 		int modelIndex = findMesh(modelArray, objectName);
@@ -392,7 +387,7 @@ void updateNodeMatrix(MsgHeader &msgHeader, std::vector<modelFromMaya>& modelArr
 			modelArray[modelIndex].modelMatrix = tempMatrix; 
 		}
 
-	}
+	//}
 
 	
 }
@@ -409,7 +404,7 @@ void updateNodeMaterial(MsgHeader &msgHeader, std::vector<modelFromMaya>& modelA
 	std::string objectName = msgHeader.objName;
 	objectName = objectName.substr(0, msgHeader.nameLen);
 
-	if (msgHeader.nodeType == NODE_TYPE::MESH) {
+	//if (msgHeader.nodeType == NODE_TYPE::MESH) {
 
 		// get mesh info send over
 		msgMesh meshInfo = {};
@@ -457,7 +452,7 @@ void updateNodeMaterial(MsgHeader &msgHeader, std::vector<modelFromMaya>& modelA
 			
 		}
 
-	}
+	//}
 
 }
 
@@ -474,7 +469,7 @@ void updateMaterial(MsgHeader &msgHeader, std::vector<modelFromMaya>& modelArray
 	std::string objectName = msgHeader.objName;
 	objectName = objectName.substr(0, msgHeader.nameLen);
 
-	if (msgHeader.nodeType == NODE_TYPE::MATERIAL) {
+	//if (msgHeader.nodeType == NODE_TYPE::MATERIAL) {
 
 		materialMaya materialInfo = {}; 
 		memcpy((char*)&materialInfo, buffer + sizeof(MsgHeader), sizeof(materialMaya));
@@ -536,7 +531,7 @@ void updateMaterial(MsgHeader &msgHeader, std::vector<modelFromMaya>& modelArray
 
 		}
 
-	}
+	//}
 }
 
 // function that adds a new material
@@ -552,7 +547,7 @@ void newMaterial(MsgHeader &msgHeader, std::vector<modelFromMaya>& modelArray, s
 	std::string objectName = msgHeader.objName;
 	objectName = objectName.substr(0, msgHeader.nameLen);
 
-	if (msgHeader.nodeType == NODE_TYPE::MATERIAL) {
+	//if (msgHeader.nodeType == NODE_TYPE::MATERIAL) {
 
 		materialMaya materialInfo = {}; 
 		memcpy((char*)&materialInfo, buffer + sizeof(MsgHeader), sizeof(materialMaya));
@@ -631,6 +626,6 @@ void newMaterial(MsgHeader &msgHeader, std::vector<modelFromMaya>& modelArray, s
 		}
 
 
-	}
+	//}
 
 }
