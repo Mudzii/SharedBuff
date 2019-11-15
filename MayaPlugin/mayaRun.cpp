@@ -2362,7 +2362,6 @@ void timerCallback(float elapsedTime, float lastTime, void* clientData) {
 		
 	}
 
-
 	/* 
 	for (int i = 0; i < transformInfoToSend.size(); i++) {
 
