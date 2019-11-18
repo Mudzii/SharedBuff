@@ -193,6 +193,7 @@ void materialAttributeChanged(MNodeMessage::AttributeMessage msg, MPlug& plug, M
 
 		if (result) {
 
+			/* 
 			// get material transparency
 			transp = lambertShader.findPlug("transparency", &result);
 			if (result) {
@@ -202,6 +203,7 @@ void materialAttributeChanged(MNodeMessage::AttributeMessage msg, MPlug& plug, M
 				transpAttr.getValue(transpClr.r);
 				transparency = transpClr.r;
 			}
+			*/
 
 			// get material color through color plugs
 			MPlug colorAttr;
@@ -333,197 +335,7 @@ void transformWorldMatrixChanged(MObject &transformNode, MDagMessage::MatrixModi
 	Matrix mTransformMatrix = {};
 	TransformInfo mTransfInfo = {};
 
-	/* 
-	MStreamUtils::stdOutStream() << endl;
-	MStreamUtils::stdOutStream() << " =============================== " << endl;
-	MStreamUtils::stdOutStream() << "TRANSFORM MAT CHANGED " << endl;
-	*/
-
-	/* 
-	if (result && !transformNode.hasFn(MFn::kCamera)) {
-
-		//MMatrix test = path.inclusiveMatrix(); 
-		//MStreamUtils::stdOutStream() << "path " << path.fullPathName() << endl;
-
-
-		// check if transform node is directry connected to a mesh
-		MFnMesh meshNode(transfNode.child(0), &result);
-		if (result) {
-
-			transfMatAbs = transfNode.transformationMatrix();
-
-			mTransformMatrix.a11 = transfMatAbs(0, 0);
-			mTransformMatrix.a12 = transfMatAbs(1, 0);
-			mTransformMatrix.a13 = transfMatAbs(2, 0);
-			mTransformMatrix.a14 = transfMatAbs(3, 0);
-
-			//row 2
-			mTransformMatrix.a21 = transfMatAbs(0, 1);
-			mTransformMatrix.a22 = transfMatAbs(1, 1);
-			mTransformMatrix.a23 = transfMatAbs(2, 1);
-			mTransformMatrix.a24 = transfMatAbs(3, 1);
-
-			//row 3
-			mTransformMatrix.a31 = transfMatAbs(0, 2);
-			mTransformMatrix.a32 = transfMatAbs(1, 2);
-			mTransformMatrix.a33 = transfMatAbs(2, 2);
-			mTransformMatrix.a34 = transfMatAbs(3, 2);
-
-			//row 4
-			mTransformMatrix.a41 = transfMatAbs(0, 3);
-			mTransformMatrix.a42 = transfMatAbs(1, 3);
-			mTransformMatrix.a43 = transfMatAbs(2, 3);
-			mTransformMatrix.a44 = transfMatAbs(3, 3);
-
-
-			// fill out mTransfInfo to add to msg vector
-			size_t totalMsgSize = (sizeof(MsgHeader) + sizeof(Transform) + sizeof(Matrix));
-
-			mTransfInfo.msgHeader.msgSize = totalMsgSize;
-			mTransfInfo.msgHeader.nodeType = NODE_TYPE::MESH;
-			mTransfInfo.msgHeader.cmdType = CMDTYPE::UPDATE_MATRIX;
-			mTransfInfo.msgHeader.nameLen = transfNode.name().length();
-			memcpy(mTransfInfo.msgHeader.objName, transfNode.name().asChar(), mTransfInfo.msgHeader.nameLen);
-
-			mTransfInfo.transfData.transfNameLen = transfNode.name().length();
-			memcpy(mTransfInfo.transfData.transfName, transfNode.name().asChar(), mTransfInfo.transfData.transfNameLen);
-
-			mTransfInfo.transfData.childNameLen = meshNode.name().length();
-			memcpy(mTransfInfo.transfData.childName, meshNode.name().asChar(), mTransfInfo.transfData.childNameLen);
-
-			mTransfInfo.transfName = transfNode.fullPathName();
-			mTransfInfo.childShapeName = meshNode.name();
-
-			mTransfInfo.transformMatrix = mTransformMatrix;
-			msgToSend = true;
-
-		}
-
-		// if not directly connected, check if mesh in hierarchy
-		else {
-
-			//MStreamUtils::stdOutStream() << "Has no child node mesh" << endl;
-			MObjectArray hierarchy;
-			bool hasShapeNode = false;
-			int childCnt = transfNode.childCount();
-
-			// add first node to hierarchy
-			MObject firstParentNode(transfNode.object());
-			hierarchy.append(firstParentNode);
-
-			// get hierarchy to mesh
-			for (int j = 0; j < hierarchy.length(); j++) {
-
-				// get the next node in hierarchy and check child count
-				MFnDagNode prnt(hierarchy[j]);
-				int prntChildCnt = prnt.childCount();
-
-				// if it has children, loop through
-				for (int i = 0; i < prntChildCnt; i++) {
-
-					// get the child object
-					MObject childObject(prnt.child(i));
-
-					// if the child is of type kTransform and has children, add to chirarchy 
-					if (childObject.apiType() == MFn::kTransform) {
-
-						MFnDagNode child(childObject);
-						int tempChildCnt = child.childCount();
-						std::string childName = child.fullPathName().asChar();
-
-						if (tempChildCnt != 0) {
-							hierarchy.append(childObject);
-						}
-
-					}
-
-					// if the child is of type mesh, add to hierarchy and break loop
-					else if (childObject.apiType() == MFn::kMesh) {
-						//MStreamUtils::stdOutStream() << "Child is mesh " << endl;
-						meshNode.setObject(childObject);
-						hierarchy.append(childObject);
-						break;
-					}
-				}
-			}
-
-			// get tot matrix by multiplying backwards
-			for (int i = hierarchy.length() - 1; i-- > 0; ) {
-				MFnDagNode child(hierarchy[i]);
-				transfMatAbs *= child.transformationMatrix();
-
-			}
-
-			//row 1
-			mTransformMatrix.a11 = transfMatAbs(0, 0);
-			mTransformMatrix.a12 = transfMatAbs(1, 0);
-			mTransformMatrix.a13 = transfMatAbs(2, 0);
-			mTransformMatrix.a14 = transfMatAbs(3, 0);
-
-			//row 2
-			mTransformMatrix.a21 = transfMatAbs(0, 1);
-			mTransformMatrix.a22 = transfMatAbs(1, 1);
-			mTransformMatrix.a23 = transfMatAbs(2, 1);
-			mTransformMatrix.a24 = transfMatAbs(3, 1);
-
-			//row 3
-			mTransformMatrix.a31 = transfMatAbs(0, 2);
-			mTransformMatrix.a32 = transfMatAbs(1, 2);
-			mTransformMatrix.a33 = transfMatAbs(2, 2);
-			mTransformMatrix.a34 = transfMatAbs(3, 2);
-
-			//row 4
-			mTransformMatrix.a41 = transfMatAbs(0, 3);
-			mTransformMatrix.a42 = transfMatAbs(1, 3);
-			mTransformMatrix.a43 = transfMatAbs(2, 3);
-			mTransformMatrix.a44 = transfMatAbs(3, 3);
-
-			// fill TransformInfo struct to add to msg vector
-			size_t totalMsgSize = (sizeof(MsgHeader) + sizeof(Transform) + sizeof(Matrix));
-
-			mTransfInfo.msgHeader.msgSize = totalMsgSize;
-			mTransfInfo.msgHeader.nodeType = NODE_TYPE::MESH;
-			mTransfInfo.msgHeader.cmdType = CMDTYPE::UPDATE_MATRIX;
-			mTransfInfo.msgHeader.nameLen = transfNode.name().length();
-			memcpy(mTransfInfo.msgHeader.objName, transfNode.name().asChar(), mTransfInfo.msgHeader.nameLen);
-
-			mTransfInfo.transfData.transfNameLen = transfNode.name().length();
-			memcpy(mTransfInfo.transfData.transfName, transfNode.name().asChar(), mTransfInfo.transfData.transfNameLen);
-
-			mTransfInfo.transfData.childNameLen = meshNode.name().length();
-			memcpy(mTransfInfo.transfData.childName, meshNode.name().asChar(), mTransfInfo.transfData.childNameLen);
-
-			mTransfInfo.childShapeName = meshNode.name();
-			mTransfInfo.transformMatrix = mTransformMatrix;
-			mTransfInfo.transfName = transfNode.fullPathName();
-			msgToSend = true;
-		}
-
-		if (msgToSend) {
-
-			// check if msg already exists. If so, update
-			bool msgExists = false;
-			for (int i = 0; i < transformInfoToSend.size(); i++) {
-				if (transformInfoToSend[i].childShapeName == meshNode.name()) {
-
-					msgExists = true;
-					//MStreamUtils::stdOutStream() << "Transf Msg already exists! Updating " << endl;
-					//transformInfoToSend[i] = mTransfInfo;
-				}
-			}
-
-			if (!msgExists) {
-
-				//MStreamUtils::stdOutStream() << "Transf Msg doesn't exists! Adding .... " << endl;
-				//transformInfoToSend.push_back(mTransfInfo);
-			}
-
-
-		}
-
-	}
-	*/
-
+	
 }
 
 // ==================================================================================
@@ -556,9 +368,8 @@ void GetMeshInfo(MFnMesh &mesh) {
 
 	MStatus result;
 
-	Color mColor = { 255, 255, 255, 255 };
-	Matrix matrixInfo = {};
 	MeshInfo mMeshInfo = {};
+	Color mColor	   = { 255, 255, 255, 255 };
 
 	// mesh information (vtx, UV, norm) ===========
 	MItMeshPolygon polyIterator(mesh.object(), &result);
@@ -651,6 +462,7 @@ void GetMeshInfo(MFnMesh &mesh) {
 					colorPlug = lambertShader.findPlug("color", &result);
 					if (result) {
 
+						/* 
 						// get material transperency
 						MPlug transp = lambertShader.findPlug("transparency", &result);
 						if (result) {
@@ -660,6 +472,7 @@ void GetMeshInfo(MFnMesh &mesh) {
 							transpAttr.getValue(transpClr.r);
 							transparency = transpClr.r;
 						}
+						*/
 
 						// get material color
 						MPlug colorAttr;
@@ -773,7 +586,6 @@ void GetMeshInfo(MFnMesh &mesh) {
 		meshUVs[j] = uvArray[j];
 	}
 
-
 	// fill msg to queue 
 	mMeshInfo.meshData.meshID    = index;
 	mMeshInfo.meshData.trisCount = totalTrisCnt;
@@ -782,8 +594,7 @@ void GetMeshInfo(MFnMesh &mesh) {
 	mMeshInfo.meshData.normalCount = normalArray.length();
 
 	mMeshInfo.meshName	   = mesh.name();
-	//mMeshInfo.meshPathName = mesh.fullPathName();
-
+	
 	// get transform matrix for new mesh
 	if (mMeshInfo.msgHeader.cmdType == CMDTYPE::NEW_NODE) {
 
@@ -796,31 +607,15 @@ void GetMeshInfo(MFnMesh &mesh) {
 		else 
 			transformationMatrix = mesh.transformationMatrix();
 		
+		float matFloat[4][4]; 	
+		transformationMatrix.get(matFloat); 
 
-		//row 1
-		matrixInfo.a11 = transformationMatrix(0, 0);
-		matrixInfo.a12 = transformationMatrix(1, 0);
-		matrixInfo.a13 = transformationMatrix(2, 0);
-		matrixInfo.a14 = transformationMatrix(3, 0);
+		mMeshInfo.transformMatrix = {  matFloat[0][0], matFloat[1][0], matFloat[2][0], matFloat[3][0],
+						matFloat[0][1], matFloat[1][1], matFloat[2][1], matFloat[3][1],
+						matFloat[0][2], matFloat[1][2], matFloat[2][2], matFloat[3][2],
+						matFloat[0][3], matFloat[1][3], matFloat[2][3], matFloat[3][3] };
 
-		//row 2
-		matrixInfo.a21 = transformationMatrix(0, 1);
-		matrixInfo.a22 = transformationMatrix(1, 1);
-		matrixInfo.a23 = transformationMatrix(2, 1);
-		matrixInfo.a24 = transformationMatrix(3, 1);
-
-		//row 3
-		matrixInfo.a31 = transformationMatrix(0, 2);
-		matrixInfo.a32 = transformationMatrix(1, 2);
-		matrixInfo.a33 = transformationMatrix(2, 2);
-		matrixInfo.a34 = transformationMatrix(3, 2);
-		//row 4
-		matrixInfo.a41 = transformationMatrix(0, 3);
-		matrixInfo.a42 = transformationMatrix(1, 3);
-		matrixInfo.a43 = transformationMatrix(2, 3);
-		matrixInfo.a44 = transformationMatrix(3, 3);
-
-		mMeshInfo.transformMatrix = matrixInfo;
+		
 	}
 
 	// Fill header ========
@@ -831,7 +626,6 @@ void GetMeshInfo(MFnMesh &mesh) {
 
 	else if (mMeshInfo.msgHeader.cmdType == CMDTYPE::UPDATE_NODE)
 		totalMsgSize = (sizeof(MsgHeader) + sizeof(Mesh) + (sizeof(float) * mMeshInfo.meshData.vtxCount * 3) + (sizeof(float) * mMeshInfo.meshData.normalCount * 3) + (sizeof(float) * mMeshInfo.meshData.UVcount));
-
 
 	mMeshInfo.msgHeader.msgSize  = totalMsgSize;
 	mMeshInfo.msgHeader.nodeType = NODE_TYPE::MESH;
@@ -862,9 +656,6 @@ void GetMeshInfo(MFnMesh &mesh) {
 			memcpy((char*)meshInfoToSend[i].meshUVs,  meshUVs, (sizeof(float) * (mMeshInfo.meshData.UVcount)));
 			memcpy((char*)meshInfoToSend[i].meshVtx,  meshVtx, (sizeof(float) * (mMeshInfo.meshData.vtxCount * 3)));
 			memcpy((char*)meshInfoToSend[i].meshNrms, meshNormals, (sizeof(float) * mMeshInfo.meshData.normalCount * 3));
-
-			//meshInfoToSend[i].materialData	  = mMeshInfo.materialData;
-			//meshInfoToSend[i].transformMatrix = mMeshInfo.transformMatrix;
 
 			break;
 		}
@@ -1114,6 +905,7 @@ void MaterialChanged(MFnMesh &mesh) {
 						colorPlug = lambertShader.findPlug("color", &result);
 						if (result) {
 
+							/* 
 							// check transparency
 							MPlug transp = lambertShader.findPlug("transparency", &result);
 							if (result) {
@@ -1123,6 +915,7 @@ void MaterialChanged(MFnMesh &mesh) {
 								transpAttr.getValue(transpClr.r);
 								transparency = transpClr.r;
 							}
+							*/
 
 							// get the color 
 							MPlug colorAttr;
@@ -1351,7 +1144,7 @@ void meshWorldMatrixChanged(MObject &transformNode, MDagMessage::MatrixModifiedF
 	MItDag dagIterator(MItDag::kDepthFirst, MFn::kTransform, &status);
 	dagIterator.reset(transformNode);
 
-	MStreamUtils::stdOutStream() << " =================== " << endl;
+	//MStreamUtils::stdOutStream() << " =================== " << endl;
 	for (; !dagIterator.isDone(); dagIterator.next()) {
 
 		// get path for selected node
@@ -1681,7 +1474,7 @@ void activeCamera(const MString &panelName, void* cliendData) {
 // ================================= LIGHT ==========================================
 // ==================================================================================
 
-/* 
+
 // get light information for when a light is created 
 void GetLightInfo(MFnPointLight &light) {
 
@@ -1784,6 +1577,7 @@ void lightAttributeChanged(MNodeMessage::AttributeMessage msg, MPlug& plug, MPlu
 		for (int i = 0; i < lightInScene.length(); i++) {
 			if (lightInScene[i] == lightNode.name()) {
 				lightIndex = i;
+				mLightInfo.msgHeader.cmdType = CMDTYPE::UPDATE_NODE;
 				break;
 			}
 		}
@@ -1794,11 +1588,7 @@ void lightAttributeChanged(MNodeMessage::AttributeMessage msg, MPlug& plug, MPlu
 			mLightInfo.msgHeader.cmdType = CMDTYPE::NEW_NODE;
 		}
 
-		else {
-			mLightInfo.msgHeader.cmdType = CMDTYPE::UPDATE_NODE;
-		}
-
-
+	
 		if (lightIndex >= 0 && msgToSend == true) {
 
 			// get color, intensity and pos
@@ -1834,7 +1624,7 @@ void lightAttributeChanged(MNodeMessage::AttributeMessage msg, MPlug& plug, MPlu
 		}
 	}
 }
-*/
+
 
 // ==================================================================================
 // ================================= OTHER ==========================================
@@ -1960,6 +1750,14 @@ void nodeNameChanged(MObject& node, const MString& str, void* clientData) {
 
 }
 
+/* 
+void nodeDuplicated(void* clientData) {
+
+
+	
+}
+*/
+
 // callback that goes through nodes that have been created and attatches callbacks
 void nodeAdded(MObject &node, void * clientData) {
 
@@ -1998,6 +1796,7 @@ void nodeAdded(MObject &node, void * clientData) {
 			if (status == MS::kSuccess)
 				callbackIdArray.append(tempID);
 
+
 		}
 
 	}
@@ -2022,7 +1821,23 @@ void nodeAdded(MObject &node, void * clientData) {
 
 	}
 
-	/* 
+	// if the node has kLambert attributes it is a lambert
+	if (node.hasFn(MFn::kLambert)) {
+
+		MObject lambertShader(node);
+
+		// add callback for when an attribute has been changed on the material node
+		tempID = MNodeMessage::addAttributeChangedCallback(lambertShader, materialAttributeChanged, NULL, &status);
+		if (Result == MS::kSuccess)
+			callbackIdArray.append(tempID);
+
+		// add callback for when material name has changed
+		tempID = MNodeMessage::addNameChangedCallback(node, nodeNameChanged, NULL, &status);
+		if (status == MS::kSuccess)
+			callbackIdArray.append(tempID);
+
+	}
+
 	// if the node has kPointLight attributes it is a pointLight
 	if (node.hasFn(MFn::kPointLight)) {
 		
@@ -2048,25 +1863,7 @@ void nodeAdded(MObject &node, void * clientData) {
 			callbackIdArray.append(tempID);
 
 	}
-	*/
-
-	// if the node has kLambert attributes it is a lambert
-	if (node.hasFn(MFn::kLambert)) {
-
-		MObject lambertShader(node);
-
-		// add callback for when an attribute has been changed on the material node
-		tempID = MNodeMessage::addAttributeChangedCallback(lambertShader, materialAttributeChanged, NULL, &status);
-		if (Result == MS::kSuccess)
-			callbackIdArray.append(tempID);
-
-		// add callback for when material name has changed
-		tempID = MNodeMessage::addNameChangedCallback(node, nodeNameChanged, NULL, &status);
-		if (status == MS::kSuccess)
-			callbackIdArray.append(tempID);
-
-	}
-
+	
 }
 
 // callback that goes through nodes that have been deleted
@@ -2114,7 +1911,6 @@ void nodeDeleted(MObject &node, void *clientData) {
 		for (int i = 0; i < materialsInScene.length(); i++) {
 			if (materialsInScene[i] == materialNode.name()) {
 				index = i;
-
 				break;
 			}
 		}
@@ -2139,6 +1935,39 @@ void nodeDeleted(MObject &node, void *clientData) {
 
 	}
 	
+	else if (node.hasFn(MFn::kPointLight)) {
+
+		MFnPointLight lightNode(node);
+		std::string lightName = lightNode.name().asChar();
+
+		int index = -1;
+		for (int i = 0; i < lightInScene.length(); i++) {
+			if (lightInScene[i] == lightNode.name()) {
+				index = i;
+				break;
+			}
+		}
+
+		if (index >= 0) {
+			
+			size_t totalMsgSize = (sizeof(MsgHeader));
+
+			deleteInfo.msgHeader.msgSize  = totalMsgSize;
+			deleteInfo.msgHeader.nodeType = NODE_TYPE::LIGHT;
+			deleteInfo.msgHeader.nameLen  = lightName.length();
+			deleteInfo.msgHeader.cmdType  = CMDTYPE::DELETE_NODE;
+			memcpy(deleteInfo.msgHeader.objName, lightName.c_str(), deleteInfo.msgHeader.nameLen);
+
+			deleteInfo.nodeIndex = index;
+			deleteInfo.nodeName  = lightNode.name();
+
+			lightInScene.remove(index);
+			nodeDeleteInfoToSend.push_back(deleteInfo);
+		}
+
+	}
+
+
 
 	/* 
 	else if (node.hasFn(MFn::kCamera)) {
@@ -2181,38 +2010,7 @@ void nodeDeleted(MObject &node, void *clientData) {
 		}
 	}
 
-	else if (node.hasFn(MFn::kPointLight)) {
-
-		MFnPointLight lightNode(node);
-		std::string lightName = lightNode.name().asChar();
-
-		int index = -1;
-		for (int i = 0; i < lightInScene.length(); i++) {
-			if (lightInScene[i] == lightNode.name()) {
-				index = i;
-				deleteInfo.msgHeader.cmdType = CMDTYPE::DELETE_NODE;
-				break;
-			}
-		}
-
-		if (index >= 0) {
-			/* 
-			size_t totalMsgSize = (sizeof(MsgHeader));
-
-			deleteInfo.msgHeader.msgSize  = totalMsgSize;
-			deleteInfo.msgHeader.nodeType = NODE_TYPE::LIGHT;
-			deleteInfo.msgHeader.nameLen  = lightName.length();
-			memcpy(deleteInfo.msgHeader.objName, lightName.c_str(), deleteInfo.msgHeader.nameLen);
-
-			deleteInfo.nodeIndex = index;
-			deleteInfo.nodeName  = lightNode.name();
-			
-
-			lightInScene.remove(index);
-			//nodeDeleteInfoToSend.push_back(deleteInfo);
-		}
-
-	}
+	
 	*/
 
 	callbackIdArray.remove(MNodeMessage::currentCallbackId());
@@ -2232,7 +2030,7 @@ void timerCallback(float elapsedTime, float lastTime, void* clientData) {
 	*/
 	globalTime += elapsedTime;
 
-
+	// send all matrix related messages
 	for (int i = 0; i < matrixInfoToSend.size(); i++) {
 
 		const char* msgChar = new char[matrixInfoToSend[i].msgHeader.msgSize];
@@ -2250,6 +2048,7 @@ void timerCallback(float elapsedTime, float lastTime, void* clientData) {
 
 	}
 
+	// send all messages with mesh information
 	for (int i = 0; i < meshInfoToSend.size(); i++) {
 
 
@@ -2312,6 +2111,7 @@ void timerCallback(float elapsedTime, float lastTime, void* clientData) {
 
 	}
 
+	// send all messages with material infromation
 	for (int i = 0; i < materialInfoToSend.size(); i++) {
 
 		const char* msgChar = new char[materialInfoToSend[i].msgHeader.msgSize];
@@ -2329,6 +2129,7 @@ void timerCallback(float elapsedTime, float lastTime, void* clientData) {
 		materialInfoToSend.erase(materialInfoToSend.begin() + i);
 	}
 
+	// send all messages with rename information
 	for (int i = 0; i < nodeRenamedInfoToSend.size(); i++) {
 
 		const char* msgChar = new char[nodeRenamedInfoToSend[i].msgHeader.msgSize];
@@ -2346,6 +2147,7 @@ void timerCallback(float elapsedTime, float lastTime, void* clientData) {
 		nodeRenamedInfoToSend.erase(nodeRenamedInfoToSend.begin() + i);
 	}
 		
+	// send all messages with delete information
 	for (int i = 0; i < nodeDeleteInfoToSend.size(); i++) {
 
 		//int index = nodeDeleteInfoToSend[i].nodeIndex; 
@@ -2383,7 +2185,7 @@ void timerCallback(float elapsedTime, float lastTime, void* clientData) {
 	*/
 
 	
-	/*
+	// send all light information
 	for (int i = 0; i < lightInfoToSend.size(); i++) {
 
 		const char* msgChar = new char[lightInfoToSend[i].msgHeader.msgSize];
@@ -2401,7 +2203,7 @@ void timerCallback(float elapsedTime, float lastTime, void* clientData) {
 		lightInfoToSend.erase(lightInfoToSend.begin() + i);
 
 	}
-	*/
+	
 
 }
 
@@ -2456,7 +2258,7 @@ void InitializeScene() {
 		cameraIterator.next();
 	}
 
-	/* 
+	
 	MItDependencyNodes lightIterator(MFn::kPointLight);
 	while (!lightIterator.isDone()) {
 
@@ -2473,12 +2275,7 @@ void InitializeScene() {
 
 		lightIterator.next();
 	}
-	*/
-
-
-
-	// camera callbacks initialized for all the view panels 
-
+	
 
 	// callbacks for all the 4 model panels used for camera 
 	tempID = MUiMessage::add3dViewPostRenderMsgCallback("modelPanel1", activeCamera, NULL, &status);

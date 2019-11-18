@@ -15,11 +15,13 @@
 #include "comLib.h"
 #pragma comment(lib, "Project1.lib")
 ComLib comLib("shaderMemory", 50, CONSUMER);
+size_t oldBuffSize = 50; 
 
 #include <Windows.h>
+
 // ==================================================================================
 
-void recvFromMaya(char* buffer, std::map<CMDTYPE, FnPtr> functionMap, std::vector<modelFromMaya>& modelArray, std::vector<lightFromMaya>& lightsArray, std::vector<cameraFromMaya>& cameraArray, std::vector<materialMaya>& materialArray, Shader shader, int* index, std::vector<Texture2D> &textureArr);
+void recvFromMaya(std::map<CMDTYPE, FnPtr> functionMap, std::vector<modelFromMaya>& modelArray, std::vector<lightFromMaya>& lightsArray, std::vector<cameraFromMaya>& cameraArray, std::vector<materialMaya>& materialArray, int* index, std::vector<Texture2D> &textureArr, std::vector<Shader> &shaderArr);
 
 // ==================================================================================
 // ==================================================================================
@@ -31,12 +33,12 @@ int main() {
 	SetTraceLog(LOG_WARNING);
 
 	// vectors with objects from Maya ====== 
+	std::vector<Shader> shaderArray; 
 	std::vector<Texture2D> textureArray;
 	std::vector<modelFromMaya> modelArray;
 	std::vector<lightFromMaya> lightsArray;
 	std::vector<cameraFromMaya> cameraArray;
 	std::vector<materialMaya> materialArray;
-
 
 	// create a light ====== 
 	lightFromMaya tempLight   = {};
@@ -45,7 +47,7 @@ int main() {
 	tempLight.lightPos		  = { 0,4,0 };
 	tempLight.color			  = { 1 * 255, 1 * 255, 1 * 255, 1 * 255 };
 	memcpy(tempLight.lightName, "light", tempLight.lightNameLen);
-	lightsArray.push_back(tempLight);
+	//lightsArray.push_back(tempLight);
 
 	// map specific commands to a specific function
 	std::map<CMDTYPE, FnPtr> funcMap;
@@ -59,7 +61,6 @@ int main() {
 	funcMap[UPDATE_MATRIX]		  = updateNodeMatrix;
 	funcMap[UPDATE_NODE_MATERIAL] = updateNodeMaterial; 
 
-	char* tempArray; 
 	int modelIndex  = 0;
 	/* 
 	// create a simple cube
@@ -140,10 +141,8 @@ int main() {
 		BeginDrawing();
 
 		// Get the messages sent from maya
-		//tempArraySize = comLib.nextSize();
-		tempArray	  = new char[1];
-		recvFromMaya(tempArray, funcMap, modelArray, lightsArray, cameraArray, materialArray, shader1, &modelIndex, textureArray);
-		delete[] tempArray; 
+		recvFromMaya(funcMap, modelArray, lightsArray, cameraArray, materialArray, &modelIndex, textureArray, shaderArray);
+		
 
 		// set the camera
 		if (cameraArray.size() > 0) {
@@ -155,28 +154,8 @@ int main() {
 			camera.target	= cameraArray[0].forward;
 		}
 		
-		// draw the light
-		DrawSphere(tempLight.lightPos, 0.1, tempLight.color);
-		SetShaderValue(shader1, lightLoc, Vector3ToFloat(tempLight.lightPos), 1);
-
-		/* 
-		// draw lights from maya
-		for (int i = 0; i < lightsArray.size(); i++) {
-			std::cout << lightsArray[i].lightName << std::endl; 
-			std::cout << lightsArray[i].intensityRadius << std::endl;
-
-			DrawSphere(lightsArray[i].lightPos, lightsArray[i].intensityRadius, lightsArray[i].color);
-			SetShaderValue(shader1, lightLoc, Vector3ToFloat(lightsArray[i].lightPos), 1);
-
-
-			Vector3 lightPos2 = lightsArray[i].lightPos; 
-			int lightLoc2 = GetShaderLocation(shader1, "lightPos");
-			SetShaderValue(shader1, lightLoc2, Vector3ToFloat(lightsArray[i].lightPos), 1);
-
-		}
-		*/
-
 		ClearBackground(RAYWHITE);
+
 
 		/* 
 		if (IsKeyPressed(KEY_D))
@@ -201,11 +180,30 @@ int main() {
 
 		BeginMode3D(camera);
 
+		// draw the light
+		DrawSphere(tempLight.lightPos, 0.1, tempLight.color);
+		SetShaderValue(shader1, lightLoc, Vector3ToFloat(tempLight.lightPos), 1);
+
+		// draw lights from maya
+		for (int i = 0; i < lightsArray.size(); i++) {
+			DrawSphere(lightsArray[i].lightPos, 0.1, lightsArray[i].color);
+
+			/* 
+			for (int j = 0; j < shaderArray.size(); j++) {
+				int lightLocTemp = GetShaderLocation(shaderArray[j], "lightPos");
+				SetShaderValue(shaderArray[j], lightLocTemp, Vector3ToFloat(lightsArray[i].lightPos), 1);
+			}
+			*/
+
+		}
+
 		// draw models from maya
 		for (int i = 0; i < modelArray.size(); i++) {
 			
 			auto m = modelArray[i];
 			auto l = GetShaderLocation(m.model.material.shader, "model");
+
+			//int modelLocTemp = GetShaderLocation(shaderArray[i], "model");
 			SetShaderValueMatrix(m.model.material.shader, modelLoc, m.modelMatrix);
 
 			//Color finalColor = { (lightsArray[0].color.r + m.color.r),(lightsArray[0].color.g + m.color.g),(lightsArray[0].color.b + m.color.b),(lightsArray[0].color.a + m.color.a) };
@@ -216,6 +214,7 @@ int main() {
 		DrawGrid(10, 1.0f);     // Draw a grid
 		EndMode3D();
 
+		// draw text
 		DrawTextRL("Maya API level editor", screenWidth - 120, screenHeight - 20, 10, GRAY);
 		DrawTextRL(FormatText("Camera position: (%.2f, %.2f, %.2f)", camera.position.x, camera.position.y, camera.position.z), 600, 20, 10, BLACK);
 		DrawTextRL(FormatText("Camera target: (%.2f, %.2f, %.2f)", camera.target.x, camera.target.y, camera.target.z), 600, 40, 10, GRAY);
@@ -225,17 +224,23 @@ int main() {
 	}
 
 	// De-Initialization
-	UnloadShader(shader1);       // Unload shader
-	UnloadTexture(texture1);     // Unload texture
+
+	// Unload shaders
+	UnloadShader(shader1);    
+	for (int i = 0; i < shaderArray.size(); i++)
+		UnloadShader(shaderArray[i]); 
 	
-	// unload textures added into array
+	// unload textures 
+	UnloadTexture(texture1);     
 	for (int i = 0; i < textureArray.size(); i++) 
 		UnloadTexture(textureArray[i]);
 	
-	// unload models added into array
-	for (int i = 0; i < modelArray.size(); i++) 
+	// unload models 
+	for (int i = 0; i < modelArray.size(); i++) {
+		UnloadShader(modelArray[i].model.material.shader);
 		UnloadModel(modelArray[i].model);
-	
+	}
+
 	
 	/* 
 	UnloadModel(model1);
@@ -252,15 +257,15 @@ int main() {
 // ==================================================================================
 // ================= FUNCTION TO REVIECE MSG FROM MAYA ==============================
 // ==================================================================================
-void recvFromMaya(char* buffer, std::map<CMDTYPE, FnPtr> functionMap, std::vector<modelFromMaya>& modelArray, std::vector<lightFromMaya>& lightsArray, std::vector<cameraFromMaya>& cameraArray, std::vector<materialMaya>& materialArray, Shader shader, int* index, std::vector<Texture2D> &textureArr) {
+void recvFromMaya(std::map<CMDTYPE, FnPtr> functionMap, std::vector<modelFromMaya>& modelArray, std::vector<lightFromMaya>& lightsArray, std::vector<cameraFromMaya>& cameraArray, std::vector<materialMaya>& materialArray, int* index, std::vector<Texture2D> &textureArr, std::vector<Shader> &shaderArr) {
 
+	char* buffer; 
 	MsgHeader msgHeader = {}; 
 	msgHeader.cmdType   = CMDTYPE::DEFAULT;
 
 	size_t nr = comLib.nextSize();
-	size_t oldBuffSize = nr;
-
 	buffer = new char[oldBuffSize];
+
 	if (nr > oldBuffSize) {
 		delete[] buffer;
 		buffer = new char[nr];
@@ -271,7 +276,7 @@ void recvFromMaya(char* buffer, std::map<CMDTYPE, FnPtr> functionMap, std::vecto
 	if (comLib.recv(buffer, nr)) {
 
 		memcpy((char*)&msgHeader, buffer, sizeof(MsgHeader));
-		functionMap[msgHeader.cmdType](msgHeader, modelArray, lightsArray, cameraArray, materialArray, buffer, shader, index, textureArr);
+		functionMap[msgHeader.cmdType](msgHeader, modelArray, lightsArray, cameraArray, materialArray, buffer, index, textureArr, shaderArr);
 	}
 
 	delete[] buffer; 
