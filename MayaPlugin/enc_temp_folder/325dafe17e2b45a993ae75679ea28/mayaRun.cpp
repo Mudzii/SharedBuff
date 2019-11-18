@@ -193,7 +193,6 @@ void materialAttributeChanged(MNodeMessage::AttributeMessage msg, MPlug& plug, M
 
 		if (result) {
 
-
 			/* 
 			// get material transparency
 			transp = lambertShader.findPlug("transparency", &result);
