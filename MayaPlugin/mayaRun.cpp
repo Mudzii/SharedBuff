@@ -45,7 +45,6 @@ std::vector<NodeRenamedInfo> nodeRenamedInfoToSend;
 
 //std::vector<CameraInfo> cameraInfoToSend;
 //std::vector<TransformInfo> transformInfoToSend;
-
 // ==================================================================================
 // ============================== MATERIAL ==========================================
 // ==================================================================================
