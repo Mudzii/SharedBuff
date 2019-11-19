@@ -21,7 +21,7 @@ size_t oldBuffSize = 50;
 
 // ==================================================================================
 
-void recvFromMaya(std::map<CMDTYPE, FnPtr> functionMap, std::vector<modelFromMaya>& modelArray, std::vector<lightFromMaya>& lightsArray, std::vector<cameraFromMaya>& cameraArray, std::vector<materialMaya>& materialArray, int* index, std::vector<Texture2D> &textureArr, std::vector<Shader> &shaderArr);
+void recvFromMaya(std::map<CMDTYPE, FnPtr> functionMap, std::vector<modelFromMaya>& modelArray, std::vector<lightFromMaya>& lightsArray, std::vector<cameraFromMaya>& cameraArray, std::vector<materialFromMaya>& materialArray);
 
 // ==================================================================================
 // ==================================================================================
@@ -33,12 +33,10 @@ int main() {
 	SetTraceLog(LOG_WARNING);
 
 	// vectors with objects from Maya ====== 
-	std::vector<Shader> shaderArray; 
-	std::vector<Texture2D> textureArray;
 	std::vector<modelFromMaya> modelArray;
 	std::vector<lightFromMaya> lightsArray;
 	std::vector<cameraFromMaya> cameraArray;
-	std::vector<materialMaya> materialArray;
+	std::vector<materialFromMaya> materialArray;
 
 	// create a light ====== 
 	lightFromMaya tempLight   = {};
@@ -61,8 +59,8 @@ int main() {
 	funcMap[UPDATE_MATRIX]		  = updateNodeMatrix;
 	funcMap[UPDATE_NODE_MATERIAL] = updateNodeMaterial; 
 
-	int modelIndex  = 0;
 	/* 
+	int modelIndex  = 0;
 	// create a simple cube
 	//Model cube;
 	//int nrOfObj		= 0;
@@ -110,6 +108,7 @@ int main() {
 		"resources/shaders/glsl330/phong.fs");   // Load model shader
 	material1.shader = shader1;
 
+
 	/* 
 	Mesh mesh1   = LoadMesh("resources/models/watermill.obj");
 	Model model1 = LoadModelFromMesh(mesh1);
@@ -141,7 +140,7 @@ int main() {
 		BeginDrawing();
 
 		// Get the messages sent from maya
-		recvFromMaya(funcMap, modelArray, lightsArray, cameraArray, materialArray, &modelIndex, textureArray, shaderArray);
+		recvFromMaya(funcMap, modelArray, lightsArray, cameraArray, materialArray);
 		
 
 		// set the camera
@@ -214,7 +213,7 @@ int main() {
 		DrawGrid(10, 1.0f);     // Draw a grid
 		EndMode3D();
 
-		// draw text
+		// write text 
 		DrawTextRL("Maya API level editor", screenWidth - 120, screenHeight - 20, 10, GRAY);
 		DrawTextRL(FormatText("Camera position: (%.2f, %.2f, %.2f)", camera.position.x, camera.position.y, camera.position.z), 600, 20, 10, BLACK);
 		DrawTextRL(FormatText("Camera target: (%.2f, %.2f, %.2f)", camera.target.x, camera.target.y, camera.target.z), 600, 40, 10, GRAY);
@@ -225,15 +224,15 @@ int main() {
 
 	// De-Initialization
 
-	// Unload shaders
-	UnloadShader(shader1);    
-	for (int i = 0; i < shaderArray.size(); i++)
-		UnloadShader(shaderArray[i]); 
-	
-	// unload textures 
-	UnloadTexture(texture1);     
-	for (int i = 0; i < textureArray.size(); i++) 
-		UnloadTexture(textureArray[i]);
+	// Unload shaders + textures
+	UnloadShader(shader1); 
+	for (int i = 0; i < materialArray.size(); i++) {
+
+		UnloadShader(materialArray[i].matShader);
+
+		if(materialArray[i].type == 1)
+			UnloadTexture(materialArray[i].matTexture);
+	}
 	
 	// unload models 
 	for (int i = 0; i < modelArray.size(); i++) {
@@ -257,7 +256,7 @@ int main() {
 // ==================================================================================
 // ================= FUNCTION TO REVIECE MSG FROM MAYA ==============================
 // ==================================================================================
-void recvFromMaya(std::map<CMDTYPE, FnPtr> functionMap, std::vector<modelFromMaya>& modelArray, std::vector<lightFromMaya>& lightsArray, std::vector<cameraFromMaya>& cameraArray, std::vector<materialMaya>& materialArray, int* index, std::vector<Texture2D> &textureArr, std::vector<Shader> &shaderArr) {
+void recvFromMaya(std::map<CMDTYPE, FnPtr> functionMap, std::vector<modelFromMaya>& modelArray, std::vector<lightFromMaya>& lightsArray, std::vector<cameraFromMaya>& cameraArray, std::vector<materialFromMaya>& materialArray) {
 
 	char* buffer; 
 	MsgHeader msgHeader = {}; 
@@ -276,7 +275,7 @@ void recvFromMaya(std::map<CMDTYPE, FnPtr> functionMap, std::vector<modelFromMay
 	if (comLib.recv(buffer, nr)) {
 
 		memcpy((char*)&msgHeader, buffer, sizeof(MsgHeader));
-		functionMap[msgHeader.cmdType](msgHeader, modelArray, lightsArray, cameraArray, materialArray, buffer, index, textureArr, shaderArr);
+		functionMap[msgHeader.cmdType](msgHeader, modelArray, lightsArray, cameraArray, materialArray, buffer);
 	}
 
 	delete[] buffer; 

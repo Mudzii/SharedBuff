@@ -61,6 +61,18 @@ struct msgMesh {
 	char materialName[MAX_CHAR_LEN];
 };
 
+struct msgMaterial {
+	int type;		//color = 0, texture = 1 
+
+	int matNameLen;
+	char materialName[MAX_CHAR_LEN];
+
+	int textureNameLen;
+	char fileTextureName[MAX_CHAR_LEN];
+
+	Color color;
+};
+
 // Structs for RayLib ===============
 struct modelPos {
 	Model model;
@@ -110,25 +122,14 @@ struct modelFromMaya {
 	std::string materialName;
 };
 
-struct materialMaya {
-	int type;		//color = 0, texture = 1 
-
-	int matNameLen;
-	char materialName[MAX_CHAR_LEN];
-
-	int textureNameLen;
-	char fileTextureName[MAX_CHAR_LEN];
-
-	Color color;
-};
-
 struct materialFromMaya {
-	int type; 
-	std::string materialName; 
+	int type;
+	std::string materialName;
 	std::string texturePath;
 
-	Color matColor; 
-	Shader matShader; 
+	Color matColor;
+	Shader matShader;
+	Texture2D matTexture; 
 };
 
 struct transformFromMaya {
@@ -139,25 +140,21 @@ struct transformFromMaya {
 	int childNameLen;
 };
 
+void addNode(MsgHeader &msgHeader, std::vector<modelFromMaya>& modelArray, std::vector<lightFromMaya>& lightsArray, std::vector<cameraFromMaya>& cameraArray, std::vector<materialFromMaya>& materialArray, char* buffer);
+void updateNode(MsgHeader &msgHeader, std::vector<modelFromMaya>& modelArray, std::vector<lightFromMaya>& lightsArray, std::vector<cameraFromMaya>& cameraArray, std::vector<materialFromMaya>& materialArray, char* buffer);
+void deleteNode(MsgHeader &msgHeader, std::vector<modelFromMaya>& modelArray, std::vector<lightFromMaya>& lightsArray, std::vector<cameraFromMaya>& cameraArray, std::vector<materialFromMaya>& materialArray, char* buffer);
+void updateNodeName(MsgHeader &msgHeader, std::vector<modelFromMaya>& modelArray, std::vector<lightFromMaya>& lightsArray, std::vector<cameraFromMaya>& cameraArray, std::vector<materialFromMaya>& materialArray, char* buffer);
+void updateNodeMatrix(MsgHeader &msgHeader, std::vector<modelFromMaya>& modelArray, std::vector<lightFromMaya>& lightsArray, std::vector<cameraFromMaya>& cameraArray, std::vector<materialFromMaya>& materialArray, char* buffer);
+void updateNodeMaterial(MsgHeader &msgHeader, std::vector<modelFromMaya>& modelArray, std::vector<lightFromMaya>& lightsArray, std::vector<cameraFromMaya>& cameraArray, std::vector<materialFromMaya>& materialArray, char* buffer);
 
-void addNode(MsgHeader &msgHeader, std::vector<modelFromMaya>& modelArray, std::vector<lightFromMaya>& lightsArray, std::vector<cameraFromMaya>& cameraArray, std::vector<materialMaya>& materialArray, char* buffer, int* index, std::vector<Texture2D> &textureArr, std::vector<Shader> &shaderArr);
-void updateNode(MsgHeader &msgHeader, std::vector<modelFromMaya>& modelArray, std::vector<lightFromMaya>& lightsArray, std::vector<cameraFromMaya>& cameraArray, std::vector<materialMaya>& materialArray, char* buffer, int* index, std::vector<Texture2D> &textureArr, std::vector<Shader> &shaderArr);
-void deleteNode(MsgHeader &msgHeader, std::vector<modelFromMaya>& modelArray, std::vector<lightFromMaya>& lightsArray, std::vector<cameraFromMaya>& cameraArray, std::vector<materialMaya>& materialArray, char* buffer, int* index, std::vector<Texture2D> &textureArr, std::vector<Shader> &shaderArr);
-void updateNodeName(MsgHeader &msgHeader, std::vector<modelFromMaya>& modelArray, std::vector<lightFromMaya>& lightsArray, std::vector<cameraFromMaya>& cameraArray, std::vector<materialMaya>& materialArray, char* buffer, int* index, std::vector<Texture2D> &textureArr, std::vector<Shader> &shaderArr);
-void updateNodeMatrix(MsgHeader &msgHeader, std::vector<modelFromMaya>& modelArray, std::vector<lightFromMaya>& lightsArray, std::vector<cameraFromMaya>& cameraArray, std::vector<materialMaya>& materialArray, char* buffer, int* index, std::vector<Texture2D> &textureArr, std::vector<Shader> &shaderArr);
-void updateNodeMaterial(MsgHeader &msgHeader, std::vector<modelFromMaya>& modelArray, std::vector<lightFromMaya>& lightsArray, std::vector<cameraFromMaya>& cameraArray, std::vector<materialMaya>& materialArray, char* buffer, int* index, std::vector<Texture2D> &textureArrr, std::vector<Shader> &shaderArr);
-
-void newMaterial(MsgHeader &msgHeader,std::vector<modelFromMaya>& modelArray, std::vector<lightFromMaya>& lightsArray, std::vector<cameraFromMaya>& cameraArray, std::vector<materialMaya>& materialArray, char* buffer, int* index, std::vector<Texture2D> &textureArr, std::vector<Shader> &shaderArr);
-void updateMaterial(MsgHeader &msgHeader,std::vector<modelFromMaya>& modelArray, std::vector<lightFromMaya>& lightsArray, std::vector<cameraFromMaya>& cameraArray, std::vector<materialMaya>& materialArray, char* buffer, int* index, std::vector<Texture2D> &textureArr, std::vector<Shader> &shaderArr);
+void newMaterial(MsgHeader &msgHeader, std::vector<modelFromMaya>& modelArray, std::vector<lightFromMaya>& lightsArray, std::vector<cameraFromMaya>& cameraArray, std::vector<materialFromMaya>& materialArray, char* buffer);
+void updateMaterial(MsgHeader &msgHeader, std::vector<modelFromMaya>& modelArray, std::vector<lightFromMaya>& lightsArray, std::vector<cameraFromMaya>& cameraArray, std::vector<materialFromMaya>& materialArray, char* buffer);
 
 
-typedef void(*FnPtr)(MsgHeader&, std::vector<modelFromMaya>&, std::vector<lightFromMaya>&, std::vector<cameraFromMaya>&, std::vector<materialMaya>&, char*, int*, std::vector<Texture2D>&, std::vector<Shader>&);
+typedef void(*FnPtr)(MsgHeader&, std::vector<modelFromMaya>&, std::vector<lightFromMaya>&, std::vector<cameraFromMaya>&, std::vector<materialFromMaya>&, char*);
 
 int findMesh(std::vector<modelFromMaya>& modelArr, std::string MeshName);
-int findMaterial(std::vector<materialMaya>& matArr, std::string MatName);
-
-
-void createModel(); 
+int findMaterial(std::vector<materialFromMaya>& matArr, std::string MatName);
 
 
 #endif
