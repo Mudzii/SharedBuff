@@ -69,6 +69,11 @@ struct MsgHeader {
 	int nameLen;
 };
 
+struct messageType {
+	CMDTYPE	cmdType;
+	int msgNr; 
+};
+
 // ===========================================================
 
 struct Mesh {
@@ -128,6 +133,8 @@ struct NodeRenamed {
 	int nodeOldNameLen;
 	char nodeOldName[MAX_CHAR_LEN];
 };
+
+
 
 // ===========================================================
 // ========== STRUCTS USED TO QUEUE MESSAGES =================
@@ -194,6 +201,14 @@ struct MatrixInfo {
 	Matrix matrixData; 
 };
 
+
+
+struct NodeInfo {
+	MsgHeader msgHeader;
+
+	MeshInfo newMesh;
+	MaterialInfo newMaterial;
+};
 
 // ===========================================================
 // ===================== MSG SIZES ===========================

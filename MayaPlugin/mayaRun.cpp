@@ -25,8 +25,7 @@ bool initBool = false;
 
 MTimer gTimer;
 float globalTime = 0.0f;
-float timerPeriod = 0.1f;
-
+float timerPeriod = 0.3f;
 
 // arrays with info in scene
 Vec3 camPosScene;
@@ -43,8 +42,14 @@ std::vector<MaterialInfo> materialInfoToSend;
 std::vector<NodeDeletedInfo> nodeDeleteInfoToSend;
 std::vector<NodeRenamedInfo> nodeRenamedInfoToSend;
 
+
+//std::vector<NodeInfo> newNodeInfo; 
+//std::vector<NodeInfo> updateNodeInfo;
+
+
 //std::vector<CameraInfo> cameraInfoToSend;
 //std::vector<TransformInfo> transformInfoToSend;
+
 // ==================================================================================
 // ============================== MATERIAL ==========================================
 // ==================================================================================
@@ -1164,6 +1169,10 @@ void meshWorldMatrixChanged(MObject &transformNode, MDagMessage::MatrixModifiedF
 			float matFloat[4][4]; 
 			meshMatrix.get(matFloat); 
 
+			//MStreamUtils::stdOutStream() << " ------------------------- " << endl;
+			//MStreamUtils::stdOutStream() << "meshNode: " << meshNode.name() << endl;
+
+
 			mMatrixInfo.nodeName = meshNode.name(); 
 
 			mMatrixInfo.matrixData = {  matFloat[0][0], matFloat[1][0], matFloat[2][0], matFloat[3][0],
@@ -1177,16 +1186,22 @@ void meshWorldMatrixChanged(MObject &transformNode, MDagMessage::MatrixModifiedF
 			mMatrixInfo.msgHeader.cmdType = CMDTYPE::UPDATE_MATRIX;
 			mMatrixInfo.msgHeader.nameLen = meshNode.name().length();
 			memcpy(mMatrixInfo.msgHeader.objName, meshNode.name().asChar(), mMatrixInfo.msgHeader.nameLen);
-		
+
 			bool msgExists = false;
+			
 			for (int i = 0; i < matrixInfoToSend.size(); i++) {
 				if (matrixInfoToSend[i].nodeName == meshNode.name()) {
+					//MStreamUtils::stdOutStream() << "msg exists. Changing...."  << endl;
+
 					msgExists = true;
 					matrixInfoToSend[i] = mMatrixInfo;
 				}
 			}
+			
 
 			if (!msgExists) {
+				//MStreamUtils::stdOutStream() << "msg doesn't exists. Adding..." << endl;
+
 				matrixInfoToSend.push_back(mMatrixInfo);
 			}
 		}
@@ -1433,38 +1448,51 @@ void activeCamera(const MString &panelName, void* cliendData) {
 
 	if (updateCam) {
 		//Camera cameraInfo = {};
-		//MsgHeader msgHeader;
+		Camera camData; 
+		MsgHeader msgHeader;
+		messageType msgType = {CMDTYPE::UPDATE_NODE, 1}; 
 
 		// fill camInfo struct
-		CameraInfo mCamInfo = {};
-		mCamInfo.camData.fov = FOV;
-		mCamInfo.camData.type = isOrtographic;
+		//CameraInfo mCamInfo = {};
+		camData.fov  = FOV;
+		camData.type = isOrtographic;
 
-		mCamInfo.camData.pos = { (float)camPos.x, (float)camPos.y, (float)camPos.z };
-		mCamInfo.camData.up = { (float)upDir.x, (float)upDir.y, (float)upDir.z };
-		mCamInfo.camData.forward = { (float)COI.x, (float)COI.y, (float)COI.z };
-
-
-		mCamInfo.msgHeader.nameLen = objName.length();
-		mCamInfo.msgHeader.nodeType = NODE_TYPE::CAMERA;
-		mCamInfo.msgHeader.msgSize = totalMsgSizeCamera;
-		mCamInfo.msgHeader.msgSize = totalMsgSizeCamera;
-		mCamInfo.msgHeader.cmdType = CMDTYPE::UPDATE_NODE;
-		memcpy(mCamInfo.msgHeader.objName, objName.c_str(), objName.length());
+		camData.forward = { (float)COI.x, (float)COI.y, (float)COI.z };
+		camData.up		= { (float)upDir.x, (float)upDir.y, (float)upDir.z };
+		camData.pos		= { (float)camPos.x, (float)camPos.y, (float)camPos.z };
 
 
-		const char* msg = new char[totalMsgSizeCamera];
+		msgHeader.nameLen = objName.length();
+		msgHeader.msgSize = totalMsgSizeCamera;
+		msgHeader.nodeType = NODE_TYPE::CAMERA;
+		msgHeader.cmdType = CMDTYPE::UPDATE_NODE;
+		memcpy(msgHeader.objName, objName.c_str(), objName.length());
 
+		/* 
+		MStreamUtils::stdOutStream() << "\n"; 
+		MStreamUtils::stdOutStream() << " =============================== \n";
+		MStreamUtils::stdOutStream() << "isOrtographic: " << isOrtographic << "\n";
+		MStreamUtils::stdOutStream() << "upDir: " << camData.up.x << " " << camData.up.y << " " << camData.up.z << "\n";
+		MStreamUtils::stdOutStream() << "pos: " << camData.pos.x << " " << camData.pos.y << " " << camData.pos.z << "\n";
+		
+		MStreamUtils::stdOutStream() << "Forward: " << camData.forward.x << " " << camData.forward.y << " " << camData.forward.z << "\n";
+		MStreamUtils::stdOutStream() << "COI: " << COI.x << " " << COI.y << " " << COI.z << "\n";
+		*/
+
+		size_t msgSize = sizeof(messageType) + totalMsgSizeCamera; 
+		const char* msg = new char[msgSize];
 		// copy over msg ======
-		memcpy((char*)msg, &mCamInfo.msgHeader, sizeof(MsgHeader));
-		memcpy((char*)msg + sizeof(MsgHeader), &mCamInfo.camData, sizeof(Camera));
+		memcpy((char*)msg, &msgType, sizeof(messageType));
+		memcpy((char*)msg + sizeof(messageType), &msgHeader, sizeof(MsgHeader));
+		memcpy((char*)msg + sizeof(messageType) + sizeof(MsgHeader), &camData, sizeof(Camera));
 
 		//send it
-		if (comLib.send(msg, totalMsgSizeCamera)) {
+		if (comLib.send(msg, msgSize)) {
 			//MStreamUtils::stdOutStream() << "activeCamera: Message sent" << "\n";
 		}
 
 		delete[]msg;
+		camPosScene = camData.pos;
 	}
 	
 
@@ -1624,7 +1652,6 @@ void lightAttributeChanged(MNodeMessage::AttributeMessage msg, MPlug& plug, MPlu
 		}
 	}
 }
-
 
 // ==================================================================================
 // ================================= OTHER ==========================================
@@ -2031,137 +2058,231 @@ void timerCallback(float elapsedTime, float lastTime, void* clientData) {
 	globalTime += elapsedTime;
 
 	// send all matrix related messages
-	for (int i = 0; i < matrixInfoToSend.size(); i++) {
+	int matrixMsgLen = matrixInfoToSend.size(); 
+	if (matrixMsgLen > 0) {
+			
+		messageType msgType = { CMDTYPE::UPDATE_MATRIX , matrixMsgLen };
+		size_t totalMsgSize = sizeof(messageType) + totalMsgSizeMatrix * matrixMsgLen;
 
-		const char* msgChar = new char[matrixInfoToSend[i].msgHeader.msgSize];
+		const char* msgChar = new char[totalMsgSize];
+		memcpy((char*)msgChar, &msgType, sizeof(messageType));
 
-		memcpy((char*)msgChar, &matrixInfoToSend[i].msgHeader, sizeof(MsgHeader));
-		memcpy((char*)msgChar + sizeof(MsgHeader), &matrixInfoToSend[i].matrixData, sizeof(Matrix));
+		int msgOffset = 0; 
+		for (int i = matrixInfoToSend.size() - 1; i >= 0; i--) {
+
+			memcpy((char*)msgChar + sizeof(messageType) + (totalMsgSizeMatrix * msgOffset), &matrixInfoToSend[i].msgHeader, sizeof(MsgHeader));
+			memcpy((char*)msgChar + sizeof(messageType) + sizeof(MsgHeader) + (totalMsgSizeMatrix * msgOffset), &matrixInfoToSend[i].matrixData, sizeof(Matrix));
+
+			msgOffset += 1;
+			matrixInfoToSend.erase(matrixInfoToSend.begin() + i);
+		}
 
 		// send it
-		if (comLib.send(msgChar, matrixInfoToSend[i].msgHeader.msgSize)) {
+		if (comLib.send(msgChar, totalMsgSize)) {
 			//MStreamUtils::stdOutStream() << "matrixInfo: Message sent" << "\n";
 		}
 
 		delete[] msgChar;
-		matrixInfoToSend.erase(matrixInfoToSend.begin() + i);
+	}
+
+	// send all messages with material infromation
+	int matInfoSize = materialInfoToSend.size(); 
+	if (matInfoSize > 0) {
+
+		for (int i = materialInfoToSend.size() - 1; i >= 0; i--) {
+
+			MStreamUtils::stdOutStream() << "=================== \n";
+
+			messageType msgType = { CMDTYPE::UPDATE_MATERIAL, 1};
+			if (materialInfoToSend[i].msgHeader.cmdType == CMDTYPE::NEW_MATERIAL) {
+				msgType.cmdType = CMDTYPE::NEW_MATERIAL; 
+			}
+
+			
+
+
+			size_t totalMsgSize = sizeof(messageType) + totalMsgSizeMaterial;
+			const char* msgChar = new char[totalMsgSize];
+
+			memcpy((char*)msgChar, &msgType, sizeof(messageType));
+			memcpy((char*)msgChar + sizeof(messageType), &materialInfoToSend[i].msgHeader, sizeof(MsgHeader));
+			memcpy((char*)msgChar + sizeof(messageType) + sizeof(MsgHeader), &materialInfoToSend[i].materialData, sizeof(Material));
+
+			
+			// send it
+			if (comLib.send(msgChar, totalMsgSize)) {
+				//MStreamUtils::stdOutStream() << "matInfo: Message sent" << "\n";
+			}
+
+			delete[] msgChar;
+			materialInfoToSend.erase(materialInfoToSend.begin() + i);
+		}
 
 	}
 
 	// send all messages with mesh information
-	for (int i = 0; i < meshInfoToSend.size(); i++) {
+	int meshMsgSize = meshInfoToSend.size(); 
+	if (meshMsgSize > 0) {
+
+		for (int i = meshInfoToSend.size() - 1; i >= 0; i--) {
 
 
-		if (meshInfoToSend[i].msgHeader.cmdType == CMDTYPE::NEW_NODE || meshInfoToSend[i].msgHeader.cmdType == CMDTYPE::UPDATE_NODE) {
+			if (meshInfoToSend[i].msgHeader.cmdType == CMDTYPE::UPDATE_NODE) {
 
-			const char* msgChar = new char[meshInfoToSend[i].msgHeader.msgSize];
+				messageType msgType = { CMDTYPE::UPDATE_NODE, 1 };
 
-			//MStreamUtils::stdOutStream() << "=======================================\n";
+				size_t totalMsgSize = sizeof(messageType) + meshInfoToSend[i].msgHeader.msgSize;
+				const char* msgChar = new char[totalMsgSize];
 
-			//MStreamUtils::stdOutStream() << "meshInfoToSend[i].msgHeader.cmdType " << meshInfoToSend[i].msgHeader.cmdType << " for " << meshInfoToSend[i].meshName << "\n";
+				// copy over msg ======
+				memcpy((char*)msgChar, &msgType, sizeof(messageType));
 
-			// copy over msg ======
-			memcpy((char*)msgChar, &meshInfoToSend[i].msgHeader, sizeof(MsgHeader));
-			memcpy((char*)msgChar + sizeof(MsgHeader), &meshInfoToSend[i].meshData, sizeof(Mesh));
+				memcpy((char*)msgChar + sizeof(messageType), &meshInfoToSend[i].msgHeader, sizeof(MsgHeader));
+				memcpy((char*)msgChar + sizeof(messageType) + sizeof(MsgHeader), &meshInfoToSend[i].meshData, sizeof(Mesh));
 
-			memcpy((char*)msgChar + sizeof(MsgHeader) + sizeof(Mesh), meshInfoToSend[i].meshVtx, (sizeof(float) * meshInfoToSend[i].meshData.vtxCount * 3));
-			memcpy((char*)msgChar + sizeof(MsgHeader) + sizeof(Mesh) + (sizeof(float) * meshInfoToSend[i].meshData.vtxCount * 3), meshInfoToSend[i].meshNrms, (sizeof(float) * meshInfoToSend[i].meshData.normalCount * 3));
-			memcpy((char*)msgChar + sizeof(MsgHeader) + sizeof(Mesh) + (sizeof(float) * meshInfoToSend[i].meshData.vtxCount * 3) + (sizeof(float) * meshInfoToSend[i].meshData.normalCount * 3), meshInfoToSend[i].meshUVs, sizeof(float) * meshInfoToSend[i].meshData.UVcount);
+				memcpy((char*)msgChar + sizeof(messageType) + sizeof(MsgHeader) + sizeof(Mesh), meshInfoToSend[i].meshVtx, (sizeof(float) * meshInfoToSend[i].meshData.vtxCount * 3));
+				memcpy((char*)msgChar + sizeof(messageType) + sizeof(MsgHeader) + sizeof(Mesh) + (sizeof(float) * meshInfoToSend[i].meshData.vtxCount * 3), meshInfoToSend[i].meshNrms, (sizeof(float) * meshInfoToSend[i].meshData.normalCount * 3));
+				memcpy((char*)msgChar + sizeof(messageType) + sizeof(MsgHeader) + sizeof(Mesh) + (sizeof(float) * meshInfoToSend[i].meshData.vtxCount * 3) + (sizeof(float) * meshInfoToSend[i].meshData.normalCount * 3), meshInfoToSend[i].meshUVs, sizeof(float) * meshInfoToSend[i].meshData.UVcount);
+
+				//send it
+				if (comLib.send(msgChar, meshInfoToSend[i].msgHeader.msgSize)) {
+					//MStreamUtils::stdOutStream() << "meshInfoToSend: Message new/update node sent" << "\n";
+				}
+
+				//MStreamUtils::stdOutStream() << "=======================================\n";
+
+				// delete allocated arrays + message
+				delete[] msgChar;
+				delete[] meshInfoToSend[i].meshVtx;
+				delete[] meshInfoToSend[i].meshUVs;
+				delete[] meshInfoToSend[i].meshNrms;
+
+			}
 
 			if (meshInfoToSend[i].msgHeader.cmdType == CMDTYPE::NEW_NODE) {
-				memcpy((char*)msgChar + sizeof(MsgHeader) + sizeof(Mesh) + (sizeof(float) * meshInfoToSend[i].meshData.vtxCount * 3) + (sizeof(float) * meshInfoToSend[i].meshData.normalCount * 3) + (sizeof(float) * meshInfoToSend[i].meshData.UVcount), &meshInfoToSend[i].materialData, sizeof(Material));
-				memcpy((char*)msgChar + sizeof(MsgHeader) + sizeof(Mesh) + (sizeof(float) * meshInfoToSend[i].meshData.vtxCount * 3) + (sizeof(float) * meshInfoToSend[i].meshData.normalCount * 3) + (sizeof(float) * meshInfoToSend[i].meshData.UVcount) + sizeof(Material), &meshInfoToSend[i].transformMatrix, sizeof(Matrix));
+
+				messageType msgType = { CMDTYPE::NEW_NODE, 1};
+
+				size_t totalMsgSize = sizeof(messageType) + meshInfoToSend[i].msgHeader.msgSize; 
+				const char* msgChar = new char[totalMsgSize];
+
+				// copy over msg ======
+				memcpy((char*)msgChar, &msgType, sizeof(messageType));
+
+				memcpy((char*)msgChar + sizeof(messageType), &meshInfoToSend[i].msgHeader, sizeof(MsgHeader));
+				memcpy((char*)msgChar + sizeof(messageType) + sizeof(MsgHeader), &meshInfoToSend[i].meshData, sizeof(Mesh));
+
+				memcpy((char*)msgChar + sizeof(messageType) + sizeof(MsgHeader) + sizeof(Mesh), meshInfoToSend[i].meshVtx, (sizeof(float) * meshInfoToSend[i].meshData.vtxCount * 3));
+				memcpy((char*)msgChar + sizeof(messageType) + sizeof(MsgHeader) + sizeof(Mesh) + (sizeof(float) * meshInfoToSend[i].meshData.vtxCount * 3), meshInfoToSend[i].meshNrms, (sizeof(float) * meshInfoToSend[i].meshData.normalCount * 3));
+				memcpy((char*)msgChar + sizeof(messageType) + sizeof(MsgHeader) + sizeof(Mesh) + (sizeof(float) * meshInfoToSend[i].meshData.vtxCount * 3) + (sizeof(float) * meshInfoToSend[i].meshData.normalCount * 3), meshInfoToSend[i].meshUVs, sizeof(float) * meshInfoToSend[i].meshData.UVcount);
+
+				memcpy((char*)msgChar + sizeof(messageType) + sizeof(MsgHeader) + sizeof(Mesh) + (sizeof(float) * meshInfoToSend[i].meshData.vtxCount * 3) + (sizeof(float) * meshInfoToSend[i].meshData.normalCount * 3) + (sizeof(float) * meshInfoToSend[i].meshData.UVcount), &meshInfoToSend[i].materialData, sizeof(Material));
+				memcpy((char*)msgChar + sizeof(messageType) + sizeof(MsgHeader) + sizeof(Mesh) + (sizeof(float) * meshInfoToSend[i].meshData.vtxCount * 3) + (sizeof(float) * meshInfoToSend[i].meshData.normalCount * 3) + (sizeof(float) * meshInfoToSend[i].meshData.UVcount) + sizeof(Material), &meshInfoToSend[i].transformMatrix, sizeof(Matrix));
+				
+
+				//send it
+				if (comLib.send(msgChar, meshInfoToSend[i].msgHeader.msgSize)) {
+					//MStreamUtils::stdOutStream() << "meshInfoToSend: Message new/update node sent" << "\n";
+				}
+
+				//MStreamUtils::stdOutStream() << "=======================================\n";
+
+				// delete allocated arrays + message
+				delete[] msgChar;
+				delete[] meshInfoToSend[i].meshVtx;
+				delete[] meshInfoToSend[i].meshUVs;
+				delete[] meshInfoToSend[i].meshNrms;
+
+			}
+
+			else if (meshInfoToSend[i].msgHeader.cmdType == CMDTYPE::UPDATE_NODE_MATERIAL) {
+
+				messageType msgType = { CMDTYPE::UPDATE_NODE_MATERIAL, 1 };
+
+				size_t totMsgSize = sizeof(messageType) + meshInfoToSend[i].msgHeader.msgSize; 
+				const char* msgChar = new char[totMsgSize];
+
+
+				// copy over msg ======
+				memcpy((char*)msgChar, &msgType, sizeof(messageType));
+				memcpy((char*)msgChar + sizeof(messageType), &meshInfoToSend[i].msgHeader, sizeof(MsgHeader));
+				memcpy((char*)msgChar + sizeof(messageType) + sizeof(MsgHeader), &meshInfoToSend[i].meshData, sizeof(Mesh));
+				memcpy((char*)msgChar + sizeof(messageType) + sizeof(MsgHeader) + sizeof(Mesh), &meshInfoToSend[i].materialData, sizeof(Material));
+
+				
+				//send it
+				if (comLib.send(msgChar, totMsgSize)) {
+					//MStreamUtils::stdOutStream() << "meshInfoToSend: Update material on node sent" << "\n";
+				}
+
+				delete[] msgChar;
 			}
 
 
-			//send it
-			if (comLib.send(msgChar, meshInfoToSend[i].msgHeader.msgSize)) {
-				//MStreamUtils::stdOutStream() << "meshInfoToSend: Message new/update node sent" << "\n";
-			}
-
-			//MStreamUtils::stdOutStream() << "=======================================\n";
-
-			// delete allocated arrays + message
-			delete[] msgChar;
-			delete[] meshInfoToSend[i].meshVtx;
-			delete[] meshInfoToSend[i].meshUVs;
-			delete[] meshInfoToSend[i].meshNrms;
+			meshInfoToSend.erase(meshInfoToSend.begin() + i);
 
 		}
-
-		else if (meshInfoToSend[i].msgHeader.cmdType == CMDTYPE::UPDATE_NODE_MATERIAL) {
-
-			const char* msgChar = new char[meshInfoToSend[i].msgHeader.msgSize];
-
-			// copy over msg ======
-			memcpy((char*)msgChar, &meshInfoToSend[i].msgHeader, sizeof(MsgHeader));
-			memcpy((char*)msgChar + sizeof(MsgHeader), &meshInfoToSend[i].meshData, sizeof(Mesh));
-			memcpy((char*)msgChar + sizeof(MsgHeader) + sizeof(Mesh), &meshInfoToSend[i].materialData, sizeof(Material));
-
-			//send it
-			if (comLib.send(msgChar, meshInfoToSend[i].msgHeader.msgSize)) {
-				//MStreamUtils::stdOutStream() << "meshInfoToSend: Update material on node sent" << "\n";
-			}
-
-			delete[] msgChar;
-		}
-
-
-		meshInfoToSend.erase(meshInfoToSend.begin() + i);
 
 	}
 
-	// send all messages with material infromation
-	for (int i = 0; i < materialInfoToSend.size(); i++) {
-
-		const char* msgChar = new char[materialInfoToSend[i].msgHeader.msgSize];
-
-		memcpy((char*)msgChar, &materialInfoToSend[i].msgHeader, sizeof(MsgHeader));
-		memcpy((char*)msgChar + sizeof(MsgHeader), &materialInfoToSend[i].materialData, sizeof(Material));
-
-
-		// send it
-		if (comLib.send(msgChar, materialInfoToSend[i].msgHeader.msgSize)) {
-			MStreamUtils::stdOutStream() << "matInfo: Message sent" << "\n";
-		}
-
-		delete[] msgChar;
-		materialInfoToSend.erase(materialInfoToSend.begin() + i);
-	}
 
 	// send all messages with rename information
-	for (int i = 0; i < nodeRenamedInfoToSend.size(); i++) {
+	int renameMsgSize = nodeRenamedInfoToSend.size();
+	if (renameMsgSize > 0) {
 
-		const char* msgChar = new char[nodeRenamedInfoToSend[i].msgHeader.msgSize];
+		messageType msgType = { CMDTYPE::UPDATE_NAME, renameMsgSize };
+		size_t totalMsgSize = sizeof(messageType) + totalMsgSizeRenamed * renameMsgSize;
 
-		memcpy((char*)msgChar, &nodeRenamedInfoToSend[i].msgHeader, sizeof(MsgHeader));
-		memcpy((char*)msgChar + sizeof(MsgHeader), &nodeRenamedInfoToSend[i].renamedInfo, sizeof(NodeRenamed));
+		const char* msgChar = new char[totalMsgSize];
+		memcpy((char*)msgChar, &msgType, sizeof(messageType));
+
+		int msgOffset = 0; 
+		for (int i = 0; i < nodeRenamedInfoToSend.size(); i++) {
+
+
+			memcpy((char*)msgChar + sizeof(messageType) + (totalMsgSizeRenamed * msgOffset), &nodeRenamedInfoToSend[i].msgHeader, sizeof(MsgHeader));
+			memcpy((char*)msgChar + sizeof(messageType) + sizeof(MsgHeader) + (totalMsgSizeRenamed * msgOffset), &nodeRenamedInfoToSend[i].renamedInfo, sizeof(NodeRenamed));
+
+
+			msgOffset++; 
+			nodeRenamedInfoToSend.erase(nodeRenamedInfoToSend.begin() + i);
+		}
 
 		//send it
-		if (comLib.send(msgChar, nodeRenamedInfoToSend[i].msgHeader.msgSize)) {
+		if (comLib.send(msgChar, totalMsgSize)) {
 			//MStreamUtils::stdOutStream() << "nodeRenamed: Message sent" << "\n";
 		}
 
-
 		delete[]msgChar;
-		nodeRenamedInfoToSend.erase(nodeRenamedInfoToSend.begin() + i);
 	}
 		
 	// send all messages with delete information
-	for (int i = 0; i < nodeDeleteInfoToSend.size(); i++) {
+	int deleteMsgSize = nodeDeleteInfoToSend.size(); 
+	if (deleteMsgSize > 0) {
 
-		//int index = nodeDeleteInfoToSend[i].nodeIndex; 
-		const char* msgChar = new char[nodeDeleteInfoToSend[i].msgHeader.msgSize];
-		memcpy((char*)msgChar, &nodeDeleteInfoToSend[i].msgHeader, sizeof(MsgHeader));
+		messageType msgType = { CMDTYPE::DELETE_NODE, deleteMsgSize };
+		size_t totalMsgSize = sizeof(messageType) + sizeof(MsgHeader) * deleteMsgSize;
 
-		if (comLib.send(msgChar, nodeDeleteInfoToSend[i].msgHeader.msgSize)) {
-			MStreamUtils::stdOutStream() << "nodeDeleted: Message sent for " << nodeDeleteInfoToSend[i].nodeName << "\n";
+		const char* msgChar = new char[totalMsgSize];
+		memcpy((char*)msgChar, &msgType, sizeof(messageType));
+
+		MStreamUtils::stdOutStream() << "deleteMsgSize " << deleteMsgSize << "\n";
+
+		int msgOffset = 0;
+		for (int i = nodeDeleteInfoToSend.size() - 1; i >= 0; i--) {
+
+			MStreamUtils::stdOutStream() << "MEEESH " << nodeDeleteInfoToSend[i].nodeName << "\n";
+
+			memcpy((char*)msgChar + sizeof(messageType) + (sizeof(MsgHeader) * msgOffset), &nodeDeleteInfoToSend[i].msgHeader, sizeof(MsgHeader));
+
+			msgOffset++; 
+			nodeDeleteInfoToSend.erase(nodeDeleteInfoToSend.begin() + i);
 		}
 
+		if (comLib.send(msgChar, totalMsgSize)) {
+			//MStreamUtils::stdOutStream() << "nodeDeleted: Message sent for " << nodeDeleteInfoToSend[i].nodeName << "\n";
+		}
 		delete[] msgChar;
-		nodeDeleteInfoToSend.erase(nodeDeleteInfoToSend.begin() + i);
-
-		
 	}
 
 	/* 
@@ -2186,21 +2307,32 @@ void timerCallback(float elapsedTime, float lastTime, void* clientData) {
 
 	
 	// send all light information
-	for (int i = 0; i < lightInfoToSend.size(); i++) {
+	int lightMsgSize = lightInfoToSend.size();
+	if (lightMsgSize > 0) {
 
-		const char* msgChar = new char[lightInfoToSend[i].msgHeader.msgSize];
 
-		memcpy((char*)msgChar, &lightInfoToSend[i].msgHeader, sizeof(MsgHeader));
-		memcpy((char*)msgChar + sizeof(MsgHeader), &lightInfoToSend[i].lightData, sizeof(Light));
+		for (int i = 0; i < lightInfoToSend.size(); i++) {
 
-		//send it
-		if (comLib.send(msgChar, lightInfoToSend[i].msgHeader.msgSize)) {
-			//MStreamUtils::stdOutStream() << "light: Message sent" << "\n";
+			messageType msgType = { CMDTYPE::UPDATE_NODE, 1 };
+			if (lightInfoToSend[i].msgHeader.cmdType == CMDTYPE::NEW_NODE)
+				msgType.cmdType = CMDTYPE::NEW_NODE;
+
+			size_t totalMsgSize = sizeof(messageType) + totalMsgSizeLight ;
+			const char* msgChar = new char[totalMsgSize];
+			memcpy((char*)msgChar, &lightMsgSize, sizeof(int));
+
+			memcpy((char*)msgChar + sizeof(messageType), &lightInfoToSend[i].msgHeader, sizeof(MsgHeader));
+			memcpy((char*)msgChar + sizeof(messageType) + sizeof(MsgHeader), &lightInfoToSend[i].lightData, sizeof(Light));
+
+			//send it
+			if (comLib.send(msgChar, totalMsgSize)) {
+				//MStreamUtils::stdOutStream() << "light: Message sent" << "\n";
+			}
+		
+			delete[] msgChar;
+			lightInfoToSend.erase(lightInfoToSend.begin() + i);
+
 		}
-
-
-		delete[] msgChar;
-		lightInfoToSend.erase(lightInfoToSend.begin() + i);
 
 	}
 	

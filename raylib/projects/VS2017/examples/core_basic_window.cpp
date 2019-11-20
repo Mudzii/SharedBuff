@@ -109,13 +109,13 @@ int main() {
 	material1.shader = shader1;
 
 
-	/* 
+	
 	Mesh mesh1   = LoadMesh("resources/models/watermill.obj");
 	Model model1 = LoadModelFromMesh(mesh1);
 	model1.material = material1;                     // Set shader effect to 3d model
 
 	unsigned char colors[12] = { 255, 0, 0, 255, 0, 255, 0, 255, 0, 0, 255, 255 };
-	*/
+	
 
 	//std::cout << "-----------------" << std::endl;
 	Vector3 position = { 0.0f, 0.0f, 0.0f };     // Set model position
@@ -137,11 +137,12 @@ int main() {
 		//----------------------------------------------------------------------------------
 		// Draw
 		//----------------------------------------------------------------------------------
-		BeginDrawing();
-
+		
 		// Get the messages sent from maya
 		recvFromMaya(funcMap, modelArray, lightsArray, cameraArray, materialArray);
 		
+		BeginDrawing();
+
 
 		// set the camera
 		if (cameraArray.size() > 0) {
@@ -183,33 +184,43 @@ int main() {
 		DrawSphere(tempLight.lightPos, 0.1, tempLight.color);
 		SetShaderValue(shader1, lightLoc, Vector3ToFloat(tempLight.lightPos), 1);
 
+		/* 
+
 		// draw lights from maya
 		for (int i = 0; i < lightsArray.size(); i++) {
 			DrawSphere(lightsArray[i].lightPos, 0.1, lightsArray[i].color);
 
-			/* 
+			
 			for (int j = 0; j < shaderArray.size(); j++) {
 				int lightLocTemp = GetShaderLocation(shaderArray[j], "lightPos");
 				SetShaderValue(shaderArray[j], lightLocTemp, Vector3ToFloat(lightsArray[i].lightPos), 1);
 			}
-			*/
+		
 
 		}
-
+		*/
+			
+		
 		// draw models from maya
 		for (int i = 0; i < modelArray.size(); i++) {
 			
+
 			auto m = modelArray[i];
 			auto l = GetShaderLocation(m.model.material.shader, "model");
 
-			//int modelLocTemp = GetShaderLocation(shaderArray[i], "model");
-			SetShaderValueMatrix(m.model.material.shader, modelLoc, m.modelMatrix);
+			int modelLocTemp = GetShaderLocation(m.model.material.shader, "model");
+			SetShaderValueMatrix(m.model.material.shader, modelLocTemp, m.modelMatrix);
 
 			//Color finalColor = { (lightsArray[0].color.r + m.color.r),(lightsArray[0].color.g + m.color.g),(lightsArray[0].color.b + m.color.b),(lightsArray[0].color.a + m.color.a) };
-			Color finalColor = { ( m.color.r),(m.color.g),(m.color.b),(m.color.a) };
+			Color finalColor = { m.color.r, m.color.g, m.color.b, m.color.a};
+			
+			//std::cout << "NAME: " << modelArray[i].name << std::endl; 
+			
 			DrawModel(m.model, {}, 1.0, finalColor);
 		}
+
 		
+
 		DrawGrid(10, 1.0f);     // Draw a grid
 		EndMode3D();
 
@@ -256,11 +267,11 @@ int main() {
 // ==================================================================================
 // ================= FUNCTION TO REVIECE MSG FROM MAYA ==============================
 // ==================================================================================
+
 void recvFromMaya(std::map<CMDTYPE, FnPtr> functionMap, std::vector<modelFromMaya>& modelArray, std::vector<lightFromMaya>& lightsArray, std::vector<cameraFromMaya>& cameraArray, std::vector<materialFromMaya>& materialArray) {
 
 	char* buffer; 
-	MsgHeader msgHeader = {}; 
-	msgHeader.cmdType   = CMDTYPE::DEFAULT;
+	messageType msgType = {}; 
 
 	size_t nr = comLib.nextSize();
 	buffer = new char[oldBuffSize];
@@ -274,8 +285,19 @@ void recvFromMaya(std::map<CMDTYPE, FnPtr> functionMap, std::vector<modelFromMay
 	// get message from Maya ======
 	if (comLib.recv(buffer, nr)) {
 
-		memcpy((char*)&msgHeader, buffer, sizeof(MsgHeader));
-		functionMap[msgHeader.cmdType](msgHeader, modelArray, lightsArray, cameraArray, materialArray, buffer);
+		memcpy((char*)&msgType, buffer, sizeof(messageType));
+
+		//std::cout << "MSG TYPE " << msgType.cmdType << std::endl; 
+		
+
+		if (msgType.cmdType > 1000 && msgType.msgNr > 0) {
+			functionMap[msgType.cmdType](msgType.msgNr, modelArray, lightsArray, cameraArray, materialArray, buffer);
+		}
+
+
+		//memcpy((char*)&msgHeader + (sizeof(MsgHeader), buffer + sizeof(int), sizeof(MsgHeader));
+		//functionMap[msgHeader.cmdType](msgHeader, modelArray, lightsArray, cameraArray, materialArray, buffer);
+
 	}
 
 	delete[] buffer; 
