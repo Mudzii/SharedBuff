@@ -282,6 +282,7 @@ void recvFromMaya(std::map<CMDTYPE, FnPtr> functionMap, std::vector<modelFromMay
 		oldBuffSize = nr;
 	}
 
+
 	// get message from Maya ======
 	if (comLib.recv(buffer, nr)) {
 
