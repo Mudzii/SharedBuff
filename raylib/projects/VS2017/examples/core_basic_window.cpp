@@ -42,10 +42,10 @@ int main() {
 	lightFromMaya tempLight   = {};
 	tempLight.lightNameLen    = 5; 
 	tempLight.intensityRadius = 0.1;
-	tempLight.lightPos		  = { 0,4,0 };
+	tempLight.lightPos		  = { 0,0,0 };
 	tempLight.color			  = { 1 * 255, 1 * 255, 1 * 255, 1 * 255 };
 	memcpy(tempLight.lightName, "light", tempLight.lightNameLen);
-	//lightsArray.push_back(tempLight);
+	
 
 	// map specific commands to a specific function
 	std::map<CMDTYPE, FnPtr> funcMap;
@@ -53,12 +53,13 @@ int main() {
 	funcMap[NEW_NODE]			  = addNode; 
 	funcMap[UPDATE_NODE]		  = updateNode;
 	funcMap[DELETE_NODE]		  = deleteNode;
-	funcMap[NEW_MATERIAL]	      = newMaterial;
+	funcMap[UPDATE_CAMERA]		  = updateCamera;
 	funcMap[UPDATE_NAME]		  = updateNodeName;
-	funcMap[UPDATE_MATERIAL]      = updateMaterial;
 	funcMap[UPDATE_MATRIX]		  = updateNodeMatrix;
-	funcMap[UPDATE_NODE_MATERIAL] = updateNodeMaterial; 
 
+	//funcMap[NEW_MATERIAL]	      = newMaterial;
+	//funcMap[UPDATE_MATERIAL]      = updateMaterial;
+	//funcMap[UPDATE_NODE_MATERIAL] = updateNodeMaterial; 
 	/* 
 	int modelIndex  = 0;
 	// create a simple cube
@@ -96,6 +97,9 @@ int main() {
 	tempCamera.forward = { 0.0f, 1.0f, -1.0f };
 	cameraArray.push_back(tempCamera);
 
+	Shader shader1 = LoadShader("resources/shaders/glsl330/phong.vs", "resources/shaders/glsl330/phong.fs");  
+
+	/* 
 	// real models rendered each frame
 	std::vector<modelPos> flatScene;
 
@@ -104,17 +108,15 @@ int main() {
 	Texture2D texture1 = LoadTexture("resources/models/watermill_diffuse.png");
 	material1.maps[MAP_DIFFUSE].texture = texture1;
 
-	Shader shader1 = LoadShader("resources/shaders/glsl330/phong.vs",
-		"resources/shaders/glsl330/phong.fs");   // Load model shader
 	material1.shader = shader1;
 
 
-	
 	Mesh mesh1   = LoadMesh("resources/models/watermill.obj");
 	Model model1 = LoadModelFromMesh(mesh1);
 	model1.material = material1;                     // Set shader effect to 3d model
 
 	unsigned char colors[12] = { 255, 0, 0, 255, 0, 255, 0, 255, 0, 0, 255, 255 };
+	*/
 	
 
 	//std::cout << "-----------------" << std::endl;
@@ -122,9 +124,9 @@ int main() {
 	SetCameraMode(camera, CAMERA_FREE);          // Set an orbital camera mode
 	SetTargetFPS(140);                           // Set our game to run at 60 frames-per-second
 	
-	int modelLoc = GetShaderLocation(shader1, "model");
-	int viewLoc  = GetShaderLocation(shader1, "view");
-	int projLoc  = GetShaderLocation(shader1, "projection");
+	//int modelLoc = GetShaderLocation(shader1, "model");
+	//int viewLoc  = GetShaderLocation(shader1, "view");
+	//int projLoc  = GetShaderLocation(shader1, "projection");
 	int lightLoc = GetShaderLocation(shader1, "lightPos");
 
 	// MAIN GAME LOOP =====================================
@@ -178,6 +180,8 @@ int main() {
 
 		*/
 
+
+		// To draw objects, add them after this line
 		BeginMode3D(camera);
 
 		// draw the light
@@ -211,11 +215,8 @@ int main() {
 			int modelLocTemp = GetShaderLocation(m.model.material.shader, "model");
 			SetShaderValueMatrix(m.model.material.shader, modelLocTemp, m.modelMatrix);
 
-			//Color finalColor = { (lightsArray[0].color.r + m.color.r),(lightsArray[0].color.g + m.color.g),(lightsArray[0].color.b + m.color.b),(lightsArray[0].color.a + m.color.a) };
-			Color finalColor = { m.color.r, m.color.g, m.color.b, m.color.a};
 			
-			//std::cout << "NAME: " << modelArray[i].name << std::endl; 
-			
+			Color finalColor = { m.color.r, m.color.g, m.color.b, m.color.a }; 
 			DrawModel(m.model, {}, 1.0, finalColor);
 		}
 
@@ -288,17 +289,9 @@ void recvFromMaya(std::map<CMDTYPE, FnPtr> functionMap, std::vector<modelFromMay
 
 		memcpy((char*)&msgType, buffer, sizeof(messageType));
 
-		//std::cout << "MSG TYPE " << msgType.cmdType << std::endl; 
-		
-
 		if (msgType.cmdType > 1000 && msgType.msgNr > 0) {
 			functionMap[msgType.cmdType](msgType.msgNr, modelArray, lightsArray, cameraArray, materialArray, buffer);
 		}
-
-
-		//memcpy((char*)&msgHeader + (sizeof(MsgHeader), buffer + sizeof(int), sizeof(MsgHeader));
-		//functionMap[msgHeader.cmdType](msgHeader, modelArray, lightsArray, cameraArray, materialArray, buffer);
-
 	}
 
 	delete[] buffer; 

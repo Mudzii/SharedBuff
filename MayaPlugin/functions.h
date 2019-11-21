@@ -38,26 +38,28 @@ enum NODE_TYPE {
 	MESH,
 	LIGHT,
 	CAMERA,
-	MATERIAL
+	MATERIAL,
+	MESH_MATERIAL
 };
 
 // what kind of command is sent 
 enum CMDTYPE {
-	DEFAULT			 = 1000,
+	DEFAULT = 1000,
 
-	NEW_NODE	     = 1001,
-	UPDATE_NODE      = 1002,
+	NEW_NODE	= 1001,
+	UPDATE_NODE = 1002,
 
-	UPDATE_MATRIX    = 1003,
-	UPDATE_NAME      = 1004,
+	UPDATE_MATRIX = 1003,
+	UPDATE_NAME   = 1004,
 
-	NEW_MATERIAL     = 1005,
-	UPDATE_MATERIAL  = 1006,
+	//NEW_MATERIAL    = 1005,
+	//UPDATE_MATERIAL = 1006,
 
-	DELETE_NODE      = 1007,
-	TRANSFORM_UPDATE = 1008,
+	DELETE_NODE			= 1007,
+	//TRANSFORM_UPDATE	= 1008,
 
-	UPDATE_NODE_MATERIAL = 1009
+	//UPDATE_NODE_MATERIAL = 1009,
+	UPDATE_CAMERA		 = 1010
 };
 
 // header for message that are sent
@@ -141,7 +143,7 @@ struct NodeRenamed {
 // ===========================================================
 
 struct MeshInfo {
-	MsgHeader msgHeader; 
+	//MsgHeader msgHeader; 
 
 	MString meshName; 
 	//MString meshPathName;
@@ -166,7 +168,7 @@ struct LightInfo {
 };
 
 struct MaterialInfo {
-	MsgHeader msgHeader;
+	//MsgHeader msgHeader;
 	MString matName; 
 	Material materialData; 
 };
@@ -206,8 +208,8 @@ struct MatrixInfo {
 struct NodeInfo {
 	MsgHeader msgHeader;
 
-	MeshInfo newMesh;
-	MaterialInfo newMaterial;
+	MeshInfo mesh;
+	MaterialInfo material;
 };
 
 // ===========================================================

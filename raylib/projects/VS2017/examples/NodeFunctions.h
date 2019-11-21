@@ -20,7 +20,8 @@ enum NODE_TYPE {
 	MESH,
 	LIGHT,
 	CAMERA,
-	MATERIAL
+	MATERIAL,
+	MESH_MATERIAL
 };
 
 enum CMDTYPE {
@@ -32,13 +33,14 @@ enum CMDTYPE {
 	UPDATE_MATRIX = 1003,
 	UPDATE_NAME = 1004,
 
-	NEW_MATERIAL = 1005,
-	UPDATE_MATERIAL = 1006,
+	//NEW_MATERIAL = 1005,
+	//UPDATE_MATERIAL = 1006,
 
 	DELETE_NODE = 1007,
-	TRANSFORM_UPDATE = 1008,
+	//TRANSFORM_UPDATE = 1008,
 
-	UPDATE_NODE_MATERIAL = 1009
+	//UPDATE_NODE_MATERIAL = 1009,
+	UPDATE_CAMERA = 1010
 };
 
 struct MsgHeader {
@@ -145,6 +147,9 @@ struct transformFromMaya {
 	int childNameLen;
 };
 
+void updateCamera(int nrMsg, std::vector<modelFromMaya>& modelArray, std::vector<lightFromMaya>& lightsArray, std::vector<cameraFromMaya>& cameraArray, std::vector<materialFromMaya>& materialArray, char* buffer);
+
+
 void addNode(int nrMsg, std::vector<modelFromMaya>& modelArray, std::vector<lightFromMaya>& lightsArray, std::vector<cameraFromMaya>& cameraArray, std::vector<materialFromMaya>& materialArray, char* buffer);
 void updateNode(int nrMsg, std::vector<modelFromMaya>& modelArray, std::vector<lightFromMaya>& lightsArray, std::vector<cameraFromMaya>& cameraArray, std::vector<materialFromMaya>& materialArray, char* buffer);
 void deleteNode(int nrMsg, std::vector<modelFromMaya>& modelArray, std::vector<lightFromMaya>& lightsArray, std::vector<cameraFromMaya>& cameraArray, std::vector<materialFromMaya>& materialArray, char* buffer);
@@ -154,6 +159,7 @@ void updateNodeMaterial(int nrMsg, std::vector<modelFromMaya>& modelArray, std::
 
 void newMaterial(int nrMsg, std::vector<modelFromMaya>& modelArray, std::vector<lightFromMaya>& lightsArray, std::vector<cameraFromMaya>& cameraArray, std::vector<materialFromMaya>& materialArray, char* buffer);
 void updateMaterial(int nrMsg, std::vector<modelFromMaya>& modelArray, std::vector<lightFromMaya>& lightsArray, std::vector<cameraFromMaya>& cameraArray, std::vector<materialFromMaya>& materialArray, char* buffer);
+
 
 
 typedef void(*FnPtr)(int, std::vector<modelFromMaya>&, std::vector<lightFromMaya>&, std::vector<cameraFromMaya>&, std::vector<materialFromMaya>&, char*);
