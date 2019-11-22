@@ -34,9 +34,7 @@ struct Matrix {
 
 // NODE TYPE for what kind of node that is sent
 enum NODE_TYPE {
-	TRANSFORM,
 	MESH,
-	LIGHT,
 	CAMERA,
 	MATERIAL,
 	MESH_MATERIAL
@@ -48,23 +46,16 @@ enum CMDTYPE {
 
 	NEW_NODE	= 1001,
 	UPDATE_NODE = 1002,
+	
+	UPDATE_CAMERA = 1003,
+	UPDATE_MATRIX = 1004,
+	UPDATE_NAME   = 1005,
 
-	UPDATE_MATRIX = 1003,
-	UPDATE_NAME   = 1004,
-
-	//NEW_MATERIAL    = 1005,
-	//UPDATE_MATERIAL = 1006,
-
-	DELETE_NODE			= 1007,
-	//TRANSFORM_UPDATE	= 1008,
-
-	//UPDATE_NODE_MATERIAL = 1009,
-	UPDATE_CAMERA		 = 1010
+	DELETE_NODE	= 1006
 };
 
 // header for message that are sent
 struct MsgHeader {
-	//CMDTYPE	  cmdType;
 	NODE_TYPE nodeType;
 	char objName[MAX_CHAR_LEN];
 	int msgSize;
@@ -168,7 +159,6 @@ struct LightInfo {
 };
 
 struct MaterialInfo {
-	//MsgHeader msgHeader;
 	MString matName; 
 	Material materialData; 
 };
@@ -202,7 +192,6 @@ struct MatrixInfo {
 	MsgHeader msgHeader;
 	Matrix matrixData; 
 };
-
 
 
 struct NodeInfo {

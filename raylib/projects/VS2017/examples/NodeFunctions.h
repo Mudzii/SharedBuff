@@ -16,9 +16,7 @@
 
 
 enum NODE_TYPE {
-	TRANSFORM,
 	MESH,
-	LIGHT,
 	CAMERA,
 	MATERIAL,
 	MESH_MATERIAL
@@ -27,24 +25,17 @@ enum NODE_TYPE {
 enum CMDTYPE {
 	DEFAULT = 1000,
 
-	NEW_NODE = 1001,
+	NEW_NODE	= 1001,
 	UPDATE_NODE = 1002,
 
-	UPDATE_MATRIX = 1003,
-	UPDATE_NAME = 1004,
+	UPDATE_CAMERA = 1003,
+	UPDATE_MATRIX = 1004,
+	UPDATE_NAME   = 1005,
 
-	//NEW_MATERIAL = 1005,
-	//UPDATE_MATERIAL = 1006,
-
-	DELETE_NODE = 1007,
-	//TRANSFORM_UPDATE = 1008,
-
-	//UPDATE_NODE_MATERIAL = 1009,
-	UPDATE_CAMERA = 1010
+	DELETE_NODE = 1006
 };
 
 struct MsgHeader {
-	//CMDTYPE   cmdType;
 	NODE_TYPE nodeType;
 	char objName[64];
 	int msgSize;
@@ -155,11 +146,11 @@ void updateNode(int nrMsg, std::vector<modelFromMaya>& modelArray, std::vector<l
 void deleteNode(int nrMsg, std::vector<modelFromMaya>& modelArray, std::vector<lightFromMaya>& lightsArray, std::vector<cameraFromMaya>& cameraArray, std::vector<materialFromMaya>& materialArray, char* buffer);
 void updateNodeName(int nrMsg, std::vector<modelFromMaya>& modelArray, std::vector<lightFromMaya>& lightsArray, std::vector<cameraFromMaya>& cameraArray, std::vector<materialFromMaya>& materialArray, char* buffer);
 void updateNodeMatrix(int nrMsg, std::vector<modelFromMaya>& modelArray, std::vector<lightFromMaya>& lightsArray, std::vector<cameraFromMaya>& cameraArray, std::vector<materialFromMaya>& materialArray, char* buffer);
-void updateNodeMaterial(int nrMsg, std::vector<modelFromMaya>& modelArray, std::vector<lightFromMaya>& lightsArray, std::vector<cameraFromMaya>& cameraArray, std::vector<materialFromMaya>& materialArray, char* buffer);
 
-void newMaterial(int nrMsg, std::vector<modelFromMaya>& modelArray, std::vector<lightFromMaya>& lightsArray, std::vector<cameraFromMaya>& cameraArray, std::vector<materialFromMaya>& materialArray, char* buffer);
-void updateMaterial(int nrMsg, std::vector<modelFromMaya>& modelArray, std::vector<lightFromMaya>& lightsArray, std::vector<cameraFromMaya>& cameraArray, std::vector<materialFromMaya>& materialArray, char* buffer);
+//void updateNodeMaterial(int nrMsg, std::vector<modelFromMaya>& modelArray, std::vector<lightFromMaya>& lightsArray, std::vector<cameraFromMaya>& cameraArray, std::vector<materialFromMaya>& materialArray, char* buffer);
 
+//void newMaterial(int nrMsg, std::vector<modelFromMaya>& modelArray, std::vector<lightFromMaya>& lightsArray, std::vector<cameraFromMaya>& cameraArray, std::vector<materialFromMaya>& materialArray, char* buffer);
+//void updateMaterial(int nrMsg, std::vector<modelFromMaya>& modelArray, std::vector<lightFromMaya>& lightsArray, std::vector<cameraFromMaya>& cameraArray, std::vector<materialFromMaya>& materialArray, char* buffer);
 
 
 typedef void(*FnPtr)(int, std::vector<modelFromMaya>&, std::vector<lightFromMaya>&, std::vector<cameraFromMaya>&, std::vector<materialFromMaya>&, char*);
