@@ -284,6 +284,7 @@ void recvFromMaya(std::map<CMDTYPE, FnPtr> functionMap, std::vector<modelFromMay
 	}
 
 
+
 	// get message from Maya ======
 	if (comLib.recv(buffer, nr)) {
 
