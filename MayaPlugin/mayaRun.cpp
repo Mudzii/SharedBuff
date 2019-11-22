@@ -25,10 +25,11 @@ bool initBool = false;
 
 MTimer gTimer;
 float globalTime = 0.0f;
-float timerPeriod = 0.05f;
+float timerPeriod = 0.04f;
 
 // arrays with info in scene
-Vec3 camPosScene;
+MMatrix sceneMatrix; 
+float sceneFOV; 
 MStringArray meshesInScene;
 MStringArray materialsInScene;
 
@@ -111,7 +112,7 @@ void texturePlugAttributeChanged(MNodeMessage::AttributeMessage msg, MPlug& plug
 							NodeInfo mNodeInfo = {};
 							mNodeInfo.msgHeader.nodeType = NODE_TYPE::MATERIAL;
 							mNodeInfo.msgHeader.msgSize  = totalMsgSizeMaterial;
-							mNodeInfo.msgHeader.cmdType  = CMDTYPE::UPDATE_NODE;
+							//mNodeInfo.msgHeader.cmdType  = CMDTYPE::UPDATE_NODE;
 
 							mNodeInfo.msgHeader.nameLen = lambertNode.name().length();
 							memcpy(mNodeInfo.msgHeader.objName, lambertNode.name().asChar(), mNodeInfo.msgHeader.nameLen);
@@ -178,6 +179,8 @@ void materialAttributeChanged(MNodeMessage::AttributeMessage msg, MPlug& plug, M
 
 		MStatus result;
 		//MaterialInfo mMatInfo = {};
+
+		CMDTYPE cmdType = CMDTYPE::DEFAULT; 
 		NodeInfo mNodeInfo = {}; 
 
 		// lambert material variables
@@ -258,8 +261,9 @@ void materialAttributeChanged(MNodeMessage::AttributeMessage msg, MPlug& plug, M
 					if (materialsInScene[i] == lambertShader.name()) {
 
 						index = i;
+						cmdType = CMDTYPE::UPDATE_NODE;
 						//MStreamUtils::stdOutStream() << "Material already exists " << endl;
-						mNodeInfo.msgHeader.cmdType = CMDTYPE::UPDATE_NODE;
+						//mNodeInfo.msgHeader.cmdType = CMDTYPE::UPDATE_NODE;
 						break;
 					}
 				}
@@ -268,7 +272,7 @@ void materialAttributeChanged(MNodeMessage::AttributeMessage msg, MPlug& plug, M
 
 					//MStreamUtils::stdOutStream() << "Material didn't exist. Adding " << endl;
 					materialsInScene.append(lambertShader.name());
-					mNodeInfo.msgHeader.cmdType = CMDTYPE::NEW_NODE;
+					cmdType = CMDTYPE::NEW_NODE;
 				}
 
 
@@ -300,12 +304,12 @@ void materialAttributeChanged(MNodeMessage::AttributeMessage msg, MPlug& plug, M
 
 				}
 
-				if (mNodeInfo.msgHeader.cmdType == CMDTYPE::NEW_NODE) {
+				if (cmdType == CMDTYPE::NEW_NODE) {
 
 					newNodeInfo.push_back(mNodeInfo);
 				}
 
-				else if (mNodeInfo.msgHeader.cmdType == CMDTYPE::UPDATE_NODE) {
+				else if (cmdType == CMDTYPE::UPDATE_NODE) {
 
 					// check if msg exists. If so update. Otherwise add to msg vector
 					bool msgExists = false;
@@ -382,6 +386,7 @@ void GetMeshInfo(MFnMesh &mesh) {
 
 	MStatus result;
 	//MeshInfo mMeshInfo = {};
+	CMDTYPE cmdType = CMDTYPE::DEFAULT;
 	NodeInfo mNodeInfo = {}; 
 
 	Color mColor = { 255, 255, 255, 255 };
@@ -530,16 +535,16 @@ void GetMeshInfo(MFnMesh &mesh) {
 	int index = findMesh(mesh.name());
 
 	if (index >= 0)
-		mNodeInfo.msgHeader.cmdType = CMDTYPE::UPDATE_NODE;
+		cmdType = CMDTYPE::UPDATE_NODE;
 
 	else {
 		meshesInScene.append(mesh.name());
-		mNodeInfo.msgHeader.cmdType = CMDTYPE::NEW_NODE;
+		cmdType = CMDTYPE::NEW_NODE;
 		index = meshesInScene.length() - 1;
 
 	}
 	// if new mesh, get material connected to the new mesh
-	if (mNodeInfo.msgHeader.cmdType == CMDTYPE::NEW_NODE) {
+	if (cmdType == CMDTYPE::NEW_NODE) {
 
 		// check if material already exists in scene, otherwise add
 		int matIndex = -1;
@@ -610,7 +615,7 @@ void GetMeshInfo(MFnMesh &mesh) {
 	mNodeInfo.mesh.meshName	= mesh.name();
 	
 	// get transform matrix for new mesh
-	if (mNodeInfo.msgHeader.cmdType == CMDTYPE::NEW_NODE) {
+	if (cmdType == CMDTYPE::NEW_NODE) {
 
 		MFnTransform parentTransform(mesh.parent(0), &result);
 		MMatrix transformationMatrix;
@@ -639,7 +644,7 @@ void GetMeshInfo(MFnMesh &mesh) {
 	mNodeInfo.msgHeader.nameLen  = mesh.name().length();
 	memcpy(mNodeInfo.msgHeader.objName, mesh.name().asChar(), mNodeInfo.msgHeader.nameLen);
 
-	if (mNodeInfo.msgHeader.cmdType == CMDTYPE::NEW_NODE) {
+	if (cmdType == CMDTYPE::NEW_NODE) {
 
 		totalMsgSize = (sizeof(MsgHeader) + sizeof(Mesh) + (sizeof(float) * mNodeInfo.mesh.meshData.vtxCount * 3) + (sizeof(float) * mNodeInfo.mesh.meshData.normalCount * 3) + (sizeof(float) * mNodeInfo.mesh.meshData.UVcount) + sizeof(Material) + sizeof(Matrix));
 		mNodeInfo.msgHeader.msgSize = totalMsgSize;
@@ -656,7 +661,7 @@ void GetMeshInfo(MFnMesh &mesh) {
 		
 	}
 
-	else if (mNodeInfo.msgHeader.cmdType == CMDTYPE::UPDATE_NODE) {
+	else if (cmdType == CMDTYPE::UPDATE_NODE) {
 		
 		totalMsgSize = (sizeof(MsgHeader) + sizeof(Mesh) + (sizeof(float) * mNodeInfo.mesh.meshData.vtxCount * 3) + (sizeof(float) * mNodeInfo.mesh.meshData.normalCount * 3) + (sizeof(float) * mNodeInfo.mesh.meshData.UVcount));
 		mNodeInfo.msgHeader.msgSize  = totalMsgSize;
@@ -826,7 +831,6 @@ void GeometryUpdate(MFnMesh &mesh) {
 		
 		mNodeInfo.msgHeader.msgSize  = totalMsgSize;
 		mNodeInfo.msgHeader.nodeType = NODE_TYPE::MESH;
-		mNodeInfo.msgHeader.cmdType  = CMDTYPE::UPDATE_NODE;
 		mNodeInfo.msgHeader.nameLen  = mesh.name().length();
 		memcpy(mNodeInfo.msgHeader.objName, mesh.name().asChar(), mNodeInfo.msgHeader.nameLen);
 
@@ -1006,7 +1010,6 @@ void MaterialChanged(MFnMesh &mesh) {
 		
 		//size_t totalMsgSize = (sizeof(MsgHeader) + sizeof(Mesh) + sizeof(Material));
 
-		mNodeInfo.msgHeader.cmdType  = CMDTYPE::UPDATE_NODE;
 		mNodeInfo.msgHeader.msgSize  = totalMsgSizeMatAndMesh;
 		mNodeInfo.msgHeader.nodeType = NODE_TYPE::MESH_MATERIAL;
 
@@ -1218,7 +1221,6 @@ void meshWorldMatrixChanged(MObject &transformNode, MDagMessage::MatrixModifiedF
 			//MsgHeader msgHeader = {}; 
 			mMatrixInfo.msgHeader.nodeType = NODE_TYPE::MESH;
 			mMatrixInfo.msgHeader.msgSize = totalMsgSizeMatrix;
-			mMatrixInfo.msgHeader.cmdType = CMDTYPE::UPDATE_MATRIX;
 			mMatrixInfo.msgHeader.nameLen = meshNode.name().length();
 			memcpy(mMatrixInfo.msgHeader.objName, meshNode.name().asChar(), mMatrixInfo.msgHeader.nameLen);
 
@@ -1457,6 +1459,7 @@ void activeCamera(const MString &panelName, void* cliendData) {
 
 	
 	double FOV = 0; // = cameraNode.verticalFieldOfView();
+
 	//get fov or zoom depending on ortho/persp
 	if (isOrtographic) {
 		double ortoWidth = cameraView.orthoWidth(&status);
@@ -1473,15 +1476,30 @@ void activeCamera(const MString &panelName, void* cliendData) {
 		FOV = FOV * (180.0 / 3.141592653589793238463);
 	}
 
+	bool updateCam = false; 
+	if (isOrtographic) {
+		if (FOV != sceneFOV)
+			updateCam = true;
 
-	//bool updateCam = false;
-	//if (!isOrtographic && (camPosScene.x == camPos.x) && (camPosScene.y == camPos.y) && (camPosScene.z == camPos.z))
-	//	updateCam = false;
+		sceneFOV = FOV;
 
-	//else
-	//	updateCam = true;
+	}
 
-	//if (updateCam) {
+	else {
+		
+
+		MMatrix camMat = camDag.inclusiveMatrix();
+		if (camMat != sceneMatrix)
+			updateCam = true;
+
+		sceneMatrix = camMat;
+	}
+
+	if (updateCam) {
+
+		MStreamUtils::stdOutStream() << "Update camera!" << "\n";
+
+
 		//Camera cameraInfo = {};
 		Camera camData; 
 		MsgHeader msgHeader;
@@ -1500,7 +1518,6 @@ void activeCamera(const MString &panelName, void* cliendData) {
 		msgHeader.nameLen = objName.length();
 		msgHeader.msgSize = totalMsgSizeCamera;
 		msgHeader.nodeType = NODE_TYPE::CAMERA;
-		msgHeader.cmdType = CMDTYPE::UPDATE_NODE;
 		memcpy(msgHeader.objName, objName.c_str(), objName.length());
 
 		/* 
@@ -1526,9 +1543,11 @@ void activeCamera(const MString &panelName, void* cliendData) {
 			//MStreamUtils::stdOutStream() << "activeCamera: Message sent" << "\n";
 		}
 
+		sceneFOV = FOV; 
 		delete[]msg;
-		camPosScene = camData.pos;
-	//}
+		
+	}
+	
 	
 
 }
@@ -1807,7 +1826,6 @@ void nodeNameChanged(MObject& node, const MString& str, void* clientData) {
 
 		mNodeRenamed.msgHeader.nameLen = oldName.length();
 		mNodeRenamed.msgHeader.msgSize = totalMsgSizeRenamed;
-		mNodeRenamed.msgHeader.cmdType = CMDTYPE::UPDATE_NAME;
 		memcpy(mNodeRenamed.msgHeader.objName, oldName.c_str(), mNodeRenamed.msgHeader.nameLen);
 
 		mNodeRenamed.renamedInfo.nodeNameLen = newName.length();
@@ -1957,7 +1975,6 @@ void nodeDeleted(MObject &node, void *clientData) {
 
 			deleteInfo.msgHeader.msgSize  = totalMsgSize;
 			deleteInfo.msgHeader.nodeType = NODE_TYPE::MESH;
-			deleteInfo.msgHeader.cmdType  = CMDTYPE::DELETE_NODE;
 			deleteInfo.msgHeader.nameLen  = meshName.length();
 			memcpy(deleteInfo.msgHeader.objName, meshName.c_str(), deleteInfo.msgHeader.nameLen);
 
@@ -1993,7 +2010,6 @@ void nodeDeleted(MObject &node, void *clientData) {
 			deleteInfo.msgHeader.msgSize  = totalMsgSize;
 			deleteInfo.msgHeader.nameLen  = matName.length();
 			deleteInfo.msgHeader.nodeType = NODE_TYPE::MATERIAL;
-			deleteInfo.msgHeader.cmdType = CMDTYPE::DELETE_NODE;
 			memcpy(deleteInfo.msgHeader.objName, matName.c_str(), deleteInfo.msgHeader.nameLen);
 
 			deleteInfo.nodeIndex = index;
@@ -2105,6 +2121,9 @@ void timerCallback(float elapsedTime, float lastTime, void* clientData) {
 	int newNewNodeMsgLen = newNodeInfo.size(); 
 	if (newNewNodeMsgLen > 0) {
 
+
+		MStreamUtils::stdOutStream() << " --------------- \n";
+
 		messageType msgType = { CMDTYPE::NEW_NODE, newNewNodeMsgLen};
 		size_t totalMsgSize = sizeof(messageType);
 		for (int j = 0; j < newNodeInfo.size(); j++) 
@@ -2198,6 +2217,9 @@ void timerCallback(float elapsedTime, float lastTime, void* clientData) {
 	// send all node update messages
 	int updateNodeMsgLen = updateNodeInfo.size(); 
 	if (updateNodeMsgLen > 0) {
+
+		MStreamUtils::stdOutStream() << " --------------- \n";
+
 
 		messageType msgType = { CMDTYPE::UPDATE_NODE, updateNodeMsgLen };
 		size_t totalMsgSize = sizeof(messageType);

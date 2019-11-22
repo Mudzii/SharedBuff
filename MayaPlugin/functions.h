@@ -64,7 +64,7 @@ enum CMDTYPE {
 
 // header for message that are sent
 struct MsgHeader {
-	CMDTYPE	  cmdType;
+	//CMDTYPE	  cmdType;
 	NODE_TYPE nodeType;
 	char objName[MAX_CHAR_LEN];
 	int msgSize;

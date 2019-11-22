@@ -79,6 +79,7 @@ void addNode(int nrMsg, std::vector<modelFromMaya>& modelArray, std::vector<ligh
 			int modelindex = findMesh(modelArray, objectName);
 			if (modelindex == -1) {
 
+				
 				// get mesh info send over
 				msgMesh meshInfo = {};
 				memcpy((char*)&meshInfo, buffer + sizeof(messageType) + sizeof(MsgHeader) + totalOffset, sizeof(msgMesh));
@@ -184,9 +185,8 @@ void addNode(int nrMsg, std::vector<modelFromMaya>& modelArray, std::vector<ligh
 			int materialIndex = findMaterial(materialArray, objectName);
 			if (materialIndex == -1) {
 
-				std::cout << "Add material " << objectName << std::endl; 
-
-
+				
+				
 				msgMaterial materialInfo = {};
 				memcpy((char*)&materialInfo, buffer + sizeof(messageType) + sizeof(MsgHeader) + totalOffset, sizeof(msgMaterial));
 
@@ -219,6 +219,7 @@ void addNode(int nrMsg, std::vector<modelFromMaya>& modelArray, std::vector<ligh
 				for (int i = 0; i < modelArray.size(); i++) {
 					if (modelArray[i].materialName == matName) {
 
+						
 						// reaload mesh & model
 						rlLoadMesh(&modelArray[i].mesh, false);
 						modelArray[i].model = LoadModelFromMesh(modelArray[i].mesh);
@@ -293,8 +294,9 @@ void updateNode(int nrMsg, std::vector<modelFromMaya>& modelArray, std::vector<l
 	std::cout << std::endl;
 	std::cout << "=======================================" << std::endl;
 	std::cout << "UPDATE NODE FUNCTION" << std::endl;
+	std::cout << "Nr of msg " << nrMsg << std::endl;
 	*/
-	
+
 
 	int matOffset		  = 0;
 	int meshMatOffset	  = 0; 
@@ -302,8 +304,6 @@ void updateNode(int nrMsg, std::vector<modelFromMaya>& modelArray, std::vector<l
 
 	for (int i = 0; i < nrMsg; i++) {
 
-		//std::cout <<  std::endl;
-		//std::cout << "---------------" << std::endl;
 
 		size_t totalOffset = meshOffsetSize + ((sizeof(MsgHeader) + sizeof(msgMaterial)) * matOffset) + ((sizeof(MsgHeader) + sizeof(msgMesh) + sizeof(msgMaterial)) * meshMatOffset);
 
@@ -319,7 +319,6 @@ void updateNode(int nrMsg, std::vector<modelFromMaya>& modelArray, std::vector<l
 			int modelIndex = findMesh(modelArray, objectName);
 			if (modelIndex >= 0) {
 
-				//std::cout << "Mesh exists. Updating  " << objectName << std::endl;
 
 				// get mesh info from buffer
 				msgMesh meshInfo = {};
@@ -403,6 +402,8 @@ void updateNode(int nrMsg, std::vector<modelFromMaya>& modelArray, std::vector<l
 			int matIndex = findMaterial(materialArray, objectName);
 			if (matIndex >= 0) {
 
+				
+
 				msgMaterial materialInfo = {};
 				memcpy((char*)&materialInfo, buffer + sizeof(messageType) + sizeof(MsgHeader) + totalOffset, sizeof(msgMaterial));
 
@@ -428,9 +429,7 @@ void updateNode(int nrMsg, std::vector<modelFromMaya>& modelArray, std::vector<l
 				for (int i = 0; i < modelArray.size(); i++) {
 					if (modelArray[i].materialName == materialName) {
 
-						//std::cout << "Mesh with material found " << modelArray[i].name << std::endl;
-
-
+						
 						// reaload mesh & model
 						rlLoadMesh(&modelArray[i].mesh, false);
 						modelArray[i].model = LoadModelFromMesh(modelArray[i].mesh);
@@ -463,10 +462,10 @@ void updateNode(int nrMsg, std::vector<modelFromMaya>& modelArray, std::vector<l
 
 		else if (msgHeader.nodeType == NODE_TYPE::MESH_MATERIAL) {
 
-			std::cout << "Update material for " << objectName << std::endl;
 
 			int modelIndex = findMesh(modelArray, objectName);
 			if (modelIndex >= 0) {
+
 
 				msgMesh meshInfo = {};
 				memcpy((char*)&meshInfo, buffer + sizeof(messageType) + sizeof(MsgHeader) + totalOffset, sizeof(msgMesh));
@@ -480,12 +479,12 @@ void updateNode(int nrMsg, std::vector<modelFromMaya>& modelArray, std::vector<l
 				std::string texturePath = materialInfo.fileTextureName;
 				texturePath = texturePath.substr(0, materialInfo.textureNameLen);
 
+			
 
 				int materialIndex = findMaterial(materialArray, materialName);
 				if (materialIndex == -1) {
 
-					std::cout << "Material not found... " << objectName << std::endl;
-
+					
 
 					materialFromMaya tempMaterial = {}; 
 					tempMaterial.texturePath  = texturePath; 
@@ -507,6 +506,8 @@ void updateNode(int nrMsg, std::vector<modelFromMaya>& modelArray, std::vector<l
 
 				}
 				
+				
+
 				// reload model and shader
 				rlLoadMesh(&modelArray[modelIndex].mesh, false);
 				modelArray[modelIndex].model = LoadModelFromMesh(modelArray[modelIndex].mesh);
@@ -515,7 +516,7 @@ void updateNode(int nrMsg, std::vector<modelFromMaya>& modelArray, std::vector<l
 
 				materialArray[modelIndex].texturePath  = texturePath;
 				materialArray[modelIndex].materialName = materialName;
-				materialArray[modelIndex].type		   = materialInfo.type;
+				materialArray[modelIndex].type		   = materialInfo.type;			
 
 				/* 
 				std::cout << "Update material for " << objectName << std::endl;
@@ -527,24 +528,17 @@ void updateNode(int nrMsg, std::vector<modelFromMaya>& modelArray, std::vector<l
 
 				if (materialArray[modelIndex].type == 1 && texturePath.length() > 0) {
 					
-					//std::cout << "material has texture " << texturePath << std::endl; 
-
 					materialInfo.color = { 255,255,255,255 };
-					
 					materialArray[materialIndex].matTexture = LoadTexture(texturePath.c_str());
 					modelArray[modelIndex].model.material.maps[MAP_DIFFUSE].texture = materialArray[materialIndex].matTexture;
 				
 				}
 
 				// update material and mesh
-				materialArray[modelIndex].matColor	= materialInfo.color;
-				modelArray[modelIndex].color		= materialInfo.color; 
-				modelArray[modelIndex].materialName = materialName; 
-				
-
-
-		
-
+				materialArray[materialIndex].matColor = materialInfo.color;
+				modelArray[modelIndex].color		  = materialInfo.color; 
+				modelArray[modelIndex].materialName   = materialName; 
+				 
 			}
 
 

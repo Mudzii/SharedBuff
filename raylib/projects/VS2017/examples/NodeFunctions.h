@@ -44,7 +44,7 @@ enum CMDTYPE {
 };
 
 struct MsgHeader {
-	CMDTYPE   cmdType;
+	//CMDTYPE   cmdType;
 	NODE_TYPE nodeType;
 	char objName[64];
 	int msgSize;
