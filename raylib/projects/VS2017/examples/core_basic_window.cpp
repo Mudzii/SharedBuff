@@ -158,6 +158,7 @@ int main() {
 		ClearBackground(RAYWHITE);
 
 
+
 		/* 
 		if (IsKeyPressed(KEY_D))
 		{
