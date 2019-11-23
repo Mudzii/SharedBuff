@@ -23,6 +23,7 @@ MStatus status = MS::kSuccess;
 MCallbackIdArray callbackIdArray;
 bool initBool = false;
 
+
 MTimer gTimer;
 float globalTime = 0.0f;
 float timerPeriod = 0.04f;
