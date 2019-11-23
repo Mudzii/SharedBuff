@@ -145,7 +145,6 @@ int main() {
 		
 		BeginDrawing();
 
-
 		// set the camera
 		if (cameraArray.size() > 0) {
 
