@@ -203,9 +203,15 @@ void materialAttributeChanged(MNodeMessage::AttributeMessage msg, MPlug& plug, M
 				MColor transpClr;
 				transpAttr = lambertShader.findPlug("transparencyR");
 				transpAttr.getValue(transpClr.r);
+				transpAttr = lambertShader.findPlug("transparencyG");
+				
 				transparency = transpClr.r;
+				transparency = 1.0 - transparency;
+				//MStreamUtils::stdOutStream() << "transparency2: " << transparency << endl;
+
 			}
 			*/
+			
 
 			// get material color through color plugs
 			MPlug colorAttr;
@@ -223,7 +229,7 @@ void materialAttributeChanged(MNodeMessage::AttributeMessage msg, MPlug& plug, M
 			//int alpha = transparency * 255;
 			mColor = { (unsigned char)red, (unsigned char)green, (unsigned char)blue, (unsigned char)255 };
 
-
+			
 			// to check for textures, check if color plug is dest for another plug
 			colorPlug.connectedTo(textureConnections, true, false);
 			if (textureConnections.length() > 0) {
@@ -468,7 +474,8 @@ void GetMeshInfo(MFnMesh &mesh) {
 					colorPlug = lambertShader.findPlug("color", &result);
 					if (result) {
 
-						/* 
+						
+						/*
 						// get material transperency
 						MPlug transp = lambertShader.findPlug("transparency", &result);
 						if (result) {
@@ -476,9 +483,12 @@ void GetMeshInfo(MFnMesh &mesh) {
 							MColor transpClr;
 							transpAttr = lambertShader.findPlug("transparencyR");
 							transpAttr.getValue(transpClr.r);
+							
 							transparency = transpClr.r;
+							transparency = 1.0 - transparency;
 						}
 						*/
+						
 
 						// get material color
 						MPlug colorAttr;
@@ -495,6 +505,8 @@ void GetMeshInfo(MFnMesh &mesh) {
 						int green = color.g * 255;
 						//int alpha = transparency * 255;
 						mColor = { (unsigned char)red, (unsigned char)green, (unsigned char)blue, (unsigned char)255 };
+
+						
 
 						// to check for textures, check if color plug is dest for another plug
 						colorPlug.connectedTo(textureConnections, true, false);
@@ -934,8 +946,11 @@ void MaterialChanged(MFnMesh &mesh) {
 								MColor transpClr;
 								transpAttr = lambertShader.findPlug("transparencyR");
 								transpAttr.getValue(transpClr.r);
+
 								transparency = transpClr.r;
+								transparency = 1.0 - transparency;
 							}
+						
 							*/
 
 							// get the color 
@@ -953,6 +968,7 @@ void MaterialChanged(MFnMesh &mesh) {
 							int green = color.g * 255;
 							//int alpha = transparency * 255;
 							mColor = { (unsigned char)red, (unsigned char)green, (unsigned char)blue, (unsigned char)255 };
+
 
 							// to check for textures, check if color plug is dest for another plug
 							colorPlug.connectedTo(textureConnections, true, false);
@@ -1778,7 +1794,7 @@ void nodeDeleted(MObject &node, void *clientData) {
 
 	else if (node.hasFn(MFn::kLambert)) {
 
-		MStreamUtils::stdOutStream() << "MATERIAL DELETED " << endl;
+		//MStreamUtils::stdOutStream() << "MATERIAL DELETED " << endl;
 
 		MFnDependencyNode materialNode(node);
 		std::string matName = materialNode.name().asChar();
@@ -1909,7 +1925,7 @@ void timerCallback(float elapsedTime, float lastTime, void* clientData) {
 	if (newNewNodeMsgLen > 0) {
 
 
-		MStreamUtils::stdOutStream() << " --------------- \n";
+		//MStreamUtils::stdOutStream() << " --------------- \n";
 
 		messageType msgType = { CMDTYPE::NEW_NODE, newNewNodeMsgLen};
 		size_t totalMsgSize = sizeof(messageType);
@@ -1926,7 +1942,7 @@ void timerCallback(float elapsedTime, float lastTime, void* clientData) {
 		size_t meshOffsetSize = 0; 
 		for (int i = newNodeInfo.size() - 1; i >= 0; i--) {
 
-			MStreamUtils::stdOutStream() << "New node " << newNodeInfo[i].msgHeader.objName << "\n";
+			//MStreamUtils::stdOutStream() << "New node " << newNodeInfo[i].msgHeader.objName << "\n";
 
 
 
@@ -1966,7 +1982,7 @@ void timerCallback(float elapsedTime, float lastTime, void* clientData) {
 
 		// send it
 		if (comLib.send(msgChar, totalMsgSize)) {
-			MStreamUtils::stdOutStream() << "newNode: Message sent" << "\n";
+			//MStreamUtils::stdOutStream() << "newNode: Message sent" << "\n";
 		}
 
 		delete[] msgChar;
@@ -2005,7 +2021,7 @@ void timerCallback(float elapsedTime, float lastTime, void* clientData) {
 	int updateNodeMsgLen = updateNodeInfo.size(); 
 	if (updateNodeMsgLen > 0) {
 
-		MStreamUtils::stdOutStream() << " --------------- \n";
+		//MStreamUtils::stdOutStream() << " --------------- \n";
 
 
 		messageType msgType = { CMDTYPE::UPDATE_NODE, updateNodeMsgLen };
@@ -2021,7 +2037,7 @@ void timerCallback(float elapsedTime, float lastTime, void* clientData) {
 		size_t meshOffsetSize = 0; 
 		for (int i = updateNodeInfo.size() - 1; i >= 0; i--) {
 
-			MStreamUtils::stdOutStream() << "Update node " << updateNodeInfo[i].msgHeader.objName << "\n";
+			//MStreamUtils::stdOutStream() << "Update node " << updateNodeInfo[i].msgHeader.objName << "\n";
 
 
 			size_t currentOffset = (meshOffsetSize) + (totalMsgSizeMaterial * matOffset) + (totalMsgSizeMatAndMesh * meshMatOffset);
@@ -2070,7 +2086,7 @@ void timerCallback(float elapsedTime, float lastTime, void* clientData) {
 
 		// send it
 		if (comLib.send(msgChar, totalMsgSize)) {
-			MStreamUtils::stdOutStream() << "updateNode: Message sent" << "\n";
+			//MStreamUtils::stdOutStream() << "updateNode: Message sent" << "\n";
 		}
 
 		delete[] msgChar;
@@ -2081,8 +2097,8 @@ void timerCallback(float elapsedTime, float lastTime, void* clientData) {
 	int deleteMsgLen = nodeDeleteInfoToSend.size(); 
 	if (deleteMsgLen > 0) {
 
-		MStreamUtils::stdOutStream() << "-------------------------\n";
-		MStreamUtils::stdOutStream() << "deleteMsgLen: " << deleteMsgLen << "\n";
+		//MStreamUtils::stdOutStream() << "-------------------------\n";
+		//MStreamUtils::stdOutStream() << "deleteMsgLen: " << deleteMsgLen << "\n";
 
 		messageType msgType = { CMDTYPE::DELETE_NODE, deleteMsgLen };
 		size_t totalMsgSize = sizeof(messageType) + (sizeof(MsgHeader)) * deleteMsgLen;
@@ -2103,7 +2119,7 @@ void timerCallback(float elapsedTime, float lastTime, void* clientData) {
 
 
 		if (comLib.send(msgChar, totalMsgSize)) {
-			MStreamUtils::stdOutStream() << "nodeDeleted: Message sent" << "\n";
+			//MStreamUtils::stdOutStream() << "nodeDeleted: Message sent" << "\n";
 		}
 		
 		delete[] msgChar; 

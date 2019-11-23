@@ -402,8 +402,7 @@ void updateNode(int nrMsg, std::vector<modelFromMaya>& modelArray, std::vector<l
 			int matIndex = findMaterial(materialArray, objectName);
 			if (matIndex >= 0) {
 
-				
-
+		
 				msgMaterial materialInfo = {};
 				memcpy((char*)&materialInfo, buffer + sizeof(messageType) + sizeof(MsgHeader) + totalOffset, sizeof(msgMaterial));
 
@@ -425,6 +424,7 @@ void updateNode(int nrMsg, std::vector<modelFromMaya>& modelArray, std::vector<l
 				materialArray[matIndex].type		 = materialInfo.type; 
 				materialArray[matIndex].matColor	 = materialInfo.color;
 			
+
 				// check if objects have material and update them
 				for (int i = 0; i < modelArray.size(); i++) {
 					if (modelArray[i].materialName == materialName) {
@@ -514,9 +514,9 @@ void updateNode(int nrMsg, std::vector<modelFromMaya>& modelArray, std::vector<l
 				modelArray[modelIndex].model.material.shader = materialArray[materialIndex].matShader;
 
 
-				materialArray[modelIndex].texturePath  = texturePath;
-				materialArray[modelIndex].materialName = materialName;
-				materialArray[modelIndex].type		   = materialInfo.type;			
+				materialArray[materialIndex].texturePath  = texturePath;
+				materialArray[materialIndex].materialName = materialName;
+				materialArray[materialIndex].type		  = materialInfo.type;
 
 				/* 
 				std::cout << "Update material for " << objectName << std::endl;
@@ -526,7 +526,7 @@ void updateNode(int nrMsg, std::vector<modelFromMaya>& modelArray, std::vector<l
 				std::cout << "materialArray[materialIndex].type " << materialArray[materialIndex].type << std::endl;
 				*/
 
-				if (materialArray[modelIndex].type == 1 && texturePath.length() > 0) {
+				if (materialArray[materialIndex].type == 1 && texturePath.length() > 0) {
 					
 					materialInfo.color = { 255,255,255,255 };
 					materialArray[materialIndex].matTexture = LoadTexture(texturePath.c_str());
@@ -536,6 +536,7 @@ void updateNode(int nrMsg, std::vector<modelFromMaya>& modelArray, std::vector<l
 
 				// update material and mesh
 				materialArray[materialIndex].matColor = materialInfo.color;
+
 				modelArray[modelIndex].color		  = materialInfo.color; 
 				modelArray[modelIndex].materialName   = materialName; 
 				 

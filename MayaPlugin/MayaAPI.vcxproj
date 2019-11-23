@@ -76,11 +76,12 @@
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <LinkIncremental>true</LinkIncremental>
     <TargetExt>.mll</TargetExt>
-    <PreBuildEventUseInBuild>true</PreBuildEventUseInBuild>
+    <PreBuildEventUseInBuild>false</PreBuildEventUseInBuild>
     <PreLinkEventUseInBuild>
     </PreLinkEventUseInBuild>
     <IncludePath>C:\Users\Mudzi\source\repos\SharedBuff\MayaPlugin\Lib;$(IncludePath)</IncludePath>
     <LibraryPath>C:\Users\Mudzi\source\repos\SharedBuff\MayaPlugin\Lib;$(LibraryPath)</LibraryPath>
+    <PostBuildEventUseInBuild>false</PostBuildEventUseInBuild>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
     <LinkIncremental>false</LinkIncremental>
